@@ -31,20 +31,75 @@ _date_blank = Games.get('Date').isna() | (Games.get('Date').astype(str).str.stri
 Games.loc[_is_2026 & _date_blank, 'Date'] = 'TBA'
 
 # Normalize known abbreviation collisions so team colors stay consistent.
-TEAM_COLOR_OVERRIDES = {
-    'LAC': ('#0080C6', '#FFC20E'),
-    'LAR': ('#003594', '#FFA300'),
-    'LV':  ('#000000', '#A5ACAF'),
-    'SF':  ('#AA0000', '#B3995D'),
-    'SEA': ('#002244', '#69BE28'),
-}
-for _abb, (_c1, _c2) in TEAM_COLOR_OVERRIDES.items():
-    _mask = Team_Info['Abb'].astype(str).str.strip().str.upper() == _abb
-    Team_Info.loc[_mask, 'Color1'] = _c1
-    Team_Info.loc[_mask, 'Color2'] = _c2
 
 # Keep a source copy; we will scope Games by selected season for the full app.
 ALL_GAMES = Games.copy()
+
+def _clean_text(v):
+    s = str(v or '').strip()
+    return '' if s.lower() in ('', 'nan', 'none') else s
+
+def _safe_float(v):
+    try:
+        f = float(v)
+        return None if math.isnan(f) else f
+    except Exception:
+        return None
+
+# Canonical venue/geo source now comes from Other_Locations.
+TEAM_STAD_MAP = {}
+TEAM_CITY_MAP = {}
+TEAM_LAT_MAP = {}
+TEAM_LON_MAP = {}
+TEAM_TZ_MAP = {}
+INTL_DATA = {}
+NEUTRAL_LOCATION_SET = set()
+
+_known_teams = set(Team_Info['Team'].astype(str).str.strip())
+_known_abbs = set(Team_Info['Abb'].astype(str).str.strip()) if 'Abb' in Team_Info.columns else set()
+
+_ol_by_team = {}
+_ol_by_abb = {}
+_ol_by_loc = {}
+if Other_Locations is not None and len(Other_Locations) > 0:
+    for _, r in Other_Locations.iterrows():
+        loc = _clean_text(r.get('Location', ''))
+        stad = _clean_text(r.get('Stadium Name', ''))
+        lat = _safe_float(r.get('Lattitude', r.get('Latitude', None)))
+        lon = _safe_float(r.get('Longitude', None))
+        tz = _clean_text(r.get('Time Zone', ''))
+        team_hint = _clean_text(
+            r.get('Team', r.get('Franchise', r.get('Club', r.get('Home', ''))))
+        )
+        abb_hint = _clean_text(
+            r.get('Abb', r.get('Abbreviation', r.get('Abv', '')))
+        )
+        entry = {'city': loc, 'stad': stad, 'lat': lat, 'lon': lon, 'tz': tz}
+
+        if team_hint:
+            _ol_by_team[team_hint] = entry
+        if abb_hint:
+            _ol_by_abb[abb_hint] = entry
+        if loc:
+            _ol_by_loc[loc] = entry
+            INTL_DATA[loc] = entry
+
+        associated = (team_hint in _known_teams) or (team_hint in _known_abbs) or (abb_hint in _known_abbs)
+        if loc and not associated:
+            NEUTRAL_LOCATION_SET.add(loc)
+
+for _, tr in Team_Info.iterrows():
+    t = _clean_text(tr.get('Team', ''))
+    if not t:
+        continue
+    abb = _clean_text(tr.get('Abb', ''))
+    loc_hint = _clean_text(tr.get('Location', ''))
+    picked = _ol_by_team.get(t) or _ol_by_abb.get(abb) or _ol_by_loc.get(loc_hint) or {}
+    TEAM_STAD_MAP[t] = _clean_text(picked.get('stad', ''))
+    TEAM_CITY_MAP[t] = _clean_text(picked.get('city', loc_hint))
+    TEAM_LAT_MAP[t] = picked.get('lat', None)
+    TEAM_LON_MAP[t] = picked.get('lon', None)
+    TEAM_TZ_MAP[t] = _clean_text(picked.get('tz', ''))
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
 st.html("""
@@ -267,10 +322,10 @@ def is_snf_game(row):
 def get_forced_venue(row):
     game_type = str(row.get('Game Type', '') or '').strip().lower()
     if 'super bowl' in game_type:
-        return ("Levi's Stadium", 'Santa Clara, California')
+        return ("SoFi Stadium", 'Inglewood, California')
     dt = pd.to_datetime(row.get('Date', None), errors='coerce')
     if pd.notna(dt) and dt.month == 2 and dt.day == 14:
-        return ("Levi's Stadium", 'Santa Clara, California')
+        return ("SoFi Stadium", 'Inglewood, California')
     return None
 
 def get_day_type(row):
@@ -284,9 +339,6 @@ def get_day_type(row):
         return 'sunday'
 
 def build_cells(Games, Team_Info, Other_Locations):
-    intl_locs = set()
-    if Other_Locations is not None and len(Other_Locations) > 0:
-        intl_locs = set(Other_Locations['Location'].dropna().astype(str))
     abb_lookup = dict(zip(Team_Info['Team'], Team_Info['Abb']))
     cells = {}
     for _, g in Games.iterrows():
@@ -298,7 +350,9 @@ def build_cells(Games, Team_Info, Other_Locations):
             continue
         home     = g['Home']
         away     = g['Away']
-        is_intl  = str(g.get('Location', '') or '') in intl_locs
+        game_loc = _clean_text(g.get('Location', ''))
+        intl_val = g.get('International', False)
+        is_intl  = bool(intl_val) if not isinstance(intl_val, float) else False
         day_type = get_day_type(g)
         home_abb = abb_lookup.get(home, str(home)[:3].upper())
         away_abb = abb_lookup.get(away, str(away)[:3].upper())
@@ -446,29 +500,17 @@ with tabs[0]:
         t: (str(l or '').strip().strip('_').strip('`') or TBD_LOGO)
         for t, l in zip(Team_Info['Team'], Team_Info['Logo'])
     }
-    lv_stad_map = {}
-    lv_city_map = {}
+    lv_stad_map = dict(TEAM_STAD_MAP)
+    lv_city_map = dict(TEAM_CITY_MAP)
     lv_clr_map = {}
     for _, row in Team_Info.iterrows():
         t = row['Team']
-        lv_stad_map[t] = str(row.get('Stadium Name', '') or '').strip()
-        if lv_stad_map[t].lower() in ('nan', 'none', ''):
-            lv_stad_map[t] = ''
-        lv_city_map[t] = str(row.get('Location', '') or '').strip()
-        if lv_city_map[t].lower() in ('nan', 'none', ''):
-            lv_city_map[t] = ''
         c = str(row.get('Color1', '') or '').strip().strip('`').strip("'\"")
         if not c or c.lower() in ('nan', 'none'):
             c = '#c8102e'
         lv_clr_map[t] = c if c.startswith('#') else f'#{c}'
-    lv_intl_locs = set()
-    lv_intl_stad = {}
-    if Other_Locations is not None and len(Other_Locations) > 0:
-        lv_intl_locs = set(Other_Locations['Location'].dropna().astype(str))
-        for _, row in Other_Locations.iterrows():
-            loc = str(row['Location']).strip()
-            stad = str(row.get('Stadium Name', '') or '').strip()
-            lv_intl_stad[loc] = '' if stad.lower() in ('nan', 'none', '') else stad
+    lv_intl_locs = set(NEUTRAL_LOCATION_SET)
+    lv_intl_stad = {k: _clean_text(v.get('stad', '')) for k, v in INTL_DATA.items()}
 
     with sub_tabs2[0]:
         try:
@@ -540,7 +582,8 @@ with tabs[0]:
                 day_fg = DAY_CFG.get(dk, DAY_CFG['sunday'])['fg']
 
                 loc = str(g.get('Location', '') or '').strip()
-                is_intl = bool(loc and loc in lv_intl_locs)
+                intl_val = g.get('International', False)
+                is_intl = bool(intl_val) if not isinstance(intl_val, float) else False
                 venue_override = get_forced_venue(g)
                 if venue_override:
                     stad, loc_disp = venue_override
@@ -727,7 +770,8 @@ with tabs[0]:
                 day_fg = DAY_CFG.get(dk, DAY_CFG['sunday'])['fg']
 
                 loc = str(g.get('Location', '') or '').strip()
-                is_intl = bool(loc and loc in lv_intl_locs)
+                intl_val = g.get('International', False)
+                is_intl = bool(intl_val) if not isinstance(intl_val, float) else False
                 venue_override = get_forced_venue(g)
                 if venue_override:
                     stad, loc_disp = venue_override
@@ -928,48 +972,12 @@ with tabs[1]:
     logo_map = {t: (tv_clean_url(l) or TBD_LOGO) for t, l in zip(Team_Info['Team'], Team_Info['Logo'])}  # noqa: E741
     wm_map   = {t: tv_clean_url(w) for t, w in zip(Team_Info['Team'], Team_Info['Wordmark'])}
     clr1_map = {t: tv_strip_clr(c) for t, c in zip(Team_Info['Team'], Team_Info['Color1'])}
-    stad_map = {}
-    city_map = {}
-    lat_map  = {}
-    lon_map  = {}
-    tz_map   = {}
-    for _, row in Team_Info.iterrows():
-        t = row['Team']
-        stad_v = str(row.get('Stadium Name', '') or '').strip()
-        stad_map[t] = '' if stad_v.lower() in ('nan', 'none', '') else stad_v
-        city_v = str(row.get('Location', '') or '').strip()
-        city_map[t] = '' if city_v.lower() in ('nan', 'none', '') else city_v
-        lat_raw = row.get('Lattitude', row.get('Latitude', None))
-        try:
-            lat_map[t] = float(lat_raw)
-        except Exception:
-            lat_map[t] = None
-        try:
-            lon_map[t] = float(row['Longitude'])
-        except Exception:
-            lon_map[t] = None
-        tz_map[t] = str(row.get('Time Zone', '') or '').strip()
-
-    intl_data = {}
-    if Other_Locations is not None and len(Other_Locations) > 0:
-        for _, row in Other_Locations.iterrows():
-            loc = str(row['Location']).strip()
-            s = str(row.get('Stadium Name', '') or '').strip()
-            intl_data[loc] = {
-                'stad': '' if s.lower() in ('nan', '') else s,
-                'lat':  None,
-                'lon':  None,
-                'tz':   str(row.get('Time Zone', '') or '').strip(),
-            }
-            lat_raw = row.get('Lattitude', row.get('Latitude', None))
-            try:
-                intl_data[loc]['lat'] = float(lat_raw)
-            except Exception:
-                pass
-            try:
-                intl_data[loc]['lon'] = float(row['Longitude'])
-            except Exception:
-                pass
+    stad_map = dict(TEAM_STAD_MAP)
+    city_map = dict(TEAM_CITY_MAP)
+    lat_map  = dict(TEAM_LAT_MAP)
+    lon_map  = dict(TEAM_LON_MAP)
+    tz_map   = dict(TEAM_TZ_MAP)
+    intl_data = dict(INTL_DATA)
 
     # ── Team selector ─────────────────────────────────────────────────────────
     team_list = Team_Info.sort_values('Team')['Team'].tolist()
@@ -990,6 +998,7 @@ with tabs[1]:
     abb  = str(tr.get('Abb', '')).strip()
     city = str(tr.get('City', '')).strip()
     nick = str(tr.get('Nickname', '')).strip()
+    team_name = str(tr.get('Team', selected_team)).strip()
     conf = str(tr.get('Conference', '')).strip()
     div  = str(tr.get('Division', '')).strip()
     fg1  = tv_fg(c1)
@@ -1050,7 +1059,7 @@ with tabs[1]:
     </div>
     <div style="font-family:'Bebas Neue',sans-serif;font-size:62px;letter-spacing:3px;
          color:{fg1};line-height:0.95;margin-bottom:14px;">
-      {city.upper()} {nick.upper()}
+      {team_name.upper()}
     </div>
     <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center;">
       {stat_block('2026 O/U', ou)}
@@ -1376,8 +1385,7 @@ with tabs[1]:
             opponent = g['Away'] if is_home else g['Home']
             game_loc = str(g.get('Location', '') or '').strip()
             intl_val = g.get('International', False)
-            intl_flag = bool(intl_val) if not isinstance(intl_val, float) else False
-            is_intl = intl_flag or (game_loc in intl_data)
+            is_intl = bool(intl_val) if not isinstance(intl_val, float) else False
             override = get_forced_venue(g)
 
             if override:
