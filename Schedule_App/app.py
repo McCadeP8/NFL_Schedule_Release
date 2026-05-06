@@ -1,8 +1,19 @@
 import math
+import html
+import json
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import pydeck as pdk
-from data import get_games
+
+def get_games() -> pd.DataFrame:
+    csv_url = "https://docs.google.com/spreadsheets/d/1qjPpIEGmhV8aF3CZ8hi-ijQlIP-_z6QYJzSArjJV9d8/export?format=csv&gid=0"
+    df = pd.read_csv(csv_url)
+    csv_url = "https://docs.google.com/spreadsheets/d/1qjPpIEGmhV8aF3CZ8hi-ijQlIP-_z6QYJzSArjJV9d8/export?format=csv&gid=597170352"
+    df2 = pd.read_csv(csv_url)
+    csv_url = "https://docs.google.com/spreadsheets/d/1qjPpIEGmhV8aF3CZ8hi-ijQlIP-_z6QYJzSArjJV9d8/export?format=csv&gid=223751105"
+    df3 = pd.read_csv(csv_url)
+    return df, df2, df3
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -338,6 +349,339 @@ def get_day_type(row):
     except Exception:
         return 'sunday'
 
+def travel_valid_coord(val):
+    if val is None:
+        return False
+    try:
+        f = float(val)
+        return not math.isnan(f)
+    except Exception:
+        return False
+
+def travel_haversine(lat1, lon1, lat2, lon2):
+    R = 3958.8
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp = math.radians(lat2 - lat1)
+    dl = math.radians(lon2 - lon1)
+    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return round(R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a)))
+
+def build_team_travel(team, games, city_map, stad_map, lat_map, lon_map, tz_map, intl_data, color_map=None):
+    team_games = games[(games['Home'] == team) | (games['Away'] == team)].copy()
+    team_games['_week_num'] = pd.to_numeric(team_games['Week'], errors='coerce')
+    team_games['_date_num'] = pd.to_datetime(team_games['Date'], errors='coerce')
+    team_games = team_games.sort_values(['_week_num', '_date_num']).reset_index(drop=True)
+
+    home_base = {
+        'name': team,
+        'city': city_map.get(team, ''),
+        'stadium': stad_map.get(team, ''),
+        'lat': lat_map.get(team),
+        'lon': lon_map.get(team),
+        'tz': tz_map.get(team, ''),
+    }
+
+    def place_key(p):
+        if travel_valid_coord(p.get('lat')) and travel_valid_coord(p.get('lon')):
+            return f"{round(float(p['lat']), 2)}|{round(float(p['lon']), 2)}"
+        return f"{p.get('city', '')}|{p.get('stadium', '')}"
+
+    def resolve_stop(g):
+        is_home = g['Home'] == team
+        opponent = g['Away'] if is_home else g['Home']
+        game_loc = str(g.get('Location', '') or '').strip()
+        intl_val = g.get('International', False)
+        is_intl = bool(intl_val) if not isinstance(intl_val, float) else False
+        override = get_forced_venue(g)
+
+        if override:
+            return {
+                'opponent': opponent, 'is_intl': False, 'travel_required': True,
+                'city': override[1], 'stadium': override[0], 'lat': lat_map.get('Los Angeles Rams'),
+                'lon': lon_map.get('Los Angeles Rams'), 'tz': 'PT',
+            }
+        if is_intl:
+            idata = intl_data.get(game_loc, {})
+            return {
+                'opponent': opponent, 'is_intl': True, 'travel_required': True,
+                'city': game_loc, 'stadium': idata.get('stad', ''),
+                'lat': idata.get('lat'), 'lon': idata.get('lon'), 'tz': idata.get('tz', ''),
+            }
+        if is_home:
+            return {
+                'opponent': opponent, 'is_intl': False, 'travel_required': False,
+                'city': city_map.get(team, ''), 'stadium': stad_map.get(team, ''),
+                'lat': lat_map.get(team), 'lon': lon_map.get(team), 'tz': tz_map.get(team, ''),
+            }
+        return {
+            'opponent': opponent, 'is_intl': False, 'travel_required': True,
+            'city': city_map.get(opponent, game_loc), 'stadium': stad_map.get(opponent, ''),
+            'lat': lat_map.get(opponent), 'lon': lon_map.get(opponent), 'tz': tz_map.get(opponent, ''),
+        }
+
+    def should_stay(cur_stop, next_stop):
+        if not (cur_stop['travel_required'] and next_stop['travel_required']):
+            return False
+        if team == 'Jacksonville Jaguars' and cur_stop['is_intl'] and next_stop['is_intl']:
+            cur_city = str(cur_stop.get('city', '')).lower()
+            nxt_city = str(next_stop.get('city', '')).lower()
+            return ('london' in cur_city) and ('london' in nxt_city)
+        return False
+
+    legs = []
+    current = dict(home_base)
+
+    def add_leg(src, dst, kind, note):
+        if place_key(src) == place_key(dst):
+            return
+        miles = None
+        if (
+            travel_valid_coord(src.get('lat')) and travel_valid_coord(src.get('lon')) and
+            travel_valid_coord(dst.get('lat')) and travel_valid_coord(dst.get('lon'))
+        ):
+            miles = travel_haversine(float(src['lat']), float(src['lon']), float(dst['lat']), float(dst['lon']))
+        legs.append({
+            'team': team,
+            'color_hex': (color_map or {}).get(team, '#2563eb'),
+            'from': src.get('city') or src.get('name') or 'Unknown',
+            'to': dst.get('city') or dst.get('name') or 'Unknown',
+            'miles': miles,
+            'kind': kind,
+            'note': note,
+            'src_lat': src.get('lat'), 'src_lon': src.get('lon'),
+            'dst_lat': dst.get('lat'), 'dst_lon': dst.get('lon'),
+        })
+
+    seq = []
+    for _, g in team_games.iterrows():
+        wk_num = pd.to_numeric(g.get('Week'), errors='coerce')
+        wk_lbl = f"Wk {int(wk_num)}" if pd.notna(wk_num) else 'Wk TBA'
+        seq.append({'week_label': wk_lbl, 'stop': resolve_stop(g)})
+
+    for i, game in enumerate(seq):
+        stop = game['stop']
+        note_base = f"{game['week_label']} vs {stop['opponent']}"
+        if stop['travel_required']:
+            add_leg(current, stop, 'outbound', f"To game: {note_base}")
+            current = dict(stop)
+        elif place_key(current) != place_key(home_base):
+            add_leg(current, home_base, 'return', f"Return home before: {note_base}")
+            current = dict(home_base)
+
+        if i == len(seq) - 1:
+            if place_key(current) != place_key(home_base):
+                add_leg(current, home_base, 'return', "Return home after season")
+            break
+
+        nxt = seq[i + 1]['stop']
+        if stop['travel_required'] and should_stay(stop, nxt):
+            current = dict(stop)
+        elif place_key(current) != place_key(home_base):
+            add_leg(current, home_base, 'return', f"Return home after: {note_base}")
+            current = dict(home_base)
+
+    return {
+        'home_base': home_base,
+        'seq': seq,
+        'legs': legs,
+        'flights': len(legs),
+        'total_miles': int(sum(l['miles'] for l in legs if l['miles'] is not None)),
+    }
+
+def travel_map_rows(legs, home_base=None, seq=None, max_arcs=None):
+    arc_rows = []
+    for l in legs:
+        if l.get('kind') != 'outbound':
+            continue
+        if not (
+            travel_valid_coord(l.get('src_lat')) and travel_valid_coord(l.get('src_lon')) and
+            travel_valid_coord(l.get('dst_lat')) and travel_valid_coord(l.get('dst_lon'))
+        ):
+            continue
+        arc_rows.append({
+            'from': l['from'], 'to': l['to'], 'note': l['note'], 'miles': l['miles'] or 0,
+            'src_lon': float(l['src_lon']), 'src_lat': float(l['src_lat']),
+            'dst_lon': float(l['dst_lon']), 'dst_lat': float(l['dst_lat']),
+            'kind': l.get('kind', 'outbound'),
+            'color_hex': l.get('color_hex', '#2563eb'),
+        })
+    if max_arcs:
+        arc_rows = sorted(arc_rows, key=lambda r: r['miles'], reverse=True)[:max_arcs]
+
+    node_rows = []
+    if home_base and travel_valid_coord(home_base.get('lat')) and travel_valid_coord(home_base.get('lon')):
+        node_rows.append({
+            'name': home_base.get('city') or home_base.get('name') or 'Home',
+            'lon': float(home_base['lon']), 'lat': float(home_base['lat']),
+            'home': True,
+        })
+    for g in seq or []:
+        s = g['stop']
+        if travel_valid_coord(s.get('lat')) and travel_valid_coord(s.get('lon')):
+            node_rows.append({
+                'name': s.get('city') or s.get('opponent') or 'Stop',
+                'lon': float(s['lon']), 'lat': float(s['lat']),
+                'home': False,
+            })
+    for a in arc_rows:
+        node_rows.append({'name': a['from'], 'lon': a['src_lon'], 'lat': a['src_lat'], 'home': False})
+        node_rows.append({'name': a['to'], 'lon': a['dst_lon'], 'lat': a['dst_lat'], 'home': False})
+    node_df = pd.DataFrame(node_rows).drop_duplicates(subset=['lon', 'lat']) if node_rows else pd.DataFrame()
+    return pd.DataFrame(arc_rows) if arc_rows else pd.DataFrame(), node_df
+
+def render_travel_motion_map(arc_df, node_df, key, height=500):
+    if len(arc_df) == 0:
+        st.info("Not enough coordinate data to draw travel routes yet.")
+        return
+
+    arcs = arc_df.to_dict('records')
+    nodes = node_df.to_dict('records') if len(node_df) else []
+    map_id = f"travel-map-{''.join(ch if ch.isalnum() else '-' for ch in str(key))}"
+    arcs_json = json.dumps(arcs)
+    nodes_json = json.dumps(nodes)
+    components.html(f"""
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  #{map_id} {{
+    height: {height}px;
+    width: 100%;
+    border: 1px solid #d9e0ec;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #dbeafe;
+  }}
+  #{map_id} .leaflet-control-attribution {{
+    font-family: Arial, sans-serif;
+    font-size: 10px;
+  }}
+  #{map_id} .leaflet-tile-pane {{
+    filter: saturate(0.78) contrast(0.96) brightness(1.04);
+  }}
+</style>
+<div id="{map_id}"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function() {{
+  const arcs = {arcs_json};
+  const nodes = {nodes_json};
+  const mapEl = document.getElementById("{map_id}");
+
+  function boot() {{
+    if (!window.L || !mapEl) {{
+      setTimeout(boot, 60);
+      return;
+    }}
+
+    const map = L.map(mapEl, {{
+      zoomControl: true,
+      scrollWheelZoom: false,
+      attributionControl: true,
+      preferCanvas: true
+    }});
+
+    L.tileLayer("https://{{s}}.basemaps.cartocdn.com/light_all/{{z}}/{{x}}/{{y}}{{r}}.png", {{
+      attribution: "&copy; OpenStreetMap &copy; CARTO",
+      subdomains: "abcd",
+      maxZoom: 18
+    }}).addTo(map);
+
+    const bounds = [];
+    arcs.forEach(a => bounds.push([a.src_lat, a.src_lon], [a.dst_lat, a.dst_lon]));
+    nodes.forEach(n => bounds.push([n.lat, n.lon]));
+    if (bounds.length) {{
+      map.fitBounds(bounds, {{ padding: [28, 28], maxZoom: 5 }});
+    }} else {{
+      map.setView([39.5, -98.35], 4);
+    }}
+
+    const routeLayer = L.svg({{ padding: 0.35 }}).addTo(map);
+    const svg = routeLayer.getPane().querySelector("svg");
+    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    svg.appendChild(g);
+
+    function curvePoints(a, steps) {{
+      const p0 = map.latLngToLayerPoint([a.src_lat, a.src_lon]);
+      const p2 = map.latLngToLayerPoint([a.dst_lat, a.dst_lon]);
+      const dx = p2.x - p0.x;
+      const dy = p2.y - p0.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      const lift = Math.min(Math.max(dist * 0.18, 34), 120);
+      const p1 = L.point((p0.x + p2.x) / 2 - (dy / dist) * lift, (p0.y + p2.y) / 2 + (dx / dist) * lift);
+      const pts = [];
+      for (let i = 0; i <= steps; i++) {{
+        const t = i / steps;
+        const x = (1 - t) * (1 - t) * p0.x + 2 * (1 - t) * t * p1.x + t * t * p2.x;
+        const y = (1 - t) * (1 - t) * p0.y + 2 * (1 - t) * t * p1.y + t * t * p2.y;
+        pts.push([x, y]);
+      }}
+      return pts;
+    }}
+
+    const movers = [];
+    function redraw() {{
+      g.innerHTML = "";
+      movers.length = 0;
+
+      arcs.forEach((a, i) => {{
+        const color = a.color_hex || "#2563eb";
+        const pts = curvePoints(a, 36);
+        const d = pts.map((p, idx) => `${{idx ? "L" : "M"}} ${{p[0].toFixed(1)}} ${{p[1].toFixed(1)}}`).join(" ");
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", d);
+        path.setAttribute("fill", "none");
+        path.setAttribute("stroke", color);
+        path.setAttribute("stroke-width", "2.4");
+        path.setAttribute("stroke-opacity", "0.42");
+        path.setAttribute("stroke-linecap", "round");
+        g.appendChild(path);
+
+        const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        dot.setAttribute("r", "5.2");
+        dot.setAttribute("fill", color);
+        dot.setAttribute("stroke", "#ffffff");
+        dot.setAttribute("stroke-width", "1.5");
+        dot.setAttribute("opacity", "0.94");
+        g.appendChild(dot);
+        movers.push({{ dot, pts, offset: (i % 14) * 0.075 }});
+      }});
+
+      nodes.forEach(n => {{
+        const p = map.latLngToLayerPoint([n.lat, n.lon]);
+        const ring = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        ring.setAttribute("cx", p.x);
+        ring.setAttribute("cy", p.y);
+        ring.setAttribute("r", n.home ? "6.5" : "5.5");
+        ring.setAttribute("fill", "#ffffff");
+        ring.setAttribute("stroke", n.home ? "#c8102e" : "#1a2030");
+        ring.setAttribute("stroke-width", n.home ? "2.8" : "2.1");
+        ring.setAttribute("opacity", "0.95");
+        g.appendChild(ring);
+      }});
+    }}
+
+    function animate(now) {{
+      const cycle = 7600;
+      movers.forEach(m => {{
+        const raw = ((now % cycle) / cycle + m.offset) % 1;
+        const t = raw <= 0.5 ? raw * 2 : (1 - raw) * 2;
+        const idx = Math.min(Math.floor(t * (m.pts.length - 1)), m.pts.length - 1);
+        const p = m.pts[idx];
+        m.dot.setAttribute("cx", p[0]);
+        m.dot.setAttribute("cy", p[1]);
+      }});
+      requestAnimationFrame(animate);
+    }}
+
+    redraw();
+    map.on("zoomend moveend resize", redraw);
+    requestAnimationFrame(animate);
+  }}
+
+  boot();
+}})();
+</script>
+""", height=height + 10)
+
 def build_cells(Games, Team_Info, Other_Locations):
     abb_lookup = dict(zip(Team_Info['Team'], Team_Info['Abb']))
     cells = {}
@@ -502,6 +846,9 @@ with tabs[0]:
     }
     lv_stad_map = dict(TEAM_STAD_MAP)
     lv_city_map = dict(TEAM_CITY_MAP)
+    lv_lat_map = dict(TEAM_LAT_MAP)
+    lv_lon_map = dict(TEAM_LON_MAP)
+    lv_tz_map = dict(TEAM_TZ_MAP)
     lv_clr_map = {}
     for _, row in Team_Info.iterrows():
         t = row['Team']
@@ -511,6 +858,7 @@ with tabs[0]:
         lv_clr_map[t] = c if c.startswith('#') else f'#{c}'
     lv_intl_locs = set(NEUTRAL_LOCATION_SET)
     lv_intl_stad = {k: _clean_text(v.get('stad', '')) for k, v in INTL_DATA.items()}
+    lv_intl_data = dict(INTL_DATA)
 
     with sub_tabs2[0]:
         try:
@@ -901,7 +1249,88 @@ with tabs[0]:
 </div>""")
 
     with sub_tabs2[3]:
-        st.write("League travel view coming soon")
+        league_routes = []
+        team_totals = []
+        for team in Team_Info.sort_values('Team')['Team'].tolist():
+            route = build_team_travel(
+                team, Games, lv_city_map, lv_stad_map, lv_lat_map, lv_lon_map, lv_tz_map, lv_intl_data, lv_clr_map
+            )
+            league_routes.extend(route['legs'])
+            team_totals.append({
+                'Team': team,
+                'Total Miles': route['total_miles'],
+            })
+
+        league_total_miles = int(sum(r['Total Miles'] for r in team_totals))
+        league_flights = len(league_routes)
+
+        def league_stat_card(label, value, sub='', accent='#c8102e'):
+            return f'''
+      <div style="background:#fff;border:1px solid #e2e6ef;border-radius:10px;
+          padding:18px 22px;box-shadow:0 1px 6px rgba(0,0,0,0.07);
+          flex:1;min-width:150px;text-align:center;border-top:4px solid {accent};">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:800;
+            letter-spacing:4px;text-transform:uppercase;color:#b0baca;margin-bottom:4px;">{label}</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:48px;color:{accent};line-height:1;">{value}</div>
+        {f'<div style="font-family:\'Barlow\',sans-serif;font-size:12px;color:#9aa5be;margin-top:2px;">{sub}</div>' if sub else ''}
+      </div>'''
+
+        st.html(
+            '<div style="display:flex;gap:14px;margin:18px 0;flex-wrap:wrap;">'
+            + league_stat_card('League Flights', f'{league_flights:,}')
+            + league_stat_card('Total Miles', f'{league_total_miles:,}')
+            + league_stat_card('Teams', f'{len(team_totals):,}')
+            + '</div>'
+        )
+
+        league_arc_df, league_node_df = travel_map_rows(league_routes)
+        render_travel_motion_map(league_arc_df, league_node_df, 'league-travel', height=520)
+
+        totals_df = pd.DataFrame(team_totals).sort_values('Total Miles', ascending=False).reset_index(drop=True)
+        league_rows_html = ''
+        for i, row in totals_df.iterrows():
+            team = row['Team']
+            row_bg = '#ffffff' if i % 2 == 0 else '#f8fafc'
+            logo = lv_logo_map.get(team, TBD_LOGO)
+            accent = lv_clr_map.get(team, '#374151')
+            miles = f"{int(row['Total Miles']):,}"
+            rank = i + 1
+            league_rows_html += f"""
+<tr style="background:{row_bg};border-bottom:1px solid #edf0f7;">
+  <td style="width:5px;padding:0;background:{accent};"></td>
+  <td style="padding:10px 12px;text-align:center;font-family:'Rajdhani',sans-serif;
+       font-size:18px;font-weight:800;color:#64748b;width:70px;">{rank}</td>
+  <td style="padding:10px 16px;vertical-align:middle;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <img src="{logo}" style="width:38px;height:38px;object-fit:contain;"
+           onerror="this.onerror=null;this.src='{TBD_LOGO}';">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:19px;font-weight:700;color:#1a2030;">{team}</div>
+    </div>
+  </td>
+  <td style="padding:10px 18px;text-align:right;font-family:'Rajdhani',sans-serif;
+       font-size:22px;font-weight:800;color:#1a2030;">{miles}</td>
+</tr>"""
+
+        st.html(f"""
+<div style="margin-top:18px;overflow-x:auto;border-radius:10px;border:1px solid #e2e6ef;
+     box-shadow:0 2px 10px rgba(0,0,0,0.08);background:#fff;">
+  <table style="border-collapse:collapse;width:100%;min-width:640px;">
+    <thead>
+      <tr style="background:#f4f6fa;border-bottom:2px solid #e2e6ef;">
+        <th style="width:5px;background:#f4f6fa;"></th>
+        <th style="padding:10px 12px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;
+             letter-spacing:3px;text-transform:uppercase;color:#b0baca;text-align:center;">Rank</th>
+        <th style="padding:10px 16px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;
+             letter-spacing:3px;text-transform:uppercase;color:#b0baca;text-align:left;">Team</th>
+        <th style="padding:10px 18px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;
+             letter-spacing:3px;text-transform:uppercase;color:#b0baca;text-align:right;">Total Miles</th>
+      </tr>
+    </thead>
+    <tbody>
+      {league_rows_html}
+    </tbody>
+  </table>
+</div>""")
 
     with sub_tabs2[4]:
         st.write("Analytics goes here")
@@ -1055,24 +1484,24 @@ with tabs[1]:
   <div style="flex:1;min-width:0;">
     <div style="font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:800;
          letter-spacing:5px;text-transform:uppercase;color:{fg1};opacity:0.55;margin-bottom:2px;">
-      {conf} &nbsp;·&nbsp; {div}
+      {div}
     </div>
     <div style="font-family:'Bebas Neue',sans-serif;font-size:62px;letter-spacing:3px;
          color:{fg1};line-height:0.95;margin-bottom:14px;">
       {team_name.upper()}
     </div>
     <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center;">
-      {stat_block('2026 O/U', ou)}
+      {stat_block('O/U', ou)}
       {divider}
-      {stat_block('2025 Record', wins)}
+      {stat_block('Record', wins)}
       {divider}
-      {stat_block('2025 DVOA', tot, f'#{tot_r}')}
+      {stat_block('DVOA', tot, f'#{tot_r}')}
       {divider}
-      {stat_block('2025 O. DVOA', off, f'#{off_r}')}
+      {stat_block('O. DVOA', off, f'#{off_r}')}
       {divider}
-      {stat_block('2025 D. DVOA', deff, f'#{def_r}')}
+      {stat_block('D. DVOA', deff, f'#{def_r}')}
       {divider}
-      {stat_block('2025 S.T. DVOA', st_dvoa, f'#{st_r}')}
+      {stat_block('S.T. DVOA', st_dvoa, f'#{st_r}')}
       {bye_block}
     </div>
   </div>
@@ -1331,18 +1760,606 @@ with tabs[1]:
 
     # ═══════════════════ ANALYTICS TAB ══════════════════════════════════════
     with sub_tabs[1]:
+        strength_metric_cols = [
+            ('O/U', 'Vegas O/U', 'high'),
+            ('2025 W', '2025 Wins', 'high'),
+            ('DVOA', 'Total', 'high'),
+            ('DVOA Rk', 'Total Rank', 'low'),
+            ('Off', 'Offense', 'high'),
+            ('Off Rk', 'Offensive Rank', 'low'),
+            ('Def', 'Defense', 'low'),
+            ('Def Rk', 'Defensive Rank', 'low'),
+            ('ST', 'Special Teams', 'high'),
+            ('ST Rk', 'Special Teams Rank', 'low'),
+        ]
+        continuity_metric_cols = [
+            ('QB', 'QB Tenure', 'high'),
+            ('HC', 'HC Tenure', 'high'),
+            ('OC', 'OC Tenure', 'high'),
+            ('DC', 'DC Tenure', 'high'),
+            ('SC', 'SC Tenure', 'high'),
+        ]
+        fantasy_metric_cols = [
+            ('QB', 'QBF', 'high'),
+            ('RB', 'RBF', 'high'),
+            ('WR', 'WRF', 'high'),
+            ('TE', 'TEF', 'high'),
+            ('K', 'KF', 'high'),
+            ('DST', 'DSTF', 'high'),
+        ]
+        all_metric_cols = strength_metric_cols + continuity_metric_cols + fantasy_metric_cols
+        metric_cols = all_metric_cols
+
+        def ana_clean_num(v):
+            if v is None:
+                return None
+            s = str(v).strip().replace('%', '').replace(',', '')
+            if s.lower() in ('', 'nan', 'none', '—', '-'):
+                return None
+            try:
+                return float(s)
+            except Exception:
+                return None
+
+        def ana_clean_metric(col, v):
+            if col == '2025 Wins':
+                if v is None:
+                    return None
+                parts = str(v).strip().split('-')
+                try:
+                    wins_num = float(parts[0])
+                    ties_num = float(parts[2]) if len(parts) > 2 else 0
+                    return wins_num + (ties_num * 0.5)
+                except Exception:
+                    return ana_clean_num(v)
+            return ana_clean_num(v)
+
+        team_metric_values = {}
+        for _, r in Team_Info.iterrows():
+            tm = str(r.get('Team', '')).strip()
+            team_metric_values[tm] = {col: ana_clean_metric(col, r.get(col)) for _, col, _ in all_metric_cols}
+
+        metric_ranges = {}
+        for _, col, _ in all_metric_cols:
+            vals = [v.get(col) for v in team_metric_values.values() if v.get(col) is not None]
+            metric_ranges[col] = (min(vals), max(vals)) if vals else (0, 0)
+
+        def ana_strength(team, col, direction):
+            val = team_metric_values.get(team, {}).get(col)
+            lo, hi = metric_ranges.get(col, (0, 0))
+            if val is None or hi == lo:
+                return None
+            pct = (val - lo) / (hi - lo)
+            if direction == 'low':
+                pct = 1 - pct
+            return max(0, min(1, pct))
+
+        def ana_heat_color(score):
+            if score is None:
+                return '#f1f5f9', '#94a3b8'
+            # Green -> gold -> red, where red means a tougher opponent for that column.
+            if score < 0.5:
+                t = score / 0.5
+                r = round(22 + (245 - 22) * t)
+                g = round(163 + (158 - 163) * t)
+                b = round(74 + (11 - 74) * t)
+            else:
+                t = (score - 0.5) / 0.5
+                r = round(245 + (190 - 245) * t)
+                g = round(158 + (24 - 158) * t)
+                b = round(11 + (34 - 11) * t)
+            fg = '#ffffff' if score > 0.70 else '#111827'
+            return f'rgb({r},{g},{b})', fg
+
+        def ana_fmt(v, col):
+            if v is None:
+                return '—'
+            if 'Rank' in col:
+                return f'{int(v)}'
+            if col in ('Total', 'Offense', 'Defense', 'Special Teams'):
+                return f'{v:g}%'
+            if col in ('QB Tenure', 'HC Tenure', 'OC Tenure', 'DC Tenure', 'SC Tenure', '2025 Wins'):
+                return f'{v:g}'
+            return f'{v:g}'
+
+        def ana_avg_fmt(v, col):
+            if v is None:
+                return 'â€”'
+            if col in ('Total', 'Offense', 'Defense', 'Special Teams'):
+                return f'{v:.1f}%'
+            return f'{v:.1f}'
+
+        team_games_ana = Games[
+            (Games['Home'] == selected_team) | (Games['Away'] == selected_team)
+        ].copy()
+        team_games_ana['_week_num'] = pd.to_numeric(team_games_ana['Week'], errors='coerce')
+        team_games_ana['_date_num'] = pd.to_datetime(team_games_ana['Date'], errors='coerce')
+        team_games_ana = team_games_ana.sort_values(['_week_num', '_date_num']).reset_index(drop=True)
+
+        games_by_week = {}
+        for _, g in team_games_ana.iterrows():
+            wk = pd.to_numeric(g.get('Week'), errors='coerce')
+            if pd.notna(wk):
+                games_by_week[int(wk)] = g
+
+        def ana_game_date(row):
+            return pd.to_datetime(row.get('Date'), errors='coerce')
+
+        def ana_prev_date(team, before_dt):
+            if pd.isna(before_dt):
+                return None
+            tg = Games[
+                ((Games['Home'] == team) | (Games['Away'] == team)) &
+                (pd.to_datetime(Games['Date'], errors='coerce') < before_dt)
+            ].copy()
+            if len(tg) == 0:
+                return None
+            prev = pd.to_datetime(tg['Date'], errors='coerce').max()
+            return prev if pd.notna(prev) else None
+
+        def ana_rest_days(team, game_dt):
+            prev = ana_prev_date(team, game_dt)
+            if prev is None or pd.isna(game_dt):
+                return None
+            return int((game_dt - prev).days)
+
+        sched_rows = []
+        primetime_games = 0
+        road_games = 0
+        neutral_games = 0
+        rest_edges = []
+        avg_scores = []
+
+        max_wk_val = pd.to_numeric(Games['Week'], errors='coerce').max()
+        max_wk = max(int(max_wk_val), 18) if pd.notna(max_wk_val) else 18
+        max_wk = min(max_wk, 18)
+
+        for wk in range(1, max_wk + 1):
+            if bye_int == wk and wk not in games_by_week:
+                sched_rows.append({'week': wk, 'bye': True})
+                continue
+            if wk not in games_by_week:
+                continue
+            g = games_by_week[wk]
+            is_home = g['Home'] == selected_team
+            opponent = g['Away'] if is_home else g['Home']
+            intl_val = g.get('International', False)
+            is_intl = bool(intl_val) if not isinstance(intl_val, float) else False
+            is_neutral = is_intl or (get_forced_venue(g) is not None)
+            if is_neutral:
+                neutral_games += 1
+            elif not is_home:
+                road_games += 1
+            if tv_day_key(g) != 'sunday':
+                primetime_games += 1
+
+            dt = ana_game_date(g)
+            team_rest = ana_rest_days(selected_team, dt)
+            opp_rest = ana_rest_days(opponent, dt)
+            rest_edge = None if team_rest is None or opp_rest is None else team_rest - opp_rest
+            if rest_edge is not None:
+                rest_edges.append(rest_edge)
+
+            scores = [
+                ana_strength(opponent, col, direction)
+                for _, col, direction in strength_metric_cols
+            ]
+            score_vals = [s for s in scores if s is not None]
+            avg_score = sum(score_vals) / len(score_vals) if score_vals else None
+            if avg_score is not None:
+                avg_scores.append(avg_score)
+
+            sched_rows.append({
+                'week': wk,
+                'bye': False,
+                'game': g,
+                'opponent': opponent,
+                'is_home': is_home,
+                'is_neutral': is_neutral,
+                'team_rest': team_rest,
+                'opp_rest': opp_rest,
+                'rest_edge': rest_edge,
+                'avg_score': avg_score,
+            })
+
+        avg_opp_ou_vals = [
+            team_metric_values.get(r.get('opponent'), {}).get('Vegas O/U')
+            for r in sched_rows if not r.get('bye')
+        ]
+        avg_opp_ou_vals = [v for v in avg_opp_ou_vals if v is not None]
+        avg_opp_ou = sum(avg_opp_ou_vals) / len(avg_opp_ou_vals) if avg_opp_ou_vals else None
+        net_rest = sum(rest_edges) if rest_edges else 0
+
+        def ana_rank_suffix(rank, total):
+            return f'#{rank} of {total}' if rank is not None else ''
+
+        league_tile_rows = []
+        for tm in Team_Info['Team'].astype(str).str.strip().tolist():
+            tm_games = Games[(Games['Home'] == tm) | (Games['Away'] == tm)].copy()
+            tm_games['_week_num'] = pd.to_numeric(tm_games['Week'], errors='coerce')
+            tm_games = tm_games.sort_values('_week_num').reset_index(drop=True)
+            tm_ou_vals = []
+            tm_rest_edges = []
+            for _, tg in tm_games.iterrows():
+                opp = tg['Away'] if tg['Home'] == tm else tg['Home']
+                opp_ou = team_metric_values.get(opp, {}).get('Vegas O/U')
+                if opp_ou is not None:
+                    tm_ou_vals.append(opp_ou)
+                tg_dt = ana_game_date(tg)
+                tm_rest = ana_rest_days(tm, tg_dt)
+                opp_rest = ana_rest_days(opp, tg_dt)
+                if tm_rest is not None and opp_rest is not None:
+                    tm_rest_edges.append(tm_rest - opp_rest)
+            league_tile_rows.append({
+                'team': tm,
+                'avg_ou': (sum(tm_ou_vals) / len(tm_ou_vals)) if tm_ou_vals else None,
+                'net_rest': sum(tm_rest_edges) if tm_rest_edges else 0,
+            })
+
+        ou_ranked = sorted([r for r in league_tile_rows if r['avg_ou'] is not None], key=lambda r: r['avg_ou'], reverse=True)
+        rest_ranked = sorted(league_tile_rows, key=lambda r: r['net_rest'], reverse=True)
+        avg_ou_rank = next((i + 1 for i, r in enumerate(ou_ranked) if r['team'] == selected_team), None)
+        net_rest_rank = next((i + 1 for i, r in enumerate(rest_ranked) if r['team'] == selected_team), None)
+
+        four_game_windows = []
+        game_only_rows = [r for r in sched_rows if not r.get('bye') and r.get('avg_score') is not None]
+        for i in range(0, max(0, len(game_only_rows) - 3)):
+            chunk = game_only_rows[i:i + 4]
+            four_game_windows.append((sum(r['avg_score'] for r in chunk) / 4, chunk[0]['week'], chunk[-1]['week']))
+        toughest_window = max(four_game_windows, default=None)
+
+        def ana_card(label, value, sub='', accent=c1):
+            return f'''
+  <div style="background:#fff;border:1px solid #e2e6ef;border-radius:8px;padding:16px 18px;
+       box-shadow:0 1px 6px rgba(0,0,0,0.06);border-top:4px solid {accent};min-width:150px;flex:1;">
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:800;
+         letter-spacing:3.5px;text-transform:uppercase;color:#94a3b8;margin-bottom:5px;">{label}</div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:44px;color:#1a2030;line-height:1;">{value}</div>
+    {f'<div style="font-family:\'Barlow\',sans-serif;font-size:12px;color:#64748b;margin-top:3px;">{sub}</div>' if sub else ''}
+  </div>'''
+
+        schedule_rating = (sum(avg_scores) / len(avg_scores)) if avg_scores else None
+        rating_label = 'TBD'
+        if schedule_rating is not None:
+            rating_label = 'Hard' if schedule_rating >= 0.64 else 'Soft' if schedule_rating <= 0.42 else 'Balanced'
+
+        cards_html = '<div style="display:flex;gap:12px;margin:18px 0;flex-wrap:wrap;">'
+        cards_html += ana_card('Schedule Read', rating_label, f'{schedule_rating * 100:.0f} strength index' if schedule_rating is not None else 'Needs opponent data')
+        cards_html += ana_card('Avg Opp O/U', f'{avg_opp_ou:.1f}' if avg_opp_ou is not None else '—', f'Vegas baseline ({ana_rank_suffix(avg_ou_rank, len(ou_ranked))})')
+        cards_html += ana_card('Road / Neutral', f'{road_games}/{neutral_games}', 'travel pressure')
+        cards_html += ana_card('Net Rest', f'{net_rest:+d}', f'days vs opponents ({ana_rank_suffix(net_rest_rank, len(rest_ranked))})')
+        cards_html += '</div>'
+
+        col_header = ''.join(
+            f'<th style="padding:9px 8px;min-width:74px;font-family:\'Barlow Condensed\',sans-serif;'
+            f'font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;'
+            f'color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;">{short}</th>'
+            for short, _, _ in metric_cols
+        )
+
+        heat_rows = ''
+        for r in sched_rows:
+            if r.get('bye'):
+                heat_rows += f"""
+<tr>
+  <td style="position:sticky;left:0;z-index:2;background:#0b0f19;color:#fff;padding:12px 12px;
+       font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:800;border-bottom:1px solid #111827;">WK {r['week']}</td>
+  <td colspan="{len(metric_cols) + 2}" style="background:#05070d;color:#fff;text-align:center;
+       padding:13px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;
+       letter-spacing:5px;text-transform:uppercase;border-bottom:1px solid #111827;">Bye Week</td>
+</tr>"""
+                continue
+
+            g = r['game']
+            opp = r['opponent']
+            opp_logo = logo_map.get(opp, TBD_LOGO)
+            opp_clr = clr1_map.get(opp, '#64748b')
+            ha = 'N' if r['is_neutral'] else 'H' if r['is_home'] else 'A'
+            try:
+                dt_label = pd.to_datetime(g.get('Date')).strftime('%b %-d')
+            except Exception:
+                try:
+                    dt_label = pd.to_datetime(g.get('Date')).strftime('%b %#d')
+                except Exception:
+                    dt_label = str(g.get('Date', 'TBA'))
+            avg_bg, avg_fg = ana_heat_color(r.get('avg_score'))
+            cells_html = ''
+            for _, col, direction in metric_cols:
+                val = team_metric_values.get(opp, {}).get(col)
+                score = ana_strength(opp, col, direction)
+                bg, fg = ana_heat_color(score)
+                cells_html += f"""
+  <td style="background:{bg};color:{fg};text-align:center;padding:9px 8px;
+       font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:800;
+       border-right:1px solid rgba(255,255,255,0.35);border-bottom:1px solid rgba(255,255,255,0.35);">
+    {ana_fmt(val, col)}
+  </td>"""
+
+            heat_rows += f"""
+<tr>
+  <td style="position:sticky;left:0;z-index:2;background:#fff;padding:10px 12px;
+       border-bottom:1px solid #edf0f7;border-left:5px solid {opp_clr};min-width:82px;">
+    <div style="font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:900;color:#1a2030;line-height:1;">WK {r['week']}</div>
+    <div style="font-family:'Barlow',sans-serif;font-size:11px;color:#94a3b8;margin-top:2px;">{dt_label}</div>
+  </td>
+  <td style="position:sticky;left:82px;z-index:2;background:#fff;padding:9px 12px;
+       border-bottom:1px solid #edf0f7;min-width:210px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <img src="{opp_logo}" style="width:34px;height:34px;object-fit:contain;"
+           onerror="this.onerror=null;this.src='{TBD_LOGO}';">
+      <div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:800;color:#1a2030;line-height:1.05;">
+          {ha} {opp}</div>
+        <div style="font-family:'Barlow',sans-serif;font-size:11px;color:#94a3b8;margin-top:2px;">
+          Rest {r['team_rest'] if r['team_rest'] is not None else '—'} vs {r['opp_rest'] if r['opp_rest'] is not None else '—'}</div>
+      </div>
+    </div>
+  </td>
+  <td style="background:{avg_bg};color:{avg_fg};text-align:center;padding:9px 10px;
+       font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:900;border-bottom:1px solid rgba(255,255,255,0.35);">
+    {f"{r['avg_score'] * 100:.0f}" if r.get('avg_score') is not None else '—'}
+  </td>
+  {cells_html}
+</tr>"""
+
+        def render_heat_table(title, description, metrics, include_index=False, include_rest=False):
+            extra_headers = ''
+            if include_index:
+                extra_headers += """
+        <th style="position:sticky;top:0;z-index:3;background:#f8fafc;padding:9px 10px;min-width:74px;
+             font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;letter-spacing:2px;
+             text-transform:uppercase;color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;">Index</th>"""
+            if include_rest:
+                extra_headers += """
+        <th style="position:sticky;top:0;z-index:3;background:#f8fafc;padding:9px 10px;min-width:74px;
+             font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;letter-spacing:2px;
+             text-transform:uppercase;color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;">Rest</th>
+        <th style="position:sticky;top:0;z-index:3;background:#f8fafc;padding:9px 10px;min-width:74px;
+             font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;letter-spacing:2px;
+             text-transform:uppercase;color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;">Opp Rest</th>"""
+
+            table_col_header = ''.join(
+                f'<th style="padding:9px 8px;min-width:74px;font-family:\'Barlow Condensed\',sans-serif;'
+                f'font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;'
+                f'color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;">{short}</th>'
+                for short, _, _ in metrics
+            )
+
+            table_rows = ''
+            extra_count = (1 if include_index else 0) + (2 if include_rest else 0)
+            for r in sched_rows:
+                if r.get('bye'):
+                    table_rows += f"""
+<tr>
+  <td style="position:sticky;left:0;z-index:2;background:#0b0f19;color:#fff;padding:12px 12px;
+       font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:800;border-bottom:1px solid #111827;">WK {r['week']}</td>
+  <td colspan="{len(metrics) + extra_count + 1}" style="background:#05070d;color:#fff;text-align:center;
+       padding:13px;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:900;
+       letter-spacing:5px;text-transform:uppercase;border-bottom:1px solid #111827;">Bye Week</td>
+</tr>"""
+                    continue
+
+                g = r['game']
+                opp = r['opponent']
+                opp_logo = logo_map.get(opp, TBD_LOGO)
+                opp_clr = clr1_map.get(opp, '#64748b')
+                ha = 'N ' if r['is_neutral'] else '@ ' if not r['is_home'] else ''
+                try:
+                    dt_label = pd.to_datetime(g.get('Date')).strftime('%b %-d')
+                except Exception:
+                    try:
+                        dt_label = pd.to_datetime(g.get('Date')).strftime('%b %#d')
+                    except Exception:
+                        dt_label = str(g.get('Date', 'TBA'))
+
+                extra_cells = ''
+                if include_index:
+                    avg_bg, avg_fg = ana_heat_color(r.get('avg_score'))
+                    idx_val = f"{r['avg_score'] * 100:.0f}" if r.get('avg_score') is not None else '—'
+                    extra_cells += f"""
+  <td style="background:{avg_bg};color:{avg_fg};text-align:center;padding:9px 10px;
+       font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:900;border-bottom:1px solid rgba(255,255,255,0.35);">{idx_val}</td>"""
+                if include_rest:
+                    rest_edge = r.get('rest_edge')
+                    rest_bg = '#dcfce7' if rest_edge is not None and rest_edge > 0 else '#fee2e2' if rest_edge is not None and rest_edge < 0 else '#f1f5f9'
+                    rest_fg = '#166534' if rest_edge is not None and rest_edge > 0 else '#991b1b' if rest_edge is not None and rest_edge < 0 else '#64748b'
+                    extra_cells += f"""
+  <td style="background:{rest_bg};color:{rest_fg};text-align:center;padding:9px 10px;
+       font-family:'Rajdhani',sans-serif;font-size:17px;font-weight:900;border-bottom:1px solid rgba(255,255,255,0.35);">{r['team_rest'] if r['team_rest'] is not None else '—'}</td>
+  <td style="background:{rest_bg};color:{rest_fg};text-align:center;padding:9px 10px;
+       font-family:'Rajdhani',sans-serif;font-size:17px;font-weight:900;border-bottom:1px solid rgba(255,255,255,0.35);">{r['opp_rest'] if r['opp_rest'] is not None else '—'}</td>"""
+
+                cells_html = ''
+                for _, col, direction in metrics:
+                    val = team_metric_values.get(opp, {}).get(col)
+                    score = ana_strength(opp, col, direction)
+                    bg, fg = ana_heat_color(score)
+                    cells_html += f"""
+  <td style="background:{bg};color:{fg};text-align:center;padding:9px 8px;
+       font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:800;
+       border-right:1px solid rgba(255,255,255,0.35);border-bottom:1px solid rgba(255,255,255,0.35);">{ana_fmt(val, col)}</td>"""
+
+                table_rows += f"""
+<tr>
+  <td style="position:sticky;left:0;z-index:2;background:#fff;padding:10px 12px;
+       border-bottom:1px solid #edf0f7;border-left:5px solid {opp_clr};min-width:82px;">
+    <div style="font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:900;color:#1a2030;line-height:1;">WK {r['week']}</div>
+    <div style="font-family:'Barlow',sans-serif;font-size:11px;color:#94a3b8;margin-top:2px;">{dt_label}</div>
+  </td>
+  <td style="position:sticky;left:82px;z-index:2;background:#fff;padding:9px 12px;
+       border-bottom:1px solid #edf0f7;min-width:210px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <img src="{opp_logo}" style="width:34px;height:34px;object-fit:contain;"
+           onerror="this.onerror=null;this.src='{TBD_LOGO}';">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:800;color:#1a2030;line-height:1.05;">{ha}{opp}</div>
+    </div>
+  </td>
+  {extra_cells}
+  {cells_html}
+</tr>"""
+
+            data_rows = [r for r in sched_rows if not r.get('bye')]
+            avg_extra_cells = ''
+            if include_index:
+                idx_vals = [r.get('avg_score') for r in data_rows if r.get('avg_score') is not None]
+                idx_avg = (sum(idx_vals) / len(idx_vals)) if idx_vals else None
+                idx_bg, idx_fg = ana_heat_color(idx_avg)
+                avg_extra_cells += f"""
+  <td style="background:{idx_bg};color:{idx_fg};text-align:center;padding:10px;
+       font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:900;border-top:2px solid #cbd5e1;">
+    {f"{idx_avg * 100:.0f}" if idx_avg is not None else '—'}
+  </td>"""
+            if include_rest:
+                team_rest_vals = [r.get('team_rest') for r in data_rows if r.get('team_rest') is not None]
+                opp_rest_vals = [r.get('opp_rest') for r in data_rows if r.get('opp_rest') is not None]
+                team_rest_avg = sum(team_rest_vals) / len(team_rest_vals) if team_rest_vals else None
+                opp_rest_avg = sum(opp_rest_vals) / len(opp_rest_vals) if opp_rest_vals else None
+                rest_edge_avg = None if team_rest_avg is None or opp_rest_avg is None else team_rest_avg - opp_rest_avg
+                rest_bg = '#dcfce7' if rest_edge_avg is not None and rest_edge_avg > 0 else '#fee2e2' if rest_edge_avg is not None and rest_edge_avg < 0 else '#f1f5f9'
+                rest_fg = '#166534' if rest_edge_avg is not None and rest_edge_avg > 0 else '#991b1b' if rest_edge_avg is not None and rest_edge_avg < 0 else '#64748b'
+                avg_extra_cells += f"""
+  <td style="background:{rest_bg};color:{rest_fg};text-align:center;padding:10px;
+       font-family:'Rajdhani',sans-serif;font-size:17px;font-weight:900;border-top:2px solid #cbd5e1;">
+    {f"{team_rest_avg:.1f}" if team_rest_avg is not None else '—'}
+  </td>
+  <td style="background:{rest_bg};color:{rest_fg};text-align:center;padding:10px;
+       font-family:'Rajdhani',sans-serif;font-size:17px;font-weight:900;border-top:2px solid #cbd5e1;">
+    {f"{opp_rest_avg:.1f}" if opp_rest_avg is not None else '—'}
+  </td>"""
+
+            avg_metric_cells = ''
+            for _, col, direction in metrics:
+                vals = [team_metric_values.get(r.get('opponent'), {}).get(col) for r in data_rows]
+                vals = [v for v in vals if v is not None]
+                avg_val = sum(vals) / len(vals) if vals else None
+                lo, hi = metric_ranges.get(col, (0, 0))
+                score = None if avg_val is None or hi == lo else (avg_val - lo) / (hi - lo)
+                if score is not None and direction == 'low':
+                    score = 1 - score
+                if score is not None:
+                    score = max(0, min(1, score))
+                bg, fg = ana_heat_color(score)
+                avg_metric_cells += f"""
+  <td style="background:{bg};color:{fg};text-align:center;padding:10px 8px;
+       font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:900;border-top:2px solid #cbd5e1;">
+    {ana_avg_fmt(avg_val, col)}
+  </td>"""
+
+            table_rows += f"""
+<tr>
+  <td style="position:sticky;left:0;z-index:2;background:#eef2f8;padding:11px 12px;
+       border-top:2px solid #cbd5e1;border-left:5px solid {c1};font-family:'Rajdhani',sans-serif;
+       font-size:18px;font-weight:900;color:#1a2030;">AVG</td>
+  <td style="position:sticky;left:82px;z-index:2;background:#eef2f8;padding:11px 12px;
+       border-top:2px solid #cbd5e1;font-family:'Barlow Condensed',sans-serif;font-size:18px;
+       font-weight:900;color:#1a2030;letter-spacing:1px;text-transform:uppercase;">Schedule Avg</td>
+  {avg_extra_cells}
+  {avg_metric_cells}
+</tr>"""
+
+            min_width = 420 + (74 * (len(metrics) + extra_count))
+            return f"""
+<div style="margin-top:18px;">
+  <div style="margin:0 0 8px;">
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:900;letter-spacing:4px;
+         text-transform:uppercase;color:{c1};">{title}</div>
+    <div style="font-family:'Barlow',sans-serif;font-size:13px;color:#64748b;margin-top:3px;line-height:1.45;">{description}</div>
+  </div>
+  <div style="overflow-x:auto;overflow-y:visible;border:1px solid #dfe5ef;border-radius:10px;background:#fff;
+       box-shadow:0 2px 12px rgba(15,23,42,0.08);">
+    <table style="border-collapse:separate;border-spacing:0;width:100%;min-width:{min_width}px;">
+      <thead>
+        <tr style="background:#f8fafc;">
+          <th style="position:sticky;left:0;top:0;z-index:4;background:#f8fafc;padding:10px 12px;
+               font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;letter-spacing:3px;
+               text-transform:uppercase;color:#94a3b8;text-align:left;border-bottom:1px solid #e2e6ef;">Week</th>
+          <th style="position:sticky;left:82px;top:0;z-index:4;background:#f8fafc;padding:10px 12px;
+               font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;letter-spacing:3px;
+               text-transform:uppercase;color:#94a3b8;text-align:left;border-bottom:1px solid #e2e6ef;">Opponent</th>
+          {extra_headers}
+          {table_col_header}
+        </tr>
+      </thead>
+      <tbody>{table_rows}</tbody>
+    </table>
+  </div>
+</div>"""
+
+        legend_html = f"""
+<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+     margin:10px 0 14px;">
+  <div style="font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:800;
+       letter-spacing:3px;text-transform:uppercase;color:#64748b;">Opponent metric heat map</div>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <span style="font-family:'Barlow',sans-serif;font-size:12px;color:#64748b;">Easier</span>
+    <div style="width:170px;height:12px;border-radius:3px;
+         background:linear-gradient(90deg,#16a34a 0%,#f59e0b 50%,#be1822 100%);
+         border:1px solid #d7deea;"></div>
+    <span style="font-family:'Barlow',sans-serif;font-size:12px;color:#64748b;">Harder</span>
+  </div>
+</div>"""
+
+        index_note_html = f"""
+<div style="background:#fff;border:1px solid #e2e6ef;border-left:5px solid {c1};border-radius:8px;
+     padding:14px 16px;margin:12px 0 6px;box-shadow:0 1px 6px rgba(0,0,0,0.05);">
+  <div style="font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;
+       letter-spacing:3px;text-transform:uppercase;color:#1a2030;margin-bottom:5px;">How Index Works</div>
+  <div style="font-family:'Barlow',sans-serif;font-size:13px;color:#64748b;line-height:1.55;">
+    Index is a 0-100 opponent strength score built from the Opponent Strength columns below. Each metric is scaled across the league for the selected season, then flipped where lower is better, such as rank columns and defensive DVOA. Higher/redder rows mean the opponent grades tougher across the available strength profile.
+  </div>
+</div>"""
+
+        toughest_text = (
+            f"Weeks {toughest_window[1]}-{toughest_window[2]}"
+            if toughest_window else "Not enough dated games"
+        )
+        rest_tilt = 'favorable' if net_rest > 0 else 'unfavorable' if net_rest < 0 else 'even'
+        insight_html = f"""
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px;">
+  <div style="background:#fff;border:1px solid #e2e6ef;border-radius:8px;padding:16px;">
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:3px;text-transform:uppercase;color:{c1};margin-bottom:6px;">Toughest Run</div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:38px;color:#1a2030;line-height:1;">{toughest_text}</div>
+    <div style="font-family:'Barlow',sans-serif;font-size:13px;color:#64748b;margin-top:6px;line-height:1.5;">Highest four-game average across the opponent metric index.</div>
+  </div>
+  <div style="background:#fff;border:1px solid #e2e6ef;border-radius:8px;padding:16px;">
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:3px;text-transform:uppercase;color:{c1};margin-bottom:6px;">Rest Profile</div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:38px;color:#1a2030;line-height:1;">{rest_tilt.upper()}</div>
+    <div style="font-family:'Barlow',sans-serif;font-size:13px;color:#64748b;margin-top:6px;line-height:1.5;">Net rest compares days since each team&apos;s previous game.</div>
+  </div>
+  <div style="background:#fff;border:1px solid #e2e6ef;border-radius:8px;padding:16px;">
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:900;letter-spacing:3px;text-transform:uppercase;color:{c1};margin-bottom:6px;">Spotlight Load</div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:38px;color:#1a2030;line-height:1;">{primetime_games}</div>
+    <div style="font-family:'Barlow',sans-serif;font-size:13px;color:#64748b;margin-top:6px;line-height:1.5;">Counts SNF plus non-Sunday games as schedule disruption/visibility spots.</div>
+  </div>
+</div>"""
+
+        strength_table_html = render_heat_table(
+            'Opponent Strength',
+            'Market baseline, record, rest and DVOA profile by opponent',
+            strength_metric_cols,
+            include_index=True,
+            include_rest=True,
+        )
+        continuity_table_html = render_heat_table(
+            'Opponent Continuity',
+            'Coaching and quarterback tenure can point to communication stability, system familiarity, and early-season readiness.',
+            continuity_metric_cols,
+        )
+        fantasy_table_html = render_heat_table(
+            'Fantasy Outlook',
+            'Position-level fantasy matchups metrics.',
+            fantasy_metric_cols,
+        )
+
         st.html(f"""
-<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
-     min-height:52vh;padding:60px 20px;text-align:center;">
-  <div style="font-size:78px;margin-bottom:22px;animation:pulse 3s ease-in-out infinite;">📊</div>
-  <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;
-       letter-spacing:6px;text-transform:uppercase;color:{c1};margin-bottom:10px;">Coming Soon</div>
-  <div style="font-family:'Bebas Neue',sans-serif;font-size:92px;letter-spacing:5px;
-       color:#1a2030;line-height:1;margin-bottom:14px;">ANALYTICS</div>
-  <div style="font-family:'Barlow',sans-serif;font-size:20px;font-weight:400;
-       color:#9aa5be;max-width:380px;line-height:1.8;">
-    Advanced metrics, performance trends, and deep team analytics are on the way.</div>
-</div>""")
+{cards_html}
+{insight_html}
+{index_note_html}
+{legend_html}
+{strength_table_html}
+{continuity_table_html}
+{fantasy_table_html}
+""")
 
     # ═══════════════════ TRAVEL TAB ══════════════════════════════════════════
     with sub_tabs[2]:
@@ -1489,14 +2506,67 @@ with tabs[1]:
         st.html(cards_html)
 
         arc_rows = []
+        incoming_node_rows = []
         for l in legs:
+            if l['kind'] != 'outbound':
+                continue
             if not (tv_valid_coord(l['src_lat']) and tv_valid_coord(l['src_lon']) and tv_valid_coord(l['dst_lat']) and tv_valid_coord(l['dst_lon'])):
                 continue
             arc_rows.append({
                 'from': l['from'], 'to': l['to'], 'note': l['note'], 'miles': l['miles'] or 0,
                 'src_lon': float(l['src_lon']), 'src_lat': float(l['src_lat']),
                 'dst_lon': float(l['dst_lon']), 'dst_lat': float(l['dst_lat']),
+                'kind': l['kind'],
+                'color_hex': c1,
                 'color': [37, 99, 235, 180] if l['kind'] == 'outbound' else [220, 38, 38, 160],
+            })
+
+        for _, g in team_games_all.iterrows():
+            if g.get('Home') != selected_team:
+                continue
+            opponent = g.get('Away')
+            src_lat = lat_map.get(opponent)
+            src_lon = lon_map.get(opponent)
+            game_loc = str(g.get('Location', '') or '').strip()
+            intl_val = g.get('International', False)
+            is_intl = bool(intl_val) if not isinstance(intl_val, float) else False
+            override = get_forced_venue(g)
+            if override:
+                dst_lat = lat_map.get('Los Angeles Rams')
+                dst_lon = lon_map.get('Los Angeles Rams')
+                dst_city = override[1]
+            elif is_intl:
+                idata = intl_data.get(game_loc, {})
+                dst_lat = idata.get('lat')
+                dst_lon = idata.get('lon')
+                dst_city = game_loc
+            else:
+                dst_lat = lat_map.get(selected_team)
+                dst_lon = lon_map.get(selected_team)
+                dst_city = city_map.get(selected_team, '')
+            if not (tv_valid_coord(src_lat) and tv_valid_coord(src_lon) and tv_valid_coord(dst_lat) and tv_valid_coord(dst_lon)):
+                continue
+            wk_num = pd.to_numeric(g.get('Week'), errors='coerce')
+            wk_lbl = f"Wk {int(wk_num)}" if pd.notna(wk_num) else 'Wk TBA'
+            miles = tv_haversine(float(src_lat), float(src_lon), float(dst_lat), float(dst_lon))
+            arc_rows.append({
+                'from': city_map.get(opponent, opponent),
+                'to': dst_city or city_map.get(selected_team, selected_team),
+                'note': f"{opponent} inbound: {wk_lbl} at {selected_team}",
+                'miles': miles,
+                'src_lon': float(src_lon), 'src_lat': float(src_lat),
+                'dst_lon': float(dst_lon), 'dst_lat': float(dst_lat),
+                'kind': 'outbound',
+                'color_hex': clr1_map.get(opponent, '#2563eb'),
+                'color': [37, 99, 235, 180],
+            })
+            incoming_node_rows.append({
+                'name': city_map.get(opponent, opponent),
+                'lon': float(src_lon),
+                'lat': float(src_lat),
+                'size': 9000,
+                'color': [30, 64, 175, 180],
+                'home': False,
             })
 
         arc_df = pd.DataFrame(arc_rows) if arc_rows else pd.DataFrame()
@@ -1505,7 +2575,7 @@ with tabs[1]:
             node_rows.append({
                 'name': home_base.get('city') or selected_team,
                 'lon': float(home_base['lon']), 'lat': float(home_base['lat']),
-                'size': 18000, 'color': [200, 16, 46, 210],
+                'size': 18000, 'color': [200, 16, 46, 210], 'home': True,
             })
         for g in seq:
             s = g['stop']
@@ -1516,48 +2586,12 @@ with tabs[1]:
                     'lat': float(s['lat']),
                     'size': 9000,
                     'color': [30, 64, 175, 180],
+                    'home': False,
                 })
+        node_rows.extend(incoming_node_rows)
         node_df = pd.DataFrame(node_rows).drop_duplicates(subset=['lon', 'lat']) if node_rows else pd.DataFrame()
 
-        layers = []
-        if len(arc_df) > 0:
-            layers.append(
-                pdk.Layer(
-                    "ArcLayer",
-                    data=arc_df,
-                    get_source_position='[src_lon, src_lat]',
-                    get_target_position='[dst_lon, dst_lat]',
-                    get_source_color='color',
-                    get_target_color='color',
-                    auto_highlight=True,
-                    pickable=True,
-                    get_width=3,
-                )
-            )
-        if len(node_df) > 0:
-            layers.append(
-                pdk.Layer(
-                    "ScatterplotLayer",
-                    data=node_df,
-                    get_position='[lon, lat]',
-                    get_fill_color='color',
-                    get_radius='size',
-                    pickable=True,
-                )
-            )
-
-        if layers:
-            st.pydeck_chart(
-                pdk.Deck(
-                    map_style=pdk.map_styles.LIGHT,
-                    initial_view_state=pdk.ViewState(latitude=39.5, longitude=-98.35, zoom=3.2, pitch=25),
-                    layers=layers,
-                    tooltip={'text': '{from} -> {to}\n{note}\n{miles} miles'},
-                ),
-                use_container_width=True
-            )
-        else:
-            st.info("Not enough coordinate data to draw travel routes yet.")
+        render_travel_motion_map(arc_df, node_df, f'team-travel-{abb}', height=500)
 
         leg_rows_html = ''
         for i, l in enumerate(legs):
