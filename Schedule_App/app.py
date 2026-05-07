@@ -842,7 +842,7 @@ tabs = st.tabs(["🌐 League View", "🏈 Team View"])
 
 with tabs[0]:
 
-    sub_tabs2 = st.tabs(["📋 Full Schedule", "🗓️ Weekly Schedule", "🌙 Primetime Schedule", "✈️ Travel", "📊 Analytics"])
+    sub_tabs2 = st.tabs(["📋 Full Schedule", "🗓️ Weekly Schedule", "🌙 Primetime Schedule", "📊 Analytics", "✈️ Travel"])
     lv_abb_map = dict(zip(Team_Info['Team'], Team_Info['Abb']))
     lv_logo_map = {
         t: (str(l or '').strip().strip('_').strip('`') or TBD_LOGO)
@@ -1252,7 +1252,7 @@ with tabs[0]:
   </table>
 </div>""")
 
-    with sub_tabs2[3]:
+    with sub_tabs2[4]:
         league_routes = []
         team_totals = []
         for team in Team_Info.sort_values('Team')['Team'].tolist():
@@ -1336,7 +1336,7 @@ with tabs[0]:
   </table>
 </div>""")
 
-    with sub_tabs2[4]:
+    with sub_tabs2[3]:
         # Filter to weeks 1-18 only
         analytics_games = Games.copy()
         analytics_games['_week_num'] = pd.to_numeric(analytics_games['Week'], errors='coerce')
@@ -1602,6 +1602,17 @@ setTimeout(() => {
                                     'strength': opp_strengths[j]
                                 })
 
+            opponent_metric_avgs = {}
+            for _, col, _ in lga_strength_cols:
+                opp_metric_vals = []
+                for _, tg in tm_games.iterrows():
+                    opp = tg['Away'] if tg['Home'] == tm else tg['Home']
+                    opp_metric_val = team_lga_metric_values.get(opp, {}).get(col)
+                    if opp_metric_val is not None:
+                        opp_metric_vals.append(opp_metric_val)
+                avg_opp_metric = sum(opp_metric_vals) / len(opp_metric_vals) if opp_metric_vals else None
+                opponent_metric_avgs[col] = avg_opp_metric
+
             team_sos_data.append({
                 'team': tm,
                 'avg_sos': avg_sos,
@@ -1618,6 +1629,7 @@ setTimeout(() => {
                 'q3': q3_avg,
                 'q4': q4_avg,
                 'hardest_4_games': hardest_4_games,
+                'opponent_metric_avgs': opponent_metric_avgs,
             })
 
         # ── Build cards ──────────────────────────────────────────────────────
@@ -1652,8 +1664,18 @@ setTimeout(() => {
 
             metric_cells = ''
             for _, col, direction in lga_strength_cols:
-                val = team_lga_metric_values.get(tm, {}).get(col)
-                score = lga_strength(tm, col, direction)
+                val = d['opponent_metric_avgs'].get(col)
+                if val is not None:
+                    lo, hi = lga_metric_ranges.get(col, (0, 0))
+                    if hi == lo:
+                        score = None
+                    else:
+                        score = (val - lo) / (hi - lo)
+                        if direction == 'low':
+                            score = 1 - score
+                        score = max(0, min(1, score))
+                else:
+                    score = None
                 bg, fg = lga_heat_color(score)
                 metric_cells += f'<td style="background:{bg};color:{fg};text-align:center;padding:9px 8px;font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:800;border-right:1px solid rgba(255,255,255,0.35);border-bottom:1px solid rgba(255,255,255,0.35);">{lga_fmt(val, col)}</td>'
 
@@ -1668,7 +1690,7 @@ setTimeout(() => {
 
         sos_avg_cells = ''
         for _, col, direction in lga_strength_cols:
-            vals = [team_lga_metric_values.get(d['team'], {}).get(col) for d in sos_sorted]
+            vals = [d['opponent_metric_avgs'].get(col) for d in sos_sorted]
             vals = [v for v in vals if v is not None]
             avg_val = sum(vals) / len(vals) if vals else None
             lo, hi = lga_metric_ranges.get(col, (0, 0))
@@ -1694,7 +1716,36 @@ setTimeout(() => {
 
         sos_col_headers = ''.join(f'<th style="padding:9px 8px;min-width:74px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;">{short}</th>' for short, _, _ in lga_strength_cols)
 
-        sos_table_html = f'<div style="margin-top:18px;"><div style="margin:0 0 8px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:900;letter-spacing:4px;text-transform:uppercase;color:#c8102e;">Schedule Strength Rankings</div><div style="font-family:\'Barlow\',sans-serif;font-size:13px;color:#64748b;margin-top:3px;line-height:1.45;">Average opponent strength across all games, with rest advantage/disadvantage metrics. Sorted hardest to easiest schedule.</div></div><div style="overflow-x:auto;overflow-y:visible;border:1px solid #dfe5ef;border-radius:10px;background:#fff;box-shadow:0 2px 12px rgba(15,23,42,0.08);"><table id="lga-sos-table" style="border-collapse:separate;border-spacing:0;width:100%;min-width:1100px;"><thead><tr style="background:#f8fafc;"><th style="position:sticky;left:0;top:0;z-index:4;background:#f8fafc;padding:10px 12px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;min-width:50px;">Rank</th><th style="position:sticky;left:50px;top:0;z-index:4;background:#f8fafc;padding:10px 12px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#94a3b8;text-align:left;border-bottom:1px solid #e2e6ef;">Team</th><th style="padding:9px 8px;min-width:74px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;">Index</th><th style="padding:9px 8px;min-width:80px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;">Adv</th><th style="padding:9px 8px;min-width:80px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;">Dis</th><th style="padding:9px 8px;min-width:80px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;">Net</th>{sos_col_headers}</tr></thead><tbody>{sos_rows}</tbody></table></div></div>'
+        sos_table_html = (
+            f'<div style="margin-top:18px;"><div style="margin:0 0 8px;">'
+            f'<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:900;'
+            f'letter-spacing:4px;text-transform:uppercase;color:#c8102e;">Schedule Strength Rankings</div>'
+            f'<div style="font-family:\'Barlow\',sans-serif;font-size:13px;color:#64748b;margin-top:3px;'
+            f'line-height:1.45;">Average opponent metrics across all 17 opponents, with rest advantage/disadvantage. '
+            f'Columns show opponents\' strength (O/U, Wins, DVOA, etc.), not team\'s own metrics. '
+            f'Sorted hardest to easiest schedule.</div></div>'
+            f'<div style="overflow-x:auto;overflow-y:visible;border:1px solid #dfe5ef;border-radius:10px;'
+            f'background:#fff;box-shadow:0 2px 12px rgba(15,23,42,0.08);"><table id="lga-sos-table" '
+            f'style="border-collapse:separate;border-spacing:0;width:100%;min-width:1100px;"><thead><tr '
+            f'style="background:#f8fafc;"><th style="position:sticky;left:0;top:0;z-index:4;'
+            f'background:#f8fafc;padding:10px 12px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;'
+            f'font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#94a3b8;text-align:center;'
+            f'border-bottom:1px solid #e2e6ef;min-width:50px;">Rank</th><th style="position:sticky;left:50px;'
+            f'top:0;z-index:4;background:#f8fafc;padding:10px 12px;font-family:\'Barlow Condensed\',sans-serif;'
+            f'font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#94a3b8;'
+            f'text-align:left;border-bottom:1px solid #e2e6ef;">Team</th><th style="padding:9px 8px;'
+            f'min-width:74px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;'
+            f'letter-spacing:2px;text-transform:uppercase;color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;">'
+            f'Index</th><th style="padding:9px 8px;min-width:80px;font-family:\'Barlow Condensed\',sans-serif;'
+            f'font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#94a3b8;'
+            f'text-align:center;border-bottom:1px solid #e2e6ef;">Adv</th><th style="padding:9px 8px;'
+            f'min-width:80px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;'
+            f'letter-spacing:2px;text-transform:uppercase;color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;">'
+            f'Dis</th><th style="padding:9px 8px;min-width:80px;font-family:\'Barlow Condensed\',sans-serif;'
+            f'font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#94a3b8;'
+            f'text-align:center;border-bottom:1px solid #e2e6ef;">Net</th>{sos_col_headers}</tr></thead>'
+            f'<tbody>{sos_rows}</tbody></table></div></div>'
+        )
 
         # ── Build SFI (Schedule Frontloading Index) table ─────────────────────
         sfi_data = [d for d in team_sos_data if d['sfi'] is not None]
@@ -1832,7 +1883,7 @@ setTimeout(() => {
 
         hardest_data_sorted = sorted(hardest_data, key=lambda x: x['difficulty'], reverse=True)
         hardest_rows = ''
-        for d in hardest_data_sorted:
+        for rank, d in enumerate(hardest_data_sorted, 1):
             tm = d['team']
             logo = d['logo']
             accent = d['accent']
@@ -1841,21 +1892,27 @@ setTimeout(() => {
 
             start_wk = hardest_4_games[0]['week']
             end_wk = hardest_4_games[-1]['week']
-            week_range = f'Wk {start_wk}-{end_wk}' if start_wk and end_wk else 'TBA'
+            week_range = f'Week {start_wk}-{end_wk}' if start_wk and end_wk else 'TBA'
 
-            matchups_html = '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'
+            diff_bg, diff_fg = lga_heat_color(avg_difficulty)
+
+            team_cell = f'<td style="position:sticky;left:0;z-index:2;padding:14px 12px;border-bottom:1px solid #edf0f7;border-left:5px solid {accent};background:#fff;min-width:220px;"><div style="display:flex;align-items:center;gap:10px;"><div style="font-family:\'Rajdhani\',sans-serif;font-size:20px;font-weight:900;color:#64748b;min-width:28px;">{rank}</div><img src="{logo}" style="width:34px;height:34px;object-fit:contain;" onerror="this.onerror=null;this.src=\'{TBD_LOGO}\';"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:15px;font-weight:800;color:#1a2030;line-height:1.05;">{tm}</div></div></td>'
+
+            week_cell = f'<td style="padding:14px 12px;border-bottom:1px solid #edf0f7;font-family:\'Rajdhani\',sans-serif;font-size:14px;font-weight:800;color:#1a2030;text-align:center;min-width:110px;">{week_range}</td>'
+
+            game_cells = ''
             for g in hardest_4_games:
                 opp = g['opponent']
                 opp_logo = lv_logo_map.get(opp, TBD_LOGO)
                 opp_abb = lv_abb_map.get(opp, opp[:3].upper())
                 vs_at = '@' if not g['is_home'] else 'vs'
-                matchups_html += f'<div style="display:flex;flex-direction:column;align-items:center;gap:6px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;color:#94a3b8;font-weight:700;letter-spacing:1px;text-transform:uppercase;">{vs_at}</div><img src="{opp_logo}" style="width:42px;height:42px;object-fit:contain;" onerror="this.onerror=null;this.src=\'{TBD_LOGO}\';"><span style="font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;color:#1a2030;">{opp_abb}</span></div>'
-            matchups_html += '</div>'
+                game_cells += f'<td style="padding:14px 12px;border-bottom:1px solid #edf0f7;text-align:center;min-width:130px;"><div style="display:flex;flex-direction:column;align-items:center;gap:8px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:11px;color:#94a3b8;font-weight:700;letter-spacing:1px;text-transform:uppercase;">{vs_at}</div><img src="{opp_logo}" style="width:46px;height:46px;object-fit:contain;" onerror="this.onerror=null;this.src=\'{TBD_LOGO}\';"><span style="font-family:\'Barlow Condensed\',sans-serif;font-size:12px;font-weight:800;color:#1a2030;">{opp_abb}</span></div></td>'
 
-            diff_bg, diff_fg = lga_heat_color(avg_difficulty)
-            hardest_rows += f'<tr><td style="position:sticky;left:0;z-index:2;padding:10px 12px;border-bottom:1px solid #edf0f7;border-left:5px solid {accent};background:#fff;min-width:200px;"><div style="display:flex;align-items:center;gap:10px;"><img src="{logo}" style="width:34px;height:34px;object-fit:contain;" onerror="this.onerror=null;this.src=\'{TBD_LOGO}\';"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:14px;font-weight:800;color:#1a2030;line-height:1.05;">{tm}</div></div></td><td style="padding:10px 12px;border-bottom:1px solid #edf0f7;font-family:\'Rajdhani\',sans-serif;font-size:14px;font-weight:800;color:#1a2030;text-align:center;min-width:100px;">{week_range}</td><td style="padding:14px 12px;border-bottom:1px solid #edf0f7;min-width:350px;">{matchups_html}</td><td style="background:{diff_bg};color:{diff_fg};padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.35);font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:900;text-align:center;min-width:90px;">{f"{avg_difficulty*100:.0f}"}</td></tr>'
+            index_cell = f'<td style="background:{diff_bg};color:{diff_fg};padding:14px 12px;border-bottom:1px solid rgba(255,255,255,0.35);font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:900;text-align:center;min-width:90px;">{f"{avg_difficulty*100:.0f}"}</td>'
 
-        hardest_table_html = f'<div style="margin-top:18px;"><div style="margin:0 0 8px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:900;letter-spacing:4px;text-transform:uppercase;color:#c8102e;">Hardest 4-Game Stretch</div><div style="font-family:\'Barlow\',sans-serif;font-size:13px;color:#64748b;margin-top:3px;line-height:1.45;">Toughest consecutive 4-game sequence by opponent strength. Week range, matchup list with location (@/home), and average difficulty index.</div></div><div style="overflow-x:auto;border:1px solid #dfe5ef;border-radius:10px;background:#fff;box-shadow:0 2px 12px rgba(15,23,42,0.08);"><table id="lga-hardest-table" style="border-collapse:collapse;width:100%;"><thead><tr style="background:#f8fafc;"><th style="position:sticky;left:0;top:0;z-index:4;padding:10px 12px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#94a3b8;text-align:left;border-bottom:1px solid #e2e6ef;background:#f8fafc;min-width:200px;">Team</th><th style="padding:10px 12px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;min-width:100px;">Weeks</th><th style="padding:10px 12px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#94a3b8;text-align:left;border-bottom:1px solid #e2e6ef;min-width:220px;">Matchups</th><th style="padding:10px 12px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;min-width:90px;">Index</th></tr></thead><tbody>{hardest_rows}</tbody></table></div></div>'
+            hardest_rows += f'<tr>{team_cell}{week_cell}{game_cells}{index_cell}</tr>'
+
+        hardest_table_html = f'<div style="margin-top:18px;"><div style="margin:0 0 8px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:900;letter-spacing:4px;text-transform:uppercase;color:#c8102e;">Hardest 4-Game Stretch</div><div style="font-family:\'Barlow\',sans-serif;font-size:13px;color:#64748b;margin-top:3px;line-height:1.45;">Toughest consecutive 4-game sequence by opponent strength. Each team shows their hardest 4-game window with week range and opponent matchups.</div></div><div style="overflow-x:auto;border:1px solid #dfe5ef;border-radius:10px;background:#fff;box-shadow:0 2px 12px rgba(15,23,42,0.08);"><table id="lga-hardest-table" style="border-collapse:collapse;width:100%;"><thead><tr style="background:#f8fafc;"><th style="position:sticky;left:0;top:0;z-index:4;padding:10px 12px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#94a3b8;text-align:left;border-bottom:1px solid #e2e6ef;background:#f8fafc;min-width:220px;">Team</th><th style="padding:10px 12px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;min-width:110px;">Weeks</th><th style="padding:10px 12px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;min-width:130px;">Game 1</th><th style="padding:10px 12px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;min-width:130px;">Game 2</th><th style="padding:10px 12px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;min-width:130px;">Game 3</th><th style="padding:10px 12px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;min-width:130px;">Game 4</th><th style="padding:10px 12px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;min-width:90px;">Index</th></tr></thead><tbody>{hardest_rows}</tbody></table></div></div>'
 
         # ── Top 50 Games (Bidirectional Strength) ────────────────────────────
         top_games = []
@@ -2098,7 +2155,7 @@ with tabs[1]:
 </div>""")
 
     # ── Sub-tabs ──────────────────────────────────────────────────────────────
-    sub_tabs = st.tabs(["📅  Schedule", "📊  Analytics", "✈️  Travel"])
+    sub_tabs = st.tabs(["📅  Schedule", "✈️  Travel", "📊  Analytics"])
 
     # ═══════════════════ SCHEDULE TAB ═══════════════════════════════════════
     with sub_tabs[0]:
@@ -2345,7 +2402,7 @@ with tabs[1]:
 </div>""")
 
     # ═══════════════════ ANALYTICS TAB ══════════════════════════════════════
-    with sub_tabs[1]:
+    with sub_tabs[2]:
         strength_metric_cols = [
             ('O/U', 'Vegas O/U', 'high'),
             ('2025 W', '2025 Wins', 'high'),
@@ -2948,7 +3005,7 @@ with tabs[1]:
 """)
 
     # ═══════════════════ TRAVEL TAB ══════════════════════════════════════════
-    with sub_tabs[2]:
+    with sub_tabs[1]:
         team_games_all = Games[
             (Games['Home'] == selected_team) | (Games['Away'] == selected_team)
         ].copy()
@@ -3177,7 +3234,7 @@ with tabs[1]:
         node_rows.extend(incoming_node_rows)
         node_df = pd.DataFrame(node_rows).drop_duplicates(subset=['lon', 'lat']) if node_rows else pd.DataFrame()
 
-        render_travel_motion_map(arc_df, node_df, f'team-travel-{abb}', height=500)
+        render_travel_motion_map(arc_df, node_df, f'team-travel-{abb}', height=500, initial_view=(39.5, -98.35, 4))
 
         leg_rows_html = ''
         for i, l in enumerate(legs):
