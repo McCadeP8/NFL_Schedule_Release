@@ -529,7 +529,7 @@ def travel_map_rows(legs, home_base=None, seq=None, max_arcs=None):
     node_df = pd.DataFrame(node_rows).drop_duplicates(subset=['lon', 'lat']) if node_rows else pd.DataFrame()
     return pd.DataFrame(arc_rows) if arc_rows else pd.DataFrame(), node_df
 
-def render_travel_motion_map(arc_df, node_df, key, height=500):
+def render_travel_motion_map(arc_df, node_df, key, height=500, initial_view=None):
     if len(arc_df) == 0:
         st.info("Not enough coordinate data to draw travel routes yet.")
         return
@@ -539,6 +539,8 @@ def render_travel_motion_map(arc_df, node_df, key, height=500):
     map_id = f"travel-map-{''.join(ch if ch.isalnum() else '-' for ch in str(key))}"
     arcs_json = json.dumps(arcs)
     nodes_json = json.dumps(nodes)
+    use_fixed_view = initial_view is not None
+    iv_lat, iv_lon, iv_zoom = initial_view if initial_view else (0, 0, 0)
     components.html(f"""
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
@@ -588,7 +590,9 @@ def render_travel_motion_map(arc_df, node_df, key, height=500):
     const bounds = [];
     arcs.forEach(a => bounds.push([a.src_lat, a.src_lon], [a.dst_lat, a.dst_lon]));
     nodes.forEach(n => bounds.push([n.lat, n.lon]));
-    if (bounds.length) {{
+    if ({use_fixed_view}) {{
+      map.setView([{iv_lat}, {iv_lon}], {iv_zoom});
+    }} else if (bounds.length) {{
       map.fitBounds(bounds, {{ padding: [28, 28], maxZoom: 5 }});
     }} else {{
       map.setView([39.5, -98.35], 4);
@@ -1284,7 +1288,7 @@ with tabs[0]:
         )
 
         league_arc_df, league_node_df = travel_map_rows(league_routes)
-        render_travel_motion_map(league_arc_df, league_node_df, 'league-travel', height=520)
+        render_travel_motion_map(league_arc_df, league_node_df, 'league-travel', height=520, initial_view=(39.5, -98.35, 4))
 
         totals_df = pd.DataFrame(team_totals).sort_values('Total Miles', ascending=False).reset_index(drop=True)
         league_rows_html = ''
@@ -1333,7 +1337,435 @@ with tabs[0]:
 </div>""")
 
     with sub_tabs2[4]:
-        st.write("Analytics goes here")
+        # ── Sorting JavaScript ───────────────────────────────────────────────
+        sort_script = '''<script>
+function makeSortable(tableId) {
+  const table = document.getElementById(tableId);
+  if (!table) return;
+  const headers = table.querySelectorAll('thead th');
+  headers.forEach((header, idx) => {
+    if (idx < 2) return;
+    header.style.cursor = 'pointer';
+    header.addEventListener('click', () => sortTable(tableId, idx));
+  });
+}
+function sortTable(tableId, col) {
+  const table = document.getElementById(tableId);
+  const tbody = table.querySelector('tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr')).filter(r => r.querySelectorAll('td').length > col);
+  rows.sort((a, b) => {
+    const aVal = a.querySelectorAll('td')[col]?.textContent.trim() || '';
+    const bVal = b.querySelectorAll('td')[col]?.textContent.trim() || '';
+    const aNum = parseFloat(aVal.replace(/[^0-9.-]/g, ''));
+    const bNum = parseFloat(bVal.replace(/[^0-9.-]/g, ''));
+    if (!isNaN(aNum) && !isNaN(bNum)) return bNum - aNum;
+    return aVal.localeCompare(bVal);
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+setTimeout(() => {
+  makeSortable('lga-sos-table');
+  makeSortable('lga-rest-table');
+  makeSortable('lga-sfi-table');
+  makeSortable('lga-hardest-table');
+  makeSortable('lga-top-games-table');
+}, 100);
+</script>'''
+
+        # ── League Analytics Helpers ─────────────────────────────────────────
+        lga_strength_cols = [
+            ('O/U', 'Vegas O/U', 'high'),
+            ('2025 W', '2025 Wins', 'high'),
+            ('DVOA', 'Total', 'high'),
+            ('DVOA Rk', 'Total Rank', 'low'),
+            ('Off', 'Offense', 'high'),
+            ('Off Rk', 'Offensive Rank', 'low'),
+            ('Def', 'Defense', 'low'),
+            ('Def Rk', 'Defensive Rank', 'low'),
+            ('ST', 'Special Teams', 'high'),
+            ('ST Rk', 'Special Teams Rank', 'low'),
+        ]
+        lga_continuity_cols = [
+            ('QB', 'QB Tenure', 'high'),
+            ('HC', 'HC Tenure', 'high'),
+            ('OC', 'OC Tenure', 'high'),
+            ('DC', 'DC Tenure', 'high'),
+            ('SC', 'SC Tenure', 'high'),
+        ]
+        lga_fantasy_cols = [
+            ('QB', 'QBF', 'high'),
+            ('RB', 'RBF', 'high'),
+            ('WR', 'WRF', 'high'),
+            ('TE', 'TEF', 'high'),
+            ('K', 'KF', 'high'),
+            ('DST', 'DSTF', 'high'),
+        ]
+        all_lga_cols = lga_strength_cols + lga_continuity_cols + lga_fantasy_cols
+
+        def lga_clean_num(v):
+            if v is None:
+                return None
+            s = str(v).strip().replace('%', '').replace(',', '')
+            if s.lower() in ('', 'nan', 'none', '—', '-'):
+                return None
+            try:
+                return float(s)
+            except Exception:
+                return None
+
+        def lga_clean_metric(col, v):
+            if col == '2025 Wins':
+                if v is None:
+                    return None
+                parts = str(v).strip().split('-')
+                try:
+                    wins_num = float(parts[0])
+                    ties_num = float(parts[2]) if len(parts) > 2 else 0
+                    return wins_num + (ties_num * 0.5)
+                except Exception:
+                    return lga_clean_num(v)
+            return lga_clean_num(v)
+
+        team_lga_metric_values = {}
+        for _, r in Team_Info.iterrows():
+            tm = str(r.get('Team', '')).strip()
+            team_lga_metric_values[tm] = {col: lga_clean_metric(col, r.get(col)) for _, col, _ in all_lga_cols}
+
+        lga_metric_ranges = {}
+        for _, col, _ in all_lga_cols:
+            vals = [v.get(col) for v in team_lga_metric_values.values() if v.get(col) is not None]
+            lga_metric_ranges[col] = (min(vals), max(vals)) if vals else (0, 0)
+
+        def lga_strength(team, col, direction):
+            val = team_lga_metric_values.get(team, {}).get(col)
+            lo, hi = lga_metric_ranges.get(col, (0, 0))
+            if val is None or hi == lo:
+                return None
+            pct = (val - lo) / (hi - lo)
+            if direction == 'low':
+                pct = 1 - pct
+            return max(0, min(1, pct))
+
+        def lga_heat_color(score):
+            if score is None:
+                return '#f1f5f9', '#94a3b8'
+            if score < 0.5:
+                t = score / 0.5
+                r = round(22 + (245 - 22) * t)
+                g = round(163 + (158 - 163) * t)
+                b = round(74 + (11 - 74) * t)
+            else:
+                t = (score - 0.5) / 0.5
+                r = round(245 + (190 - 245) * t)
+                g = round(158 + (24 - 158) * t)
+                b = round(11 + (34 - 11) * t)
+            fg = '#ffffff' if score > 0.70 else '#111827'
+            return f'rgb({r},{g},{b})', fg
+
+        def lga_fmt(v, col):
+            if v is None:
+                return '—'
+            if 'Rank' in col:
+                return f'{int(v)}'
+            if col in ('Total', 'Offense', 'Defense', 'Special Teams'):
+                return f'{v:g}%'
+            return f'{v:g}'
+
+        def lga_avg_fmt(v, col):
+            if v is None:
+                return '—'
+            if col in ('Total', 'Offense', 'Defense', 'Special Teams'):
+                return f'{v:.1f}%'
+            return f'{v:.1f}'
+
+        # ── Per-team SOS & game stats ────────────────────────────────────────
+        team_sos_data = []
+        all_games_for_top50 = []
+
+        for tm in Team_Info['Team'].astype(str).str.strip().tolist():
+            tm_games = Games[(Games['Home'] == tm) | (Games['Away'] == tm)].copy()
+            tm_games['_week_num'] = pd.to_numeric(tm_games['Week'], errors='coerce')
+            tm_games['_date_num'] = pd.to_datetime(tm_games['Date'], errors='coerce')
+            tm_games = tm_games.sort_values(['_week_num', '_date_num']).reset_index(drop=True)
+
+            ou_vals = []
+            rest_edges = []
+            rest_adv_ct = 0
+            rest_dis_ct = 0
+            road_ct = 0
+            pt_ct = 0
+            intl_ct = 0
+            q1_scores, q2_scores, q3_scores, q4_scores = [], [], [], []
+
+            hardest_4_game_stretch = None
+            hardest_4_idx = None
+            hardest_4_score = -1
+
+            for i, (_, tg) in enumerate(tm_games.iterrows()):
+                opp = tg['Away'] if tg['Home'] == tm else tg['Home']
+                wk_num = pd.to_numeric(tg.get('Week'), errors='coerce')
+
+                opp_ou = team_lga_metric_values.get(opp, {}).get('Vegas O/U')
+                if opp_ou is not None:
+                    ou_vals.append(opp_ou)
+
+                opp_scores = [lga_strength(opp, col, direction) for _, col, direction in lga_strength_cols]
+                opp_scores = [s for s in opp_scores if s is not None]
+                opp_strength = sum(opp_scores) / len(opp_scores) if opp_scores else None
+
+                if pd.notna(wk_num) and opp_strength is not None:
+                    if wk_num <= 4:
+                        q1_scores.append(opp_strength)
+                    elif wk_num <= 9:
+                        q2_scores.append(opp_strength)
+                    elif wk_num <= 14:
+                        q3_scores.append(opp_strength)
+                    else:
+                        q4_scores.append(opp_strength)
+                    all_games_for_top50.append({'team': tm, 'opponent': opp, 'week': wk_num, 'strength': opp_strength})
+
+                tg_dt = pd.to_datetime(tg.get('Date'), errors='coerce')
+                if tg['Home'] != tm:
+                    road_ct += 1
+                is_neutral = bool(tg.get('International', False)) if not isinstance(tg.get('International', False), float) else False
+                if is_neutral:
+                    intl_ct += 1
+                if get_day_type(tg) != 'sunday':
+                    pt_ct += 1
+
+                prev_tg = tm_games[tm_games['_date_num'] < tg_dt]
+                if len(prev_tg) > 0:
+                    prev_dt = pd.to_datetime(prev_tg.iloc[-1].get('Date'), errors='coerce')
+                    if pd.notna(prev_dt) and pd.notna(tg_dt):
+                        tm_rest = int((tg_dt - prev_dt).days)
+                        opp_prev = prev_tg.iloc[-1]
+                        opp_opponent = opp_prev['Away'] if opp_prev['Home'] == tm else opp_prev['Home']
+                        opp_prev_dt = prev_dt
+                        opp_rest = int((tg_dt - opp_prev_dt).days)
+                        rest_edge = tm_rest - opp_rest
+                        rest_edges.append(rest_edge)
+                        if rest_edge > 0:
+                            rest_adv_ct += 1
+                        elif rest_edge < 0:
+                            rest_dis_ct += 1
+
+            avg_ou = sum(ou_vals) / len(ou_vals) if ou_vals else None
+            q1_avg = sum(q1_scores) / len(q1_scores) if q1_scores else None
+            q2_avg = sum(q2_scores) / len(q2_scores) if q2_scores else None
+            q3_avg = sum(q3_scores) / len(q3_scores) if q3_scores else None
+            q4_avg = sum(q4_scores) / len(q4_scores) if q4_scores else None
+            all_q_scores = q1_scores + q2_scores + q3_scores + q4_scores
+            avg_sos = sum(all_q_scores) / len(all_q_scores) if all_q_scores else None
+
+            total_sfi = None
+            if all_q_scores:
+                first_half_avg = (sum(q1_scores) + sum(q2_scores)) / (len(q1_scores) + len(q2_scores)) if (q1_scores or q2_scores) else None
+                second_half_avg = (sum(q3_scores) + sum(q4_scores)) / (len(q3_scores) + len(q4_scores)) if (q3_scores or q4_scores) else None
+                if first_half_avg is not None and second_half_avg is not None:
+                    total_sfi = first_half_avg - second_half_avg
+
+            net_rest = sum(rest_edges) if rest_edges else 0
+
+            hardest_4_stretch_str = 'N/A'
+            for i in range(len(tm_games) - 3):
+                window = tm_games.iloc[i:i+4]
+                if len(window) == 4:
+                    window_wks = window['Week'].astype(str)
+                    window_opps = [row['Away'] if row['Home'] == tm else row['Home'] for _, row in window.iterrows()]
+                    opp_strengths = []
+                    for opp in window_opps:
+                        scores = [lga_strength(opp, col, direction) for _, col, direction in lga_strength_cols]
+                        scores = [s for s in scores if s is not None]
+                        if scores:
+                            opp_strengths.append(sum(scores) / len(scores))
+                    if opp_strengths and len(opp_strengths) == 4:
+                        avg_str = sum(opp_strengths) / 4
+                        if avg_str > hardest_4_score:
+                            hardest_4_score = avg_str
+                            try:
+                                start_wk = int(window['Week'].iloc[0])
+                                end_wk = int(window['Week'].iloc[-1])
+                                opp_abbrs = [lv_abb_map.get(o, o[:3].upper()) for o in window_opps]
+                                hardest_4_stretch_str = f'Week {start_wk}-{end_wk}: {", ".join(opp_abbrs)}'
+                            except:
+                                hardest_4_stretch_str = 'N/A'
+
+            team_sos_data.append({
+                'team': tm,
+                'avg_sos': avg_sos,
+                'avg_ou': avg_ou,
+                'net_rest': net_rest,
+                'rest_adv': rest_adv_ct,
+                'rest_dis': rest_dis_ct,
+                'road_games': road_ct,
+                'primetime_games': pt_ct,
+                'intl_games': intl_ct,
+                'sfi': total_sfi,
+                'q1': q1_avg,
+                'q2': q2_avg,
+                'q3': q3_avg,
+                'q4': q4_avg,
+                'hardest_4': hardest_4_stretch_str,
+            })
+
+        # ── Build cards ──────────────────────────────────────────────────────
+        league_game_count = len(Games)
+        league_pt_count = len(Games[Games.apply(lambda r: get_day_type(r) != 'sunday', axis=1)])
+        league_intl_count = len(Games[Games['International'].apply(lambda v: bool(v) if not isinstance(v, float) else False)])
+        hard_sched_teams = sum(1 for d in team_sos_data if d['avg_sos'] is not None and d['avg_sos'] >= 0.56)
+
+        def lga_card(label, value, sub='', accent='#c8102e'):
+            sub_html = f'<div style="font-family:\'Barlow\',sans-serif;font-size:12px;color:#64748b;margin-top:3px;">{sub}</div>' if sub else ''
+            return f'<div style="background:#fff;border:1px solid #e2e6ef;border-radius:8px;padding:16px 18px;box-shadow:0 1px 6px rgba(0,0,0,0.06);border-top:4px solid {accent};min-width:150px;flex:1;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;font-weight:800;letter-spacing:3.5px;text-transform:uppercase;color:#94a3b8;margin-bottom:5px;">{label}</div><div style="font-family:\'Bebas Neue\',sans-serif;font-size:44px;color:#1a2030;line-height:1;">{value}</div>{sub_html}</div>'
+
+        cards_html = '<div style="display:flex;gap:12px;margin:18px 0;flex-wrap:wrap;">'
+        cards_html += lga_card('Total Games', f'{league_game_count:,}')
+        cards_html += lga_card('Primetime Games', f'{league_pt_count:,}', 'TNF / SNF / MNF')
+        cards_html += lga_card('International Games', f'{league_intl_count:,}', 'neutral/intl venues')
+        cards_html += lga_card('Hard Schedules', f'{hard_sched_teams}', f'of {len(team_sos_data)} teams')
+        cards_html += '</div>'
+
+        # ── Build SOS rankings table ─────────────────────────────────────────
+        sos_sorted = sorted([d for d in team_sos_data if d['avg_sos'] is not None], key=lambda d: d['avg_sos'], reverse=True)
+        sos_rows = ''
+        for rank, d in enumerate(sos_sorted, 1):
+            tm = d['team']
+            logo = lv_logo_map.get(tm, TBD_LOGO)
+            accent = lv_clr_map.get(tm, '#374151')
+            avg_sos = d['avg_sos']
+            sos_bg, sos_fg = lga_heat_color(avg_sos)
+
+            metric_cells = ''
+            for _, col, direction in lga_strength_cols:
+                val = team_lga_metric_values.get(tm, {}).get(col)
+                score = lga_strength(tm, col, direction)
+                bg, fg = lga_heat_color(score)
+                metric_cells += f'<td style="background:{bg};color:{fg};text-align:center;padding:9px 8px;font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:800;border-right:1px solid rgba(255,255,255,0.35);border-bottom:1px solid rgba(255,255,255,0.35);">{lga_fmt(val, col)}</td>'
+
+            sos_rows += f'<tr><td style="position:sticky;left:0;z-index:2;background:#fff;padding:10px 12px;border-bottom:1px solid #edf0f7;border-left:5px solid {accent};min-width:50px;text-align:center;font-family:\'Rajdhani\',sans-serif;font-size:18px;font-weight:900;color:#1a2030;">{rank}</td><td style="position:sticky;left:50px;z-index:2;background:#fff;padding:9px 12px;border-bottom:1px solid #edf0f7;min-width:210px;"><div style="display:flex;align-items:center;gap:10px;"><img src="{logo}" style="width:34px;height:34px;object-fit:contain;" onerror="this.onerror=null;this.src=\'{TBD_LOGO}\';"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:#1a2030;line-height:1.05;">{tm}</div></div></td><td style="background:{sos_bg};color:{sos_fg};text-align:center;padding:9px 10px;font-family:\'Rajdhani\',sans-serif;font-size:18px;font-weight:900;border-bottom:1px solid rgba(255,255,255,0.35);">{f"{avg_sos*100:.0f}" if avg_sos else "—"}</td>{metric_cells}</tr>'
+
+        sos_avg_cells = ''
+        for _, col, direction in lga_strength_cols:
+            vals = [team_lga_metric_values.get(d['team'], {}).get(col) for d in sos_sorted]
+            vals = [v for v in vals if v is not None]
+            avg_val = sum(vals) / len(vals) if vals else None
+            lo, hi = lga_metric_ranges.get(col, (0, 0))
+            score = None if avg_val is None or hi == lo else (avg_val - lo) / (hi - lo)
+            if score is not None and direction == 'low':
+                score = 1 - score
+            score = max(0, min(1, score)) if score is not None else None
+            bg, fg = lga_heat_color(score)
+            sos_avg_cells += f'<td style="background:{bg};color:{fg};text-align:center;padding:10px 8px;font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:900;border-top:2px solid #cbd5e1;">{lga_avg_fmt(avg_val, col)}</td>'
+
+        sos_avg_sos_vals = [d['avg_sos'] for d in sos_sorted if d['avg_sos'] is not None]
+        sos_avg_sos = sum(sos_avg_sos_vals) / len(sos_avg_sos_vals) if sos_avg_sos_vals else None
+        sos_avg_bg, sos_avg_fg = lga_heat_color(sos_avg_sos)
+
+        sos_rows += f'<tr><td style="position:sticky;left:0;z-index:2;background:#eef2f8;padding:11px 12px;border-top:2px solid #cbd5e1;border-left:5px solid #c8102e;font-family:\'Rajdhani\',sans-serif;font-size:18px;font-weight:900;color:#1a2030;">AVG</td><td style="position:sticky;left:50px;z-index:2;background:#eef2f8;padding:11px 12px;border-top:2px solid #cbd5e1;font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:900;color:#1a2030;letter-spacing:1px;text-transform:uppercase;">League Avg</td><td style="background:{sos_avg_bg};color:{sos_avg_fg};text-align:center;padding:10px;font-family:\'Rajdhani\',sans-serif;font-size:18px;font-weight:900;border-top:2px solid #cbd5e1;">{f"{sos_avg_sos*100:.0f}" if sos_avg_sos else "—"}</td>{sos_avg_cells}</tr>'
+
+        sos_col_headers = ''.join(f'<th style="padding:9px 8px;min-width:74px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;">{short}</th>' for short, _, _ in lga_strength_cols)
+
+        sos_table_html = f'<div style="margin-top:18px;"><div style="margin:0 0 8px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:900;letter-spacing:4px;text-transform:uppercase;color:#c8102e;">Schedule Strength Rankings</div><div style="font-family:\'Barlow\',sans-serif;font-size:13px;color:#64748b;margin-top:3px;line-height:1.45;">Average opponent strength across all games, sorted hardest to easiest.</div></div><div style="overflow-x:auto;overflow-y:visible;border:1px solid #dfe5ef;border-radius:10px;background:#fff;box-shadow:0 2px 12px rgba(15,23,42,0.08);"><table style="border-collapse:separate;border-spacing:0;width:100%;min-width:900px;"><thead><tr style="background:#f8fafc;"><th style="position:sticky;left:0;top:0;z-index:4;background:#f8fafc;padding:10px 12px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;min-width:50px;">Rank</th><th style="position:sticky;left:50px;top:0;z-index:4;background:#f8fafc;padding:10px 12px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#94a3b8;text-align:left;border-bottom:1px solid #e2e6ef;">Team</th><th style="padding:9px 8px;min-width:74px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;">Index</th>{sos_col_headers}</tr></thead><tbody>{sos_rows}</tbody></table></div></div>'
+
+        # ── Build SFI (Schedule Frontloading Index) table ─────────────────────
+        sfi_data = [d for d in team_sos_data if d['sfi'] is not None]
+        sfi_sorted = sorted(sfi_data, key=lambda d: d['sfi'], reverse=True)
+        sfi_rows = ''
+
+        for rank, d in enumerate(sfi_sorted, 1):
+            tm = d['team']
+            logo = lv_logo_map.get(tm, TBD_LOGO)
+            accent = lv_clr_map.get(tm, '#374151')
+            sfi = d['sfi']
+            first_half = d['first_half_avg']
+            second_half = d['second_half_avg']
+            sfi_norm = (sfi + 1) / 2
+            sfi_norm = max(0, min(1, sfi_norm))
+            sfi_bg, sfi_fg = lga_heat_color(sfi_norm)
+
+            verdict = 'FRONTLOADED' if sfi > 0.08 else 'BACKLOADED' if sfi < -0.08 else 'EVEN'
+            verdict_color = '#be1822' if sfi > 0.08 else '#16a34a' if sfi < -0.08 else '#64748b'
+
+            sfi_rows += f'<tr><td style="position:sticky;left:0;z-index:2;background:#fff;padding:10px 12px;border-bottom:1px solid #edf0f7;border-left:5px solid {accent};min-width:50px;text-align:center;font-family:\'Rajdhani\',sans-serif;font-size:18px;font-weight:900;color:#1a2030;">{rank}</td><td style="position:sticky;left:50px;z-index:2;background:#fff;padding:9px 12px;border-bottom:1px solid #edf0f7;min-width:210px;"><div style="display:flex;align-items:center;gap:10px;"><img src="{logo}" style="width:34px;height:34px;object-fit:contain;" onerror="this.onerror=null;this.src=\'{TBD_LOGO}\';"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:800;color:#1a2030;line-height:1.05;">{tm}</div></div></td><td style="background:{sfi_bg};color:{sfi_fg};text-align:center;padding:9px 10px;font-family:\'Rajdhani\',sans-serif;font-size:18px;font-weight:900;border-bottom:1px solid rgba(255,255,255,0.35);">{sfi:+.2f}</td><td style="background:#f1f5f9;color:#64748b;text-align:center;padding:9px 10px;font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:800;border-bottom:1px solid #edf0f7;">{f"{first_half*100:.0f}" if first_half else "—"}</td><td style="background:#f1f5f9;color:#64748b;text-align:center;padding:9px 10px;font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:800;border-bottom:1px solid #edf0f7;">{f"{second_half*100:.0f}" if second_half else "—"}</td><td style="background:#fff;color:{verdict_color};text-align:center;padding:9px 10px;font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:900;letter-spacing:2px;text-transform:uppercase;border-bottom:1px solid #edf0f7;">{verdict}</td></tr>'
+
+        sfi_table_html = f'<div style="margin-top:18px;"><div style="margin:0 0 8px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:900;letter-spacing:4px;text-transform:uppercase;color:#c8102e;">Schedule Frontloading Index (SFI)</div><div style="font-family:\'Barlow\',sans-serif;font-size:13px;color:#64748b;margin-top:3px;line-height:1.45;">Compares first-half (Weeks 1–9) vs second-half (Weeks 10–18) opponent strength. Positive SFI = harder early (disadvantage); negative SFI = harder late (advantage).</div></div><div style="overflow-x:auto;overflow-y:visible;border:1px solid #dfe5ef;border-radius:10px;background:#fff;box-shadow:0 2px 12px rgba(15,23,42,0.08);"><table style="border-collapse:separate;border-spacing:0;width:100%;min-width:900px;"><thead><tr style="background:#f8fafc;"><th style="position:sticky;left:0;top:0;z-index:4;background:#f8fafc;padding:10px 12px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;min-width:50px;">Rank</th><th style="position:sticky;left:50px;top:0;z-index:4;background:#f8fafc;padding:10px 12px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#94a3b8;text-align:left;border-bottom:1px solid #e2e6ef;">Team</th><th style="padding:9px 8px;min-width:90px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;">SFI</th><th style="padding:9px 8px;min-width:90px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;">Weeks 1–9</th><th style="padding:9px 8px;min-width:90px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;">Weeks 10–18</th><th style="padding:9px 8px;min-width:120px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;">Verdict</th></tr></thead><tbody>{sfi_rows}</tbody></table></div></div>'
+
+        # ── All Games Table (Part C) ─────────────────────────────────────────
+        all_games_copy = Games.copy()
+        all_games_copy['_week_num'] = pd.to_numeric(all_games_copy['Week'], errors='coerce')
+        all_games_copy['_date_dt'] = pd.to_datetime(all_games_copy['Date'], errors='coerce')
+
+        known_games = all_games_copy[all_games_copy['_week_num'].notna()].copy()
+        known_games = known_games.sort_values(['_week_num', '_date_dt']).reset_index(drop=True)
+
+        tba_games = all_games_copy[all_games_copy['_week_num'].isna()].copy()
+        game_type_priority = {'Regular Season': 0, 'Preseason': 1, 'Playoff': 2, 'Super Bowl': 3}
+        tba_games['_type_priority'] = tba_games['Game Type'].apply(lambda x: game_type_priority.get(str(x).strip(), 999))
+        tba_games = tba_games.sort_values(['_type_priority', 'Away']).reset_index(drop=True)
+
+        all_games_rows_html = ''
+        current_week_header = None
+
+        for _, g in pd.concat([known_games, tba_games], ignore_index=True).iterrows():
+            wk_raw = g.get('Week', '')
+            try:
+                wk_val = int(wk_raw)
+                wk_label = f'Week {wk_val}'
+            except Exception:
+                wk_val = None
+                wk_label = 'TBA'
+
+            if wk_label != current_week_header:
+                current_week_header = wk_label
+                if wk_val is not None:
+                    header_style = 'background:#eef2f8;border-top:1px solid #dde2ed;border-bottom:1px solid #dde2ed;'
+                    fg = '#64748b'
+                else:
+                    header_style = 'background:#0b0f19;border-top:1px solid #111827;border-bottom:1px solid #111827;'
+                    fg = '#fff'
+                all_games_rows_html += f'<tr style="{header_style}"><td style="width:5px;padding:0;background:{"#1a2030" if wk_val else "#c8102e"};"></td><td colspan="7" style="padding:8px 14px;font-family:\'Barlow Condensed\',sans-serif;font-size:12px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:{fg};">{wk_label}</td></tr>'
+
+            home = g['Home']
+            away = g['Away']
+            home_abb = lv_abb_map.get(home, str(home)[:3].upper())
+            away_abb = lv_abb_map.get(away, str(away)[:3].upper())
+            home_logo = lv_logo_map.get(home, TBD_LOGO)
+            away_logo = lv_logo_map.get(away, TBD_LOGO)
+            home_clr = lv_clr_map.get(home, '#374151')
+
+            try:
+                dt_label = pd.to_datetime(g.get('Date')).strftime('%a, %b %-d')
+            except Exception:
+                try:
+                    dt_label = pd.to_datetime(g.get('Date')).strftime('%a, %b %#d')
+                except Exception:
+                    dt_label = str(g.get('Date', 'TBD'))
+
+            time_et = str(g.get('Time (ET)', '') or '').strip()
+            if time_et.lower() in ('', 'nan'):
+                time_et = 'TBD'
+
+            tv = str(g.get('TV Network', '') or '').strip()
+            if tv.lower() in ('', 'nan'):
+                tv = ''
+            tv_badge = f'<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;background:#e5e7eb;color:#374151;padding:3px 8px;border-radius:3px;display:inline-block;">{tv}</span>' if tv else ''
+
+            game_type = str(g.get('Game Type', '') or '').strip()
+            if game_type.lower() in ('', 'nan', 'none'):
+                game_type = 'Regular Season'
+
+            loc = str(g.get('Location', '') or '').strip()
+            if not loc:
+                loc = 'TBD'
+
+            all_games_rows_html += f'<tr style="background:#ffffff;border-bottom:1px solid #edf0f7;"><td style="width:5px;padding:0;background:{home_clr};"></td><td style="padding:10px 12px;font-family:\'Rajdhani\',sans-serif;font-size:13px;font-weight:800;color:#64748b;min-width:90px;">{dt_label}</td><td style="padding:10px 12px;font-family:\'Rajdhani\',sans-serif;font-size:13px;color:#64748b;min-width:60px;">{time_et}</td><td style="padding:10px 12px;min-width:140px;"><div style="display:flex;align-items:center;gap:8px;"><img src="{away_logo}" style="width:28px;height:28px;object-fit:contain;" onerror="this.onerror=null;this.src=\'{TBD_LOGO}\';"><span style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:800;color:#1a2030;">{away_abb}</span></div></td><td style="padding:10px 12px;text-align:center;font-family:\'Barlow Condensed\',sans-serif;font-size:13px;color:#64748b;">@</td><td style="padding:10px 12px;min-width:140px;"><div style="display:flex;align-items:center;gap:8px;"><img src="{home_logo}" style="width:28px;height:28px;object-fit:contain;" onerror="this.onerror=null;this.src=\'{TBD_LOGO}\';"><span style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:800;color:#1a2030;">{home_abb}</span></div></td><td style="padding:10px 12px;min-width:180px;font-family:\'Barlow\',sans-serif;font-size:12px;color:#64748b;">{game_type}</td><td style="padding:10px 12px;min-width:120px;">{tv_badge}</td></tr>'
+
+        all_games_table_html = f'<div style="margin-top:18px;"><div style="margin:0 0 8px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:900;letter-spacing:4px;text-transform:uppercase;color:#c8102e;">All Games ({len(all_games_copy)} total)</div><div style="font-family:\'Barlow\',sans-serif;font-size:13px;color:#64748b;margin-top:3px;line-height:1.45;">Complete game schedule including TBA matchups and dates.</div></div><div style="overflow-x:auto;border:1px solid #dfe5ef;border-radius:10px;background:#fff;box-shadow:0 2px 12px rgba(15,23,42,0.08);"><table style="border-collapse:collapse;width:100%;min-width:800px;"><thead><tr style="background:#f8fafc;"><th style="width:5px;background:#f8fafc;"></th><th style="padding:10px 12px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#94a3b8;text-align:left;border-bottom:1px solid #e2e6ef;min-width:90px;">Date</th><th style="padding:10px 12px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#94a3b8;text-align:left;border-bottom:1px solid #e2e6ef;min-width:60px;">Time</th><th style="padding:10px 12px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#94a3b8;text-align:left;border-bottom:1px solid #e2e6ef;min-width:140px;">Away</th><th style="padding:10px 12px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#94a3b8;text-align:center;border-bottom:1px solid #e2e6ef;width:30px;"></th><th style="padding:10px 12px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#94a3b8;text-align:left;border-bottom:1px solid #e2e6ef;min-width:140px;">Home</th><th style="padding:10px 12px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#94a3b8;text-align:left;border-bottom:1px solid #e2e6ef;min-width:180px;">Type</th><th style="padding:10px 12px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#94a3b8;text-align:left;border-bottom:1px solid #e2e6ef;min-width:120px;">TV</th></tr></thead><tbody>{all_games_rows_html}</tbody></table></div></div>'
+
+        # ── Render everything ────────────────────────────────────────────────
+        legend_html = f'<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:10px 0 14px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:12px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#64748b;">Opponent metric heat map (SOS Index)</div><div style="display:flex;align-items:center;gap:8px;"><span style="font-family:\'Barlow\',sans-serif;font-size:12px;color:#64748b;">Easier</span><div style="width:170px;height:12px;border-radius:3px;background:linear-gradient(90deg,#16a34a 0%,#f59e0b 50%,#be1822 100%);border:1px solid #d7deea;"></div><span style="font-family:\'Barlow\',sans-serif;font-size:12px;color:#64748b;">Harder</span></div></div>'
+
+        st.html(f"""{cards_html}{sos_table_html}{legend_html}{sfi_table_html}{all_games_table_html}""")
 
 with tabs[1]:
 
