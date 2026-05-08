@@ -285,7 +285,7 @@ st.html(f"""
     <img class="nfl-logo" src="{NFL_LOGO}" alt="NFL">
     <div>
       <div class="masthead-sub">Schedule Hub</div>
-      <div class="masthead-title">NFL SCHEDULE</div>
+      <div class="masthead-title">2025 NFL SCHEDULE</div>
     </div>
   </div>
 </div>
@@ -297,14 +297,16 @@ season_choices = sorted(
 if not season_choices:
     season_choices = ['2025', '2026']
 default_season = '2026' if '2026' in season_choices else season_choices[-1]
-season_col, _ = st.columns([1.2, 5.8])
-with season_col:
-    selected_season = st.selectbox(
-        "Select Season",
-        season_choices,
-        index=season_choices.index(default_season),
-        key="global_season_select",
-    )
+# season_col, _ = st.columns([1.2, 5.8])
+# with season_col:
+#     selected_season = st.selectbox(
+#         "Select Season",
+#         season_choices,
+#         index=season_choices.index(default_season),
+#         key="global_season_select",
+#     )
+
+selected_season = 2025
 
 Games = ALL_GAMES[ALL_GAMES['_season'].astype(str) == str(selected_season)].copy()
 
@@ -844,7 +846,6 @@ def make_division_table(division_label, division_teams, cells, row_offset=0):
 
     html += '</tbody></table></div>'
     return html
-
 
 tabs = st.tabs(["🌐 League View", "🏈 Team View"])
 
