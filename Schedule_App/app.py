@@ -400,10 +400,16 @@ def build_team_travel(team, games, city_map, stad_map, lat_map, lon_map, tz_map,
                 'city': override[1], 'stadium': override[0], 'lat': lat_map.get('Los Angeles Rams'),
                 'lon': lon_map.get('Los Angeles Rams'), 'tz': 'PT',
             }
-        if is_intl:
+
+        team_city = city_map.get(team, '').lower()
+        opp_city = city_map.get(opponent, '').lower()
+        game_loc_lower = game_loc.lower() if game_loc else ''
+        is_neutral = (game_loc in NEUTRAL_LOCATION_SET) or (is_intl and game_loc) or (game_loc_lower and team_city and opp_city and game_loc_lower != team_city and game_loc_lower != opp_city)
+
+        if is_neutral and game_loc:
             idata = intl_data.get(game_loc, {})
             return {
-                'opponent': opponent, 'is_intl': True, 'travel_required': True,
+                'opponent': opponent, 'is_intl': is_intl, 'travel_required': True,
                 'city': game_loc, 'stadium': idata.get('stad', ''),
                 'lat': idata.get('lat'), 'lon': idata.get('lon'), 'tz': idata.get('tz', ''),
             }
@@ -433,6 +439,8 @@ def build_team_travel(team, games, city_map, stad_map, lat_map, lon_map, tz_map,
 
     def add_leg(src, dst, kind, note):
         if place_key(src) == place_key(dst):
+            return
+        if not dst.get('city') or dst.get('city') == '—':
             return
         miles = None
         if (
@@ -539,8 +547,8 @@ def render_travel_motion_map(arc_df, node_df, key, height=500, initial_view=None
     map_id = f"travel-map-{''.join(ch if ch.isalnum() else '-' for ch in str(key))}"
     arcs_json = json.dumps(arcs)
     nodes_json = json.dumps(nodes)
-    use_fixed_view = initial_view is not None
-    iv_lat, iv_lon, iv_zoom = initial_view if initial_view else (0, 0, 0)
+    use_fixed_view = 'true' if initial_view is not None else 'false'
+    iv_lat, iv_lon, iv_zoom = initial_view if initial_view else (39.5, -98.35, 4)
     components.html(f"""
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
@@ -842,7 +850,7 @@ tabs = st.tabs(["🌐 League View", "🏈 Team View"])
 
 with tabs[0]:
 
-    sub_tabs2 = st.tabs(["📋 Full Schedule", "🗓️ Weekly Schedule", "🌙 Primetime Schedule", "📊 Analytics", "✈️ Travel"])
+    sub_tabs2 = st.tabs(["📋 Full Schedule", "🗓️ Weekly Schedule", "🌙 Primetime Schedule", "✈️ Travel", "📊 Analytics"])
     lv_abb_map = dict(zip(Team_Info['Team'], Team_Info['Abb']))
     lv_logo_map = {
         t: (str(l or '').strip().strip('_').strip('`') or TBD_LOGO)
@@ -1252,12 +1260,23 @@ with tabs[0]:
   </table>
 </div>""")
 
-    with sub_tabs2[4]:
+    with sub_tabs2[3]:
+        week_col, _ = st.columns([1.5, 5.5])
+        with week_col:
+            week_options = ['Full Season'] + [f'Week {w}' for w in range(1, 19)]
+            selected_week_display = st.selectbox('Filter by Week', week_options, index=0, key='league_week_filter')
+
+        if selected_week_display == 'Full Season':
+            games_to_use = Games
+        else:
+            week_num = int(selected_week_display.split()[1])
+            games_to_use = Games[pd.to_numeric(Games['Week'], errors='coerce') == week_num].copy()
+
         league_routes = []
         team_totals = []
         for team in Team_Info.sort_values('Team')['Team'].tolist():
             route = build_team_travel(
-                team, Games, lv_city_map, lv_stad_map, lv_lat_map, lv_lon_map, lv_tz_map, lv_intl_data, lv_clr_map
+                team, games_to_use, lv_city_map, lv_stad_map, lv_lat_map, lv_lon_map, lv_tz_map, lv_intl_data, lv_clr_map
             )
             league_routes.extend(route['legs'])
             team_totals.append({
@@ -1336,7 +1355,7 @@ with tabs[0]:
   </table>
 </div>""")
 
-    with sub_tabs2[3]:
+    with sub_tabs2[4]:
         # Filter to weeks 1-18 only
         analytics_games = Games.copy()
         analytics_games['_week_num'] = pd.to_numeric(analytics_games['Week'], errors='coerce')
@@ -1398,11 +1417,17 @@ setTimeout(() => {
         ]
         lga_fantasy_cols = [
             ('QB', 'QBF', 'high'),
+            ('QB Rk', 'QBFR', 'high'),
             ('RB', 'RBF', 'high'),
+            ('RB Rk', 'RBFR', 'high'),
             ('WR', 'WRF', 'high'),
+            ('WR Rk', 'WRFR', 'high'),
             ('TE', 'TEF', 'high'),
+            ('TE Rk', 'TEFR', 'high'),
             ('K', 'KF', 'high'),
+            ('K Rk', 'KFR', 'high'),
             ('DST', 'DSTF', 'high'),
+            ('DST Rk', 'DSTFR', 'high'),
         ]
         all_lga_cols = lga_strength_cols + lga_continuity_cols + lga_fantasy_cols
 
@@ -1472,15 +1497,19 @@ setTimeout(() => {
             if 'Rank' in col:
                 return f'{int(v)}'
             if col in ('Total', 'Offense', 'Defense', 'Special Teams'):
-                return f'{v:g}%'
-            return f'{v:g}'
+                return f'{v:.2f}%'
+            if col in ('Vegas O/U', '2025 Wins'):
+                return f'{v:.2f}'
+            return f'{v:.2f}' if isinstance(v, (int, float)) else str(v)
 
         def lga_avg_fmt(v, col):
             if v is None:
                 return '—'
             if col in ('Total', 'Offense', 'Defense', 'Special Teams'):
-                return f'{v:.1f}%'
-            return f'{v:.1f}'
+                return f'{v:.2f}%'
+            if col in ('Vegas O/U', '2025 Wins'):
+                return f'{v:.2f}'
+            return f'{v:.2f}' if isinstance(v, (int, float)) else str(v)
 
         # ── Per-team SOS & game stats ────────────────────────────────────────
         team_sos_data = []
@@ -1631,6 +1660,22 @@ setTimeout(() => {
                 'hardest_4_games': hardest_4_games,
                 'opponent_metric_avgs': opponent_metric_avgs,
             })
+
+        # Recalculate rank columns as actual 1-32 ranks based on averages
+        metric_to_rank = {
+            'Total': ('Total Rank', False),
+            'Offense': ('Offensive Rank', False),
+            'Defense': ('Defensive Rank', True),
+            'Special Teams': ('Special Teams Rank', False)
+        }
+        for metric_col, (rank_col, reverse_rank) in metric_to_rank.items():
+            teams_with_metric = [(d, d['opponent_metric_avgs'].get(metric_col)) for d in team_sos_data]
+            teams_with_metric = [(d, val) for d, val in teams_with_metric if val is not None]
+            sorted_teams = sorted(teams_with_metric, key=lambda x: x[1], reverse=True)
+            if reverse_rank:
+                sorted_teams.reverse()
+            for rank_idx, (team_record, _) in enumerate(sorted_teams, 1):
+                team_record['opponent_metric_avgs'][rank_col] = rank_idx
 
         # ── Build cards ──────────────────────────────────────────────────────
         league_game_count = len(analytics_games)
@@ -2093,6 +2138,11 @@ with tabs[1]:
     st_dvoa = tr.get('Special Teams', '—')
     st_r    = tr.get('Special Teams Rank', '—')
 
+    tot = f'{float(tot):.1f}%' if tot != '—' and isinstance(tot, (int, float)) else tot
+    off = f'{float(off):.1f}%' if off != '—' and isinstance(off, (int, float)) else off
+    deff = f'{float(deff):.1f}%' if deff != '—' and isinstance(deff, (int, float)) else deff
+    st_dvoa = f'{float(st_dvoa):.1f}%' if st_dvoa != '—' and isinstance(st_dvoa, (int, float)) else st_dvoa
+
     wm_filter = 'brightness(0) invert(1)' if tv_lum(c1) < 0.35 else ''
 
     divider = f'<div style="width:1px;height:38px;background:{fg1};opacity:0.2;flex-shrink:0;"></div>'
@@ -2424,11 +2474,17 @@ with tabs[1]:
         ]
         fantasy_metric_cols = [
             ('QB', 'QBF', 'high'),
+            ('QB Rk', 'QBFR', 'high'),
             ('RB', 'RBF', 'high'),
+            ('RB Rk', 'RBFR', 'high'),
             ('WR', 'WRF', 'high'),
+            ('WR Rk', 'WRFR', 'high'),
             ('TE', 'TEF', 'high'),
+            ('TE Rk', 'TEFR', 'high'),
             ('K', 'KF', 'high'),
+            ('K Rk', 'KFR', 'high'),
             ('DST', 'DSTF', 'high'),
+            ('DST Rk', 'DSTFR', 'high'),
         ]
         all_metric_cols = strength_metric_cols + continuity_metric_cols + fantasy_metric_cols
         metric_cols = all_metric_cols
@@ -2640,7 +2696,7 @@ with tabs[1]:
             })
 
         ou_ranked = sorted([r for r in league_tile_rows if r['avg_ou'] is not None], key=lambda r: r['avg_ou'], reverse=True)
-        rest_ranked = sorted(league_tile_rows, key=lambda r: r['net_rest'], reverse=True)
+        rest_ranked = sorted(league_tile_rows, key=lambda r: -float(r['net_rest']))
         avg_ou_rank = next((i + 1 for i, r in enumerate(ou_ranked) if r['team'] == selected_team), None)
         net_rest_rank = next((i + 1 for i, r in enumerate(rest_ranked) if r['team'] == selected_team), None)
 
@@ -2670,7 +2726,7 @@ with tabs[1]:
         cards_html += ana_card('Schedule Read', rating_label, f'{schedule_rating * 100:.0f} strength index' if schedule_rating is not None else 'Needs opponent data')
         cards_html += ana_card('Avg Opp O/U', f'{avg_opp_ou:.1f}' if avg_opp_ou is not None else '—', f'Vegas baseline ({ana_rank_suffix(avg_ou_rank, len(ou_ranked))})')
         cards_html += ana_card('Road / Neutral', f'{road_games}/{neutral_games}', 'travel pressure')
-        cards_html += ana_card('Net Rest', f'{net_rest:+d}', f'days vs opponents ({ana_rank_suffix(net_rest_rank, len(rest_ranked))})')
+        cards_html += ana_card('Net Rest', f'{net_rest:+d}', ' ')
         cards_html += '</div>'
 
         col_header = ''.join(
@@ -3054,10 +3110,16 @@ with tabs[1]:
                     'city': override[1], 'stadium': override[0], 'lat': lat_map.get('San Francisco 49ers'),
                     'lon': lon_map.get('San Francisco 49ers'), 'tz': 'PT',
                 }
-            if is_intl:
+
+            team_city = city_map.get(selected_team, '').lower()
+            opp_city = city_map.get(opponent, '').lower()
+            game_loc_lower = game_loc.lower() if game_loc else ''
+            is_neutral = (game_loc in NEUTRAL_LOCATION_SET) or (is_intl and game_loc) or (game_loc_lower and team_city and opp_city and game_loc_lower != team_city and game_loc_lower != opp_city)
+
+            if is_neutral and game_loc:
                 idata = intl_data.get(game_loc, {})
                 return {
-                    'opponent': opponent, 'is_intl': True, 'travel_required': True,
+                    'opponent': opponent, 'is_intl': is_intl, 'travel_required': True,
                     'city': game_loc, 'stadium': idata.get('stad', ''),
                     'lat': idata.get('lat'), 'lon': idata.get('lon'), 'tz': idata.get('tz', ''),
                 }
@@ -3088,6 +3150,8 @@ with tabs[1]:
 
         def add_leg(src, dst, kind, note):
             if place_key(src) == place_key(dst):
+                return
+            if not dst.get('city') or dst.get('city') == '—':
                 return
             miles = None
             if tv_valid_coord(src.get('lat')) and tv_valid_coord(src.get('lon')) and tv_valid_coord(dst.get('lat')) and tv_valid_coord(dst.get('lon')):
