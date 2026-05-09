@@ -1,0 +1,250 @@
+# ============================================================
+# McCade's Branding Guide
+# For use by AI when building apps, charts, tables, and UIs
+# ============================================================
+
+## OVERVIEW
+This is the personal branding system for McCade Pearson (McCadeP8).
+Always apply this guide consistently across all outputs unless explicitly told otherwise.
+The aesthetic is dark, data-forward, and polished — inspired by sports analytics dashboards.
+
+
+# ============================================================
+# 1. COLOR PALETTE
+# ============================================================
+
+## Theme Colors (Named)
+background  = #0D1117   → Dark slate gray. Use for plot/page backgrounds.
+text        = #F0F3F5   → Very light gray. Use for all body text.
+panel       = #1C1F26   → Near-black with blue hint. Use for card/panel fills.
+border      = #3E92CC   → Strong blue. Use for borders, axes, dividers, highlights.
+strip_text  = #0D1117   → Matches background. Use for facet strip label text.
+lighter     = #C3DDFD   → Baby blue. Use for headings, strip backgrounds, light accents.
+light       = #6FB1FC   → Sky blue. Use for links, secondary headings, highlights.
+medium      = #326DA8   → Jazz navy. Use for table headers, mid-weight accents.
+dark        = #1D3557   → Deep indigo/navy. Use for dark accents, gradient endpoints.
+
+## Discrete Color Palette (in order)
+1.  #C3DDFD  → Baby blue
+2.  #F94144  → Vivid red
+3.  #6A4C93  → Purple
+4.  #F9C74F  → Yellow/gold
+5.  #43AA8B  → Teal/green
+6.  #577590  → Muted steel blue
+7.  #F3722C  → Orange
+8.  #277DA1  → Medium blue
+9.  #264653  → Dark teal
+
+Use these in order for categorical/series data (charts, legends, multi-line plots, etc.).
+
+## Grid Lines
+Major grid: #2D3748 (subtle dark blue-gray, very low opacity feel)
+Minor grid: none
+
+
+# ============================================================
+# 2. TYPOGRAPHY
+# ============================================================
+
+Primary Font: "Barlow Semi Condensed" (Google Fonts)
+Fallback:     sans-serif
+
+## Font Weights
+- Light:      300
+- Regular:    400
+- Semi-Bold:  600
+- Bold:       700
+
+## Font Sizes (Web / CSS)
+- Body:           16px
+- H1 (page title): 2.2em  — centered, border-bottom: 3px solid #3E92CC
+- H2:             1.8em   — color: #6FB1FC
+- H3:             1.4em   — color: #326DA8
+- Small/meta:     1.1em   — color: #6FB1FC
+
+## Font Sizes (ggplot2 / R)
+- Plot title:     20pt, bold, hjust = 0.5
+- Axis titles:    17pt
+- Axis text:      13pt, color = #F0F3F5
+- Legend title:   14pt, bold
+- Legend text:    12pt
+- Strip text:     10pt, color = #0D1117
+
+
+# ============================================================
+# 3. CSS / WEB STYLING
+# ============================================================
+
+body {
+  background-color: #0D1117;
+  color: #F0F3F5;
+  font-family: 'Barlow Semi Condensed', sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.main-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  background-color: #1C1F26;
+  padding: 40px;
+  border: 2px solid #3E92CC;
+  border-radius: 8px;
+}
+
+## Cards / Panels
+background: #1C1F26
+border: 1px–2px solid #3E92CC
+border-radius: 8px
+
+## Code Blocks
+background: #0D1117
+border: 1px solid #3E92CC
+border-radius: 5px
+padding: 15px
+font-family: 'Courier New', monospace
+
+## Inline Code
+background: #1C1F26
+color: #C3DDFD
+padding: 2px 4px
+border-radius: 3px
+
+## Links
+default:  #6FB1FC
+hover:    #C3DDFD, underline
+
+## Blockquotes
+border-left: 4px solid #3E92CC
+padding-left: 20px
+color: #C3DDFD
+font-style: italic
+
+## Tables (HTML/CSS)
+- border-collapse: collapse
+- border: 1px solid #3E92CC on th and td
+- th background: #326DA8, color: #F0F3F5, font-weight: 600
+- tr:nth-child(even) background: #1C1F26
+- padding: 12px on all cells
+
+
+# ============================================================
+# 4. GGPLOT2 THEME (R)
+# ============================================================
+
+Always apply theme_McCadeP8() to ggplot2 charts. Key specs:
+
+plot.background    → fill: #0D1117
+panel.background   → fill: #1C1F26
+panel.border       → color: #3E92CC, linewidth: 1.2
+panel.grid.major   → color: #2D3748, size: 0.25
+panel.grid.minor   → none
+axis.ticks         → color: #3E92CC, linewidth: 1
+
+legend.background  → fill: #1C1F26
+strip.background   → fill: #C3DDFD, colour: #3E92CC
+strip.text         → colour: #0D1117
+
+For continuous color scales:
+  low  = #6FB1FC  (light)
+  high = #1D3557  (dark)
+
+For discrete color scales: use McCadeP8_palette in order (see Section 1).
+
+Always load font with:
+  font_add_google("Barlow Semi Condensed", "Barlow Semi Condensed")
+  showtext_auto()
+
+
+# ============================================================
+# 5. GT TABLES (R)
+# ============================================================
+
+Apply the following gt() styling to match the branding:
+
+- Container background:    #0D1117
+- Table background:        #1C1F26
+- Header background:       #326DA8
+- Header text color:       #F0F3F5
+- Column label font-weight: bold
+- Borders: color #3E92CC
+- Body text color:         #F0F3F5
+- Striped rows (even):     #0D1117
+- Font family:             Barlow Semi Condensed, sans-serif
+- Title color:             #C3DDFD
+- Subtitle color:          #6FB1FC
+
+Preferred tab_options() settings:
+  table.background.color         = "#1C1F26"
+  table.font.names               = "Barlow Semi Condensed"
+  table.font.color               = "#F0F3F5"
+  column_labels.background.color = "#326DA8"
+  column_labels.font.weight      = "bold"
+  row.striping.background_color  = "#0D1117"
+  row.striping.include_table_body = TRUE
+  table_body.border.top.color    = "#3E92CC"
+  table_body.border.bottom.color = "#3E92CC"
+  heading.title.font.size        = px(20)
+  heading.subtitle.font.size     = px(14)
+
+
+# ============================================================
+# 6. SHINY / BSLIB APPS (R)
+# ============================================================
+
+Use bslib::bs_theme() with:
+  bg       = "#0D1117"
+  fg       = "#F0F3F5"
+  primary  = "#3E92CC"
+  secondary = "#326DA8"
+  base_font = bslib::font_google("Barlow Semi Condensed")
+
+Cards/panels: bg #1C1F26, border #3E92CC
+Value boxes / bsicons: accent color #6FB1FC
+
+
+# ============================================================
+# 7. GENERAL DESIGN RULES
+# ============================================================
+
+1. Dark backgrounds always. Never use white or light-mode defaults.
+2. Blue is the dominant accent color (#3E92CC for borders/primary, #6FB1FC for secondary).
+3. Baby blue (#C3DDFD) is for headings and emphasis, NOT for backgrounds.
+4. Red (#F94144) is reserved for negative values, alerts, or first categorical series.
+5. All borders and dividers use #3E92CC.
+6. Avoid drop shadows — rely on borders for depth.
+7. Rounded corners: 5–8px for cards and containers.
+8. Always use Barlow Semi Condensed. Load from Google Fonts if needed.
+9. Centered page titles with a bottom border in #3E92CC.
+10. Avoid clutter — minimal gridlines, no minor gridlines in plots.
+11. For R plots, always use showtext for font rendering.
+12. When in doubt: dark panel, blue border, light text.
+
+
+# ============================================================
+# 8. QUICK REFERENCE — HEX CODES
+# ============================================================
+
+#0D1117  background (darkest)
+#1C1F26  panel / card fill
+#2D3748  major gridlines
+#1D3557  dark accent / gradient end
+#326DA8  medium blue / table headers
+#3E92CC  primary border / accent
+#6FB1FC  sky blue / links / secondary text
+#C3DDFD  baby blue / headings / lighter accent
+#F0F3F5  near-white body text
+
+#F94144  red (negative / alert / series 2)
+#6A4C93  purple (series 3)
+#F9C74F  gold (series 4)
+#43AA8B  teal (series 5)
+#577590  steel blue (series 6)
+#F3722C  orange (series 7)
+#277DA1  medium blue (series 8)
+#264653  dark teal (series 9)
+
+
+# ============================================================
+# END OF BRANDING GUIDE
+# ============================================================

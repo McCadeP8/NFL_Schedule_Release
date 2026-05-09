@@ -297,18 +297,16 @@ season_choices = sorted(
 if not season_choices:
     season_choices = ['2025', '2026']
 default_season = '2026' if '2026' in season_choices else season_choices[-1]
-# season_col, _ = st.columns([1.2, 5.8])
-# with season_col:
-#     selected_season = st.selectbox(
-#         "Select Season",
-#         season_choices,
-#         index=season_choices.index(default_season),
-#         key="global_season_select",
-#     )
+season_col, _ = st.columns([1.2, 5.8])
+with season_col:
+    selected_season = st.selectbox(
+        "Select Season",
+        season_choices,
+        index=season_choices.index(default_season),
+        key="global_season_select",
+    )
 
-selected_season = 2025
-
-Games = ALL_GAMES[ALL_GAMES['_season'].astype(str).isin(['2025', '2026'])].copy()
+Games = ALL_GAMES[ALL_GAMES['_season'].astype(str) == str(selected_season)].copy()
 
 # ── Config ────────────────────────────────────────────────────────────────────
 DAY_CFG = {
