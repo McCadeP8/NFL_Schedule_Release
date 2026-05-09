@@ -308,7 +308,7 @@ default_season = '2026' if '2026' in season_choices else season_choices[-1]
 
 selected_season = 2025
 
-Games = ALL_GAMES[ALL_GAMES['_season'].astype(str) == str(selected_season)].copy()
+Games = ALL_GAMES[ALL_GAMES['_season'].astype(str).isin(['2025', '2026'])].copy()
 
 # ── Config ────────────────────────────────────────────────────────────────────
 DAY_CFG = {
