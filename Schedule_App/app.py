@@ -7,14 +7,14 @@ import pandas as pd
 import pydeck as pdk
 
 TV_LOGO_MAP = {
-    'ESPN': 'https://pbs.twimg.com/media/HH7Sj3VbUAAVGbq?format=png&name=360x360',
-    'CBS': 'https://pbs.twimg.com/media/HH7Sj3UbkAArKlA?format=png&name=240x240',
-    'Fox': 'https://pbs.twimg.com/media/HH7Sj3TbkAEqbo3?format=png&name=360x360',
-    'Prime Video': 'https://pbs.twimg.com/media/HH7Sg3LaYAAHGhO?format=png&name=240x240',
-    'Netflix': 'https://pbs.twimg.com/media/HH7SybtaYAADUoy?format=png&name=small',
-    'Youtube': 'https://pbs.twimg.com/media/HH7Sg3Da8AAyZ8V?format=png&name=4096x4096',
-    'NFL Network': 'https://pbs.twimg.com/media/HH7Sg1-aAAEvHYk?format=png&name=240x240',
-    'NBC': 'https://pbs.twimg.com/media/HH7Sg2saAAA3-9G?format=jpg&name=small',
+    'ESPN': 'https://pbs.twimg.com/media/HH7aIPVbAAECaT8?format=png&name=360x360',
+    'CBS': 'https://pbs.twimg.com/media/HH7aIPVakAAavgX?format=png&name=360x360',
+    'Fox': 'https://pbs.twimg.com/media/HH7aFy1aUAAlk2c?format=png&name=360x360',
+    'Prime Video': 'https://pbs.twimg.com/media/HH7aFy4bkAAQm8X?format=png&name=360x360',
+    'Netflix': 'https://pbs.twimg.com/media/HH7aIPRbQAAG3Mb?format=png&name=360x360',
+    'Youtube': 'https://pbs.twimg.com/media/HH7aFy5acAAS1xR?format=png&name=360x360',
+    'NFL Network': 'https://pbs.twimg.com/media/HH7aFy4awAAmYjY?format=png&name=360x360',
+    'NBC': 'https://pbs.twimg.com/media/HH7aIPcbUAA8FJK?format=png&name=360x360',
 }
 
 def get_games() -> pd.DataFrame:
