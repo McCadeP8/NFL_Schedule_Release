@@ -474,7 +474,7 @@ def build_team_travel(team, games, city_map, stad_map, lat_map, lon_map, tz_map,
     seq = []
     for _, g in team_games.iterrows():
         wk_num = pd.to_numeric(g.get('Week'), errors='coerce')
-        wk_lbl = f"Wk {int(wk_num)}" if pd.notna(wk_num) else 'Wk TBA'
+        wk_lbl = f"Wk {wk_num if wk_num != int(wk_num) else int(wk_num)}" if pd.notna(wk_num) else 'Wk TBA'
         seq.append({'week_label': wk_lbl, 'stop': resolve_stop(g)})
 
     for i, game in enumerate(seq):
@@ -802,7 +802,7 @@ def make_division_table(division_label, division_teams, cells, row_offset=0):
         row_border = "border-bottom:none;" if is_last else "border-bottom:1px solid #f0f2f7;"
 
         try:
-            bye_int = int(bye_wk) if bye_wk is not None and str(bye_wk).strip() not in ('', 'nan') else None
+            bye_int = int(float(bye_wk)) if bye_wk is not None and str(bye_wk).strip() not in ('', 'nan') else None
         except (ValueError, TypeError):
             bye_int = None
 
@@ -1089,6 +1089,43 @@ with tabs[0]:
     </tbody>
   </table>
 </div>""")
+
+            bye_teams = Team_Info[pd.to_numeric(Team_Info['Bye'], errors='coerce') == selected_week].copy()
+            if len(bye_teams) > 0:
+                bye_tiles_html = """
+<div style="margin-top:24px;">
+  <div style="font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:800;
+       letter-spacing:3px;text-transform:uppercase;color:#b0baca;margin-bottom:14px;">
+    Teams on Bye
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:12px;">"""
+                for _, bye_team in bye_teams.iterrows():
+                    team_name = bye_team['Team']
+                    team_abb = lv_abb_map.get(team_name, str(team_name)[:3].upper())
+                    team_logo = lv_logo_map.get(team_name, TBD_LOGO)
+                    team_clr = lv_clr_map.get(team_name, '#374151')
+
+                    bye_tiles_html += f"""
+    <div style="display:flex;flex-direction:column;align-items:center;padding:16px 12px;
+         border:1px solid #e2e6ef;border-radius:8px;background:#fafbfc;
+         border-left:4px solid {team_clr};min-width:100px;text-align:center;">
+      <div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;
+           margin-bottom:8px;flex-shrink:0;">
+        <img src="{team_logo}" style="max-width:48px;max-height:48px;object-fit:contain;"
+             onerror="this.onerror=null;this.src='{TBD_LOGO}';">
+      </div>
+      <div style="font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;
+           color:{team_clr};letter-spacing:0.5px;margin-bottom:4px;">
+        {team_abb}
+      </div>
+      <div style="font-family:'Barlow',sans-serif;font-size:11px;color:#9aa5be;line-height:1.3;">
+        {team_name}
+      </div>
+    </div>"""
+                bye_tiles_html += """
+  </div>
+</div>"""
+                st.html(bye_tiles_html)
 
     with sub_tabs2[2]:
         pt_col, _ = st.columns([2.2, 3.8])
@@ -2239,7 +2276,7 @@ with tabs[1]:
 
     bye_wk = tr.get('Bye', None)
     try:
-        bye_int = int(bye_wk) if bye_wk and str(bye_wk).strip() not in ('', 'nan') else None
+        bye_int = int(float(bye_wk)) if bye_wk and str(bye_wk).strip() not in ('', 'nan') else None
     except Exception:
         bye_int = None
 
@@ -2368,7 +2405,7 @@ with tabs[1]:
             wk_rows = team_games if tba_week_mode else team_games[team_week_num == wk]
 
             if len(wk_rows) == 0:
-                if (not tba_week_mode) and bye_int is not None and wk == bye_int:
+                if bye_int is not None and wk == bye_int:
                     rows_html += f"""
 <tr style="background:#f8fafc;border-bottom:1px solid #edf0f7;">
   <td style="width:5px;background:#e2e6ef;"></td>
