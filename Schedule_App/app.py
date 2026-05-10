@@ -2390,8 +2390,10 @@ with tabs[1]:
             team_games['_opp_sort'] = team_games.apply(
                 lambda r: str(r['Away'] if r['Home'] == selected_team else r['Home']), axis=1
             )
+            team_games['_week_num'] = pd.to_numeric(team_games['Week'], errors='coerce')
             team_games = team_games.sort_values(
-                ['_is_non_reg', '_post_order', '_game_type_norm', '_ha_sort', '_opp_sort']
+                ['_is_non_reg', '_post_order', '_week_num', '_ha_sort', '_opp_sort'],
+                na_position='last'
             ).reset_index(drop=True)
             wk_iter = [None]
         else:
@@ -2400,6 +2402,21 @@ with tabs[1]:
             wk_iter = range(1, max_wk + 1)
         rows_html = ''
         current_game_type = None
+
+        if tba_week_mode and bye_int is not None:
+            rows_html += f"""
+<tr style="background:#f8fafc;border-bottom:1px solid #edf0f7;">
+  <td style="width:5px;background:#e2e6ef;"></td>
+  <td style="padding:10px 8px 10px 12px;text-align:center;vertical-align:middle;">
+    <div style="width:34px;height:34px;border-radius:50%;background:#e2e6ef;color:#b0baca;
+         display:inline-flex;align-items:center;justify-content:center;
+         font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;">{bye_int}</div>
+  </td>
+  <td colspan="5" style="padding:12px 16px;vertical-align:middle;">
+    <span style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;
+         letter-spacing:5px;text-transform:uppercase;color:#c8d2e0;">— BYE WEEK —</span>
+  </td>
+</tr>"""
 
         for wk in wk_iter:
             wk_rows = team_games if tba_week_mode else team_games[team_week_num == wk]
@@ -2532,7 +2549,7 @@ with tabs[1]:
                     f'font-weight:600;color:#4a5a78;">{loc_disp}</div>'
                 )
                 wk_num = pd.to_numeric(g.get('Week'), errors='coerce')
-                wk_badge = str(int(wk_num)) if pd.notna(wk_num) else 'TBA'
+                wk_badge = str(wk_num if pd.notna(wk_num) and wk_num != int(wk_num) else int(wk_num)) if pd.notna(wk_num) else 'TBA'
 
                 rows_html += f"""
 <tr style="background:#ffffff;border-bottom:1px solid #f0f2f7;transition:background 0.15s;">
