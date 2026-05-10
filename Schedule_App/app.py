@@ -716,7 +716,11 @@ def build_cells(Games, Team_Info, Other_Locations):
     cells = {}
     for _, g in Games.iterrows():
         try:
-            week = int(g['Week'])
+            week_raw = pd.to_numeric(g['Week'], errors='coerce')
+            if pd.notna(week_raw) and week_raw == int(week_raw):
+                week = int(week_raw)
+            else:
+                continue
         except Exception:
             continue
         if week not in WEEKS:
