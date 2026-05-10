@@ -995,7 +995,7 @@ with tabs[0]:
                 if tv:
                     tv_logo_url = TV_LOGO_MAP.get(tv, '')
                     if tv_logo_url:
-                        tv_badge = f'<img src="{tv_logo_url}" style="max-height:45px;max-width:140px;object-fit:contain;" onerror="this.style.display=\'none\';">'
+                        tv_badge = f'<img src="{tv_logo_url}" style="max-height:65px;max-width:200px;object-fit:contain;" onerror="this.style.display=\'none\';">'
                     else:
                         tv_badge = (
                             f'<span style="background:#f1f5f9;color:#475569;font-family:\'Barlow Condensed\','
@@ -1191,7 +1191,7 @@ with tabs[0]:
                 if tv:
                     tv_logo_url = TV_LOGO_MAP.get(tv, '')
                     if tv_logo_url:
-                        tv_badge = f'<img src="{tv_logo_url}" style="max-height:45px;max-width:140px;object-fit:contain;" onerror="this.style.display=\'none\';">'
+                        tv_badge = f'<img src="{tv_logo_url}" style="max-height:65px;max-width:200px;object-fit:contain;" onerror="this.style.display=\'none\';">'
                     else:
                         tv_badge = (
                             f'<span style="background:#f1f5f9;color:#475569;font-family:\'Barlow Condensed\','
@@ -1941,7 +1941,7 @@ setTimeout(() => {
             if tv:
                 tv_logo_url = TV_LOGO_MAP.get(tv, '')
                 if tv_logo_url:
-                    tv_badge = f'<img src="{tv_logo_url}" style="max-height:40px;max-width:120px;object-fit:contain;" onerror="this.style.display=\'none\';">'
+                    tv_badge = f'<img src="{tv_logo_url}" style="max-height:55px;max-width:160px;object-fit:contain;" onerror="this.style.display=\'none\';">'
                 else:
                     tv_badge = f'<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;background:#e5e7eb;color:#374151;padding:3px 8px;border-radius:3px;display:inline-block;">{tv}</span>'
             else:
@@ -2476,7 +2476,7 @@ with tabs[1]:
                 if tv:
                     tv_logo_url = TV_LOGO_MAP.get(tv, '')
                     if tv_logo_url:
-                        tv_badge = f'<img src="{tv_logo_url}" style="max-height:45px;max-width:140px;object-fit:contain;" onerror="this.style.display=\'none\';">'
+                        tv_badge = f'<img src="{tv_logo_url}" style="max-height:65px;max-width:200px;object-fit:contain;" onerror="this.style.display=\'none\';">'
                     else:
                         tv_badge = (
                             f'<span style="background:#f1f5f9;color:#475569;font-family:\'Barlow Condensed\','
