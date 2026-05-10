@@ -47,7 +47,7 @@ else:
     Games['_season'] = ''
 
 # Normalize schedule placeholders for 2026 data still missing week/date.
-Games['Week'] = pd.to_numeric(Games.get('Week'), errors='coerce').astype('Int64')
+Games['Week'] = pd.to_numeric(Games.get('Week'), errors='coerce')
 _is_2026 = Games['_season'] == '2026'
 _date_blank = Games.get('Date').isna() | (Games.get('Date').astype(str).str.strip() == '')
 Games.loc[_is_2026 & _date_blank, 'Date'] = 'TBA'
