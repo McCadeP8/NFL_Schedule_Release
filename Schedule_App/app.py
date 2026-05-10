@@ -474,7 +474,13 @@ def build_team_travel(team, games, city_map, stad_map, lat_map, lon_map, tz_map,
     seq = []
     for _, g in team_games.iterrows():
         wk_num = pd.to_numeric(g.get('Week'), errors='coerce')
-        wk_lbl = f"Wk {wk_num if wk_num != int(wk_num) else int(wk_num)}" if pd.notna(wk_num) else 'Wk TBA'
+        if pd.notna(wk_num):
+            if wk_num == 18.5:
+                wk_lbl = 'Wk TBD'
+            else:
+                wk_lbl = f"Wk {wk_num if wk_num != int(wk_num) else int(wk_num)}"
+        else:
+            wk_lbl = 'Wk TBA'
         seq.append({'week_label': wk_lbl, 'stop': resolve_stop(g)})
 
     for i, game in enumerate(seq):
@@ -2549,7 +2555,13 @@ with tabs[1]:
                     f'font-weight:600;color:#4a5a78;">{loc_disp}</div>'
                 )
                 wk_num = pd.to_numeric(g.get('Week'), errors='coerce')
-                wk_badge = str(wk_num if pd.notna(wk_num) and wk_num != int(wk_num) else int(wk_num)) if pd.notna(wk_num) else 'TBA'
+                if pd.notna(wk_num):
+                    if wk_num == 18.5:
+                        wk_badge = 'TBD'
+                    else:
+                        wk_badge = str(wk_num if wk_num != int(wk_num) else int(wk_num))
+                else:
+                    wk_badge = 'TBA'
 
                 rows_html += f"""
 <tr style="background:#ffffff;border-bottom:1px solid #f0f2f7;transition:background 0.15s;">
