@@ -1165,7 +1165,11 @@ with tabs[0]:
             for _, g in primetime_games.iterrows():
                 wk_raw = g.get('Week', '')
                 try:
-                    wk_val = int(wk_raw)
+                    wk_numeric = pd.to_numeric(wk_raw, errors='coerce')
+                    if pd.notna(wk_numeric):
+                        wk_val = 'TBD' if wk_numeric == 18.5 else (wk_numeric if wk_numeric != int(wk_numeric) else int(wk_numeric))
+                    else:
+                        wk_val = 'TBA'
                 except Exception:
                     wk_val = 'TBA'
 
@@ -1701,7 +1705,7 @@ setTimeout(() => {
                                 opp = window_opps[j]
                                 is_home = row['Home'] == tm
                                 hardest_4_games.append({
-                                    'week': int(row['Week']) if pd.notna(row['Week']) else None,
+                                    'week': pd.to_numeric(row['Week'], errors='coerce') if pd.notna(row['Week']) else None,
                                     'opponent': opp,
                                     'is_home': is_home,
                                     'strength': opp_strengths[j]
@@ -1713,7 +1717,7 @@ setTimeout(() => {
                                 opp = window_opps[j]
                                 is_home = row['Home'] == tm
                                 easiest_4_games.append({
-                                    'week': int(row['Week']) if pd.notna(row['Week']) else None,
+                                    'week': pd.to_numeric(row['Week'], errors='coerce') if pd.notna(row['Week']) else None,
                                     'opponent': opp,
                                     'is_home': is_home,
                                     'strength': opp_strengths[j]
@@ -1945,8 +1949,17 @@ setTimeout(() => {
         for _, g in pd.concat([known_games, tba_games], ignore_index=True).iterrows():
             wk_raw = g.get('Week', '')
             try:
-                wk_val = int(wk_raw)
-                wk_label = f'Week {wk_val}'
+                wk_numeric = pd.to_numeric(wk_raw, errors='coerce')
+                if pd.notna(wk_numeric):
+                    if wk_numeric == 18.5:
+                        wk_val = 'TBD'
+                        wk_label = 'Week TBD'
+                    else:
+                        wk_val = wk_numeric if wk_numeric != int(wk_numeric) else int(wk_numeric)
+                        wk_label = f'Week {wk_val}'
+                else:
+                    wk_val = None
+                    wk_label = 'TBA'
             except Exception:
                 wk_val = None
                 wk_label = 'TBA'
@@ -2120,13 +2133,13 @@ setTimeout(() => {
         # Convert all_games_for_top50 to dict for fast lookup
         strength_dict = {}
         for g in all_games_for_top50:
-            key = (g['team'], g['opponent'], int(g['week']))
+            key = (g['team'], g['opponent'], g['week'])
             strength_dict[key] = g['strength']
 
         for _, orig_game in analytics_games.iterrows():
             away = orig_game['Away']
             home = orig_game['Home']
-            wk = int(orig_game['Week']) if pd.notna(orig_game['Week']) else 0
+            wk = pd.to_numeric(orig_game['Week'], errors='coerce') if pd.notna(orig_game['Week']) else 0
 
             game_key = tuple(sorted([away, home, str(wk)]))
             if game_key in games_processed:
@@ -2165,7 +2178,8 @@ setTimeout(() => {
             for rank, g in enumerate(games, start_rank):
                 away = g['away']
                 home = g['home']
-                wk = int(g['week']) if pd.notna(g['week']) else 0
+                wk = g['week'] if pd.notna(g['week']) else 0
+                wk_display = 'TBD' if wk == 18.5 else (str(wk if wk != int(wk) else int(wk)))
                 weighted = g['weighted']
                 away_abb = lv_abb_map.get(away, away[:3].upper())
                 home_abb = lv_abb_map.get(home, home[:3].upper())
@@ -2173,7 +2187,7 @@ setTimeout(() => {
                 home_logo = lv_logo_map.get(home, TBD_LOGO)
                 weighted_norm = min(1.0, weighted / 1.5)
                 weight_bg, weight_fg = lga_heat_color(weighted_norm)
-                rows += f'<tr><td style="padding:10px 12px;border-bottom:1px solid #edf0f7;font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:800;color:#1a2030;text-align:center;min-width:50px;">{rank}</td><td style="padding:10px 12px;border-bottom:1px solid #edf0f7;font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:800;color:#1a2030;text-align:center;min-width:60px;">Wk {wk}</td><td style="padding:8px 10px;border-bottom:1px solid #edf0f7;"><div style="display:flex;align-items:center;gap:6px;"><div style="display:flex;align-items:center;gap:3px;"><img src="{away_logo}" style="width:24px;height:24px;object-fit:contain;" onerror="this.onerror=null;this.src=\'{TBD_LOGO}\';"><span style="font-family:\'Barlow Condensed\',sans-serif;font-size:12px;font-weight:800;color:#1a2030;">{away_abb}</span></div><span style="font-family:\'Barlow Condensed\',sans-serif;font-size:11px;color:#94a3b8;">@</span><div style="display:flex;align-items:center;gap:3px;"><img src="{home_logo}" style="width:24px;height:24px;object-fit:contain;" onerror="this.onerror=null;this.src=\'{TBD_LOGO}\';"><span style="font-family:\'Barlow Condensed\',sans-serif;font-size:12px;font-weight:800;color:#1a2030;">{home_abb}</span></div></div></td><td style="background:{weight_bg};color:{weight_fg};padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.35);font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:900;text-align:center;min-width:70px;">{f"{weighted*100:.0f}"}</td></tr>'
+                rows += f'<tr><td style="padding:10px 12px;border-bottom:1px solid #edf0f7;font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:800;color:#1a2030;text-align:center;min-width:50px;">{rank}</td><td style="padding:10px 12px;border-bottom:1px solid #edf0f7;font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:800;color:#1a2030;text-align:center;min-width:60px;">Wk {wk_display}</td><td style="padding:8px 10px;border-bottom:1px solid #edf0f7;"><div style="display:flex;align-items:center;gap:6px;"><div style="display:flex;align-items:center;gap:3px;"><img src="{away_logo}" style="width:24px;height:24px;object-fit:contain;" onerror="this.onerror=null;this.src=\'{TBD_LOGO}\';"><span style="font-family:\'Barlow Condensed\',sans-serif;font-size:12px;font-weight:800;color:#1a2030;">{away_abb}</span></div><span style="font-family:\'Barlow Condensed\',sans-serif;font-size:11px;color:#94a3b8;">@</span><div style="display:flex;align-items:center;gap:3px;"><img src="{home_logo}" style="width:24px;height:24px;object-fit:contain;" onerror="this.onerror=null;this.src=\'{TBD_LOGO}\';"><span style="font-family:\'Barlow Condensed\',sans-serif;font-size:12px;font-weight:800;color:#1a2030;">{home_abb}</span></div></div></td><td style="background:{weight_bg};color:{weight_fg};padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.35);font-family:\'Rajdhani\',sans-serif;font-size:16px;font-weight:900;text-align:center;min-width:70px;">{f"{weighted*100:.0f}"}</td></tr>'
             return rows
 
         top25_rows = build_games_table(top_games_sorted[:25], 1)
@@ -2773,7 +2787,7 @@ with tabs[1]:
         for _, g in team_games_ana.iterrows():
             wk = pd.to_numeric(g.get('Week'), errors='coerce')
             if pd.notna(wk):
-                games_by_week[int(wk)] = g
+                games_by_week[wk] = g
 
         def ana_game_date(row):
             return pd.to_datetime(row.get('Date'), errors='coerce')
