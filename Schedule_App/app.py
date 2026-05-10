@@ -6,6 +6,17 @@ import streamlit.components.v1 as components
 import pandas as pd
 import pydeck as pdk
 
+TV_LOGO_MAP = {
+    'ESPN': 'https://pbs.twimg.com/media/HH7Sj3VbUAAVGbq?format=png&name=360x360',
+    'CBS': 'https://pbs.twimg.com/media/HH7Sj3UbkAArKlA?format=png&name=240x240',
+    'Fox': 'https://pbs.twimg.com/media/HH7Sj3TbkAEqbo3?format=png&name=360x360',
+    'Prime Video': 'https://pbs.twimg.com/media/HH7Sg3LaYAAHGhO?format=png&name=240x240',
+    'Netflix': 'https://pbs.twimg.com/media/HH7SybtaYAADUoy?format=png&name=small',
+    'Youtube': 'https://pbs.twimg.com/media/HH7Sg3Da8AAyZ8V?format=png&name=4096x4096',
+    'NFL Network': 'https://pbs.twimg.com/media/HH7Sg1-aAAEvHYk?format=png&name=240x240',
+    'NBC': 'https://pbs.twimg.com/media/HH7Sg2saAAA3-9G?format=jpg&name=small',
+}
+
 def get_games() -> pd.DataFrame:
     csv_url = "https://docs.google.com/spreadsheets/d/1qjPpIEGmhV8aF3CZ8hi-ijQlIP-_z6QYJzSArjJV9d8/export?format=csv&gid=0"
     df = pd.read_csv(csv_url)
@@ -980,11 +991,19 @@ with tabs[0]:
                     'sans-serif;font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;'
                     'padding:2px 6px;border-radius:3px;margin-left:8px;vertical-align:middle;">INTL</span>'
                 ) if is_intl else ''
-                tv_badge = (
-                    f'<span style="background:#f1f5f9;color:#475569;font-family:\'Barlow Condensed\','
-                    f'sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;padding:3px 10px;'
-                    f'border-radius:3px;border:1px solid #dde2ed;white-space:nowrap;">{tv}</span>'
-                ) if tv else ''
+                # TV badge - use logo if available, otherwise use text
+                if tv:
+                    tv_logo_url = TV_LOGO_MAP.get(tv, '')
+                    if tv_logo_url:
+                        tv_badge = f'<img src="{tv_logo_url}" style="max-height:45px;max-width:140px;object-fit:contain;" onerror="this.style.display=\'none\';">'
+                    else:
+                        tv_badge = (
+                            f'<span style="background:#f1f5f9;color:#475569;font-family:\'Barlow Condensed\','
+                            f'sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;padding:3px 10px;'
+                            f'border-radius:3px;border:1px solid #dde2ed;white-space:nowrap;">{tv}</span>'
+                        )
+                else:
+                    tv_badge = ''
                 gtype_badge = (
                     f'<span style="display:inline-block;background:#eef2f8;color:#475569;'
                     f'font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:700;'
@@ -1168,11 +1187,19 @@ with tabs[0]:
                     'sans-serif;font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;'
                     'padding:2px 6px;border-radius:3px;margin-left:8px;vertical-align:middle;">INTL</span>'
                 ) if is_intl else ''
-                tv_badge = (
-                    f'<span style="background:#f1f5f9;color:#475569;font-family:\'Barlow Condensed\','
-                    f'sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;padding:3px 10px;'
-                    f'border-radius:3px;border:1px solid #dde2ed;white-space:nowrap;">{tv}</span>'
-                ) if tv else ''
+                # TV badge - use logo if available, otherwise use text
+                if tv:
+                    tv_logo_url = TV_LOGO_MAP.get(tv, '')
+                    if tv_logo_url:
+                        tv_badge = f'<img src="{tv_logo_url}" style="max-height:45px;max-width:140px;object-fit:contain;" onerror="this.style.display=\'none\';">'
+                    else:
+                        tv_badge = (
+                            f'<span style="background:#f1f5f9;color:#475569;font-family:\'Barlow Condensed\','
+                            f'sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;padding:3px 10px;'
+                            f'border-radius:3px;border:1px solid #dde2ed;white-space:nowrap;">{tv}</span>'
+                        )
+                else:
+                    tv_badge = ''
                 gtype_badge = (
                     f'<span style="display:inline-block;background:#eef2f8;color:#475569;'
                     f'font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:700;'
@@ -1910,7 +1937,15 @@ setTimeout(() => {
             tv = str(g.get('TV Network', '') or '').strip()
             if tv.lower() in ('', 'nan'):
                 tv = ''
-            tv_badge = f'<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;background:#e5e7eb;color:#374151;padding:3px 8px;border-radius:3px;display:inline-block;">{tv}</span>' if tv else ''
+            # TV badge - use logo if available, otherwise use text
+            if tv:
+                tv_logo_url = TV_LOGO_MAP.get(tv, '')
+                if tv_logo_url:
+                    tv_badge = f'<img src="{tv_logo_url}" style="max-height:40px;max-width:120px;object-fit:contain;" onerror="this.style.display=\'none\';">'
+                else:
+                    tv_badge = f'<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;background:#e5e7eb;color:#374151;padding:3px 8px;border-radius:3px;display:inline-block;">{tv}</span>'
+            else:
+                tv_badge = ''
 
             game_type = str(g.get('Game Type', '') or '').strip()
             if game_type.lower() in ('', 'nan', 'none'):
@@ -2437,11 +2472,19 @@ with tabs[1]:
                     'uppercase;padding:2px 6px;border-radius:3px;margin-left:8px;vertical-align:middle;">INTL</span>'
                 ) if is_intl else ''
 
-                tv_badge = (
-                    f'<span style="background:#f1f5f9;color:#475569;font-family:\'Barlow Condensed\','
-                    f'sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;padding:3px 10px;'
-                    f'border-radius:3px;border:1px solid #dde2ed;white-space:nowrap;">{tv}</span>'
-                ) if tv else ''
+                # TV badge - use logo if available, otherwise use text
+                if tv:
+                    tv_logo_url = TV_LOGO_MAP.get(tv, '')
+                    if tv_logo_url:
+                        tv_badge = f'<img src="{tv_logo_url}" style="max-height:45px;max-width:140px;object-fit:contain;" onerror="this.style.display=\'none\';">'
+                    else:
+                        tv_badge = (
+                            f'<span style="background:#f1f5f9;color:#475569;font-family:\'Barlow Condensed\','
+                            f'sans-serif;font-size:13px;font-weight:700;letter-spacing:1px;padding:3px 10px;'
+                            f'border-radius:3px;border:1px solid #dde2ed;white-space:nowrap;">{tv}</span>'
+                        )
+                else:
+                    tv_badge = ''
 
                 location_html = (
                     f'<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:17px;'
