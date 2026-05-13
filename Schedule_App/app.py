@@ -388,6 +388,10 @@ def travel_haversine(lat1, lon1, lat2, lon2):
 
 def travel_week_num(value):
     wk = pd.to_numeric(value, errors='coerce')
+    if pd.notna(wk):
+        return float(wk)
+    cleaned = str(value or '').strip().lower().replace('week', '').replace('wk', '').strip()
+    wk = pd.to_numeric(cleaned, errors='coerce')
     return None if pd.isna(wk) else float(wk)
 
 def manual_travel_stayover(team, from_week, to_week):
@@ -398,6 +402,19 @@ def manual_travel_stayover(team, from_week, to_week):
             continue
         try:
             if float(item.get('from_week')) == float(from_week) and float(item.get('to_week')) == float(to_week):
+                return True
+        except Exception:
+            continue
+    return False
+
+def manual_travel_stayover_to(team, to_week):
+    if to_week is None:
+        return False
+    for item in MANUAL_TRAVEL_STAYOVERS:
+        if str(item.get('team', '')).strip() != str(team).strip():
+            continue
+        try:
+            if float(item.get('to_week')) == float(to_week):
                 return True
         except Exception:
             continue
@@ -524,7 +541,7 @@ def build_team_travel(team, games, city_map, stad_map, lat_map, lon_map, tz_map,
 
         if i == len(seq) - 1:
             if place_key(current) != place_key(home_base):
-                add_leg(current, home_base, 'return', "Return home after season")
+                add_leg(current, home_base, 'return', "Return home after season", game.get('week_num'))
             break
 
         if stop['travel_required'] and should_stay(game, seq[i + 1]):
@@ -3482,13 +3499,15 @@ with tabs[1]:
             home_team = str(g.get('Home', '')).strip()
             away_team = str(g.get('Away', '')).strip()
             game_loc = str(g.get('Location', '') or '').strip()
-            wk_num = pd.to_numeric(g.get('Week'), errors='coerce')
-            wk_lbl = f"Wk {int(wk_num)}" if pd.notna(wk_num) else 'Wk TBA'
+            wk_num = travel_week_num(g.get('Week'))
+            wk_lbl = f"Wk {int(wk_num)}" if wk_num is not None else 'Wk TBA'
 
             if flag_is_true(g.get('International', False)) and game_loc:
                 site = game_site(game_loc)
-                add_direct_flight(team_origin(home_team), site, home_team, away_team, wk_lbl, 'international')
-                add_direct_flight(team_origin(away_team), site, away_team, home_team, wk_lbl, 'international')
+                if not manual_travel_stayover_to(home_team, wk_num):
+                    add_direct_flight(team_origin(home_team), site, home_team, away_team, wk_lbl, 'international')
+                if not manual_travel_stayover_to(away_team, wk_num):
+                    add_direct_flight(team_origin(away_team), site, away_team, home_team, wk_lbl, 'international')
             else:
                 add_direct_flight(team_origin(away_team), team_origin(home_team), away_team, home_team, wk_lbl, 'flight')
 
@@ -3532,6 +3551,7 @@ with tabs[1]:
             selected_team, team_games_all, city_map, stad_map, lat_map, lon_map, tz_map, intl_data, clr1_map
         )
         travel_legs = team_route['legs']
+        transfer_legs = [l for l in travel_legs if l.get('kind') == 'transfer']
         flights = team_route['flights']
         total_miles = team_route['total_miles']
 
@@ -3552,8 +3572,9 @@ with tabs[1]:
         cards_html += '</div>'
         st.html(cards_html)
 
+        visual_legs = legs + transfer_legs
         arc_rows = []
-        for l in travel_legs:
+        for l in visual_legs:
             if not (tv_valid_coord(l['src_lat']) and tv_valid_coord(l['src_lon']) and tv_valid_coord(l['dst_lat']) and tv_valid_coord(l['dst_lon'])):
                 continue
             arc_rows.append({
