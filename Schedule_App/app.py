@@ -3407,6 +3407,64 @@ with tabs[1]:
         flights = len(legs)
         total_miles = int(sum(l['miles'] for l in legs if l['miles'] is not None))
 
+        def flag_is_true(v):
+            if isinstance(v, float):
+                return False if math.isnan(v) else bool(v)
+            return str(v).strip().lower() in ('true', '1', 'yes', 'y')
+
+        def team_origin(team):
+            return {
+                'team': team,
+                'city': city_map.get(team, ''),
+                'lat': lat_map.get(team),
+                'lon': lon_map.get(team),
+            }
+
+        def game_site(game_loc):
+            idata = intl_data.get(game_loc, {})
+            return {
+                'team': '',
+                'city': game_loc,
+                'lat': idata.get('lat'),
+                'lon': idata.get('lon'),
+            }
+
+        def direct_miles(src, dst):
+            if tv_valid_coord(src.get('lat')) and tv_valid_coord(src.get('lon')) and tv_valid_coord(dst.get('lat')) and tv_valid_coord(dst.get('lon')):
+                return tv_haversine(float(src['lat']), float(src['lon']), float(dst['lat']), float(dst['lon']))
+            return None
+
+        def add_direct_flight(src, dst, flight_team, opponent, week_label, kind):
+            miles = direct_miles(src, dst)
+            legs.append({
+                'from': src.get('city') or src.get('team') or 'Unknown',
+                'to': dst.get('city') or dst.get('team') or 'Unknown',
+                'miles': miles,
+                'kind': kind,
+                'note': f"{week_label}: {flight_team} vs {opponent}",
+                'src_lat': src.get('lat'), 'src_lon': src.get('lon'),
+                'dst_lat': dst.get('lat'), 'dst_lon': dst.get('lon'),
+                'color_hex': clr1_map.get(flight_team, '#2563eb'),
+            })
+
+        legs = []
+        for _, g in team_games_all.iterrows():
+            home_team = str(g.get('Home', '')).strip()
+            away_team = str(g.get('Away', '')).strip()
+            game_loc = str(g.get('Location', '') or '').strip()
+            wk_num = pd.to_numeric(g.get('Week'), errors='coerce')
+            wk_lbl = f"Wk {int(wk_num)}" if pd.notna(wk_num) else 'Wk TBA'
+
+            if flag_is_true(g.get('International', False)) and game_loc:
+                site = game_site(game_loc)
+                add_direct_flight(team_origin(home_team), site, home_team, away_team, wk_lbl, 'international')
+                add_direct_flight(team_origin(away_team), site, away_team, home_team, wk_lbl, 'international')
+            else:
+                add_direct_flight(team_origin(away_team), team_origin(home_team), away_team, home_team, wk_lbl, 'flight')
+
+        flights = len(legs)
+        total_miles = int(sum(l['miles'] for l in legs if l['miles'] is not None))
+
         def stat_card(label, value, sub='', accent=c1):
             return f'''
       <div style="background:#fff;border:1px solid #e2e6ef;border-radius:10px;
@@ -3425,10 +3483,7 @@ with tabs[1]:
         st.html(cards_html)
 
         arc_rows = []
-        incoming_node_rows = []
         for l in legs:
-            if l['kind'] != 'outbound':
-                continue
             if not (tv_valid_coord(l['src_lat']) and tv_valid_coord(l['src_lon']) and tv_valid_coord(l['dst_lat']) and tv_valid_coord(l['dst_lon'])):
                 continue
             arc_rows.append({
@@ -3436,56 +3491,8 @@ with tabs[1]:
                 'src_lon': float(l['src_lon']), 'src_lat': float(l['src_lat']),
                 'dst_lon': float(l['dst_lon']), 'dst_lat': float(l['dst_lat']),
                 'kind': l['kind'],
-                'color_hex': c1,
-                'color': [37, 99, 235, 180] if l['kind'] == 'outbound' else [220, 38, 38, 160],
-            })
-
-        for _, g in team_games_all.iterrows():
-            if g.get('Home') != selected_team:
-                continue
-            opponent = g.get('Away')
-            src_lat = lat_map.get(opponent)
-            src_lon = lon_map.get(opponent)
-            game_loc = str(g.get('Location', '') or '').strip()
-            intl_val = g.get('International', False)
-            is_intl = bool(intl_val) if not isinstance(intl_val, float) else False
-            override = get_forced_venue(g)
-            if override:
-                dst_lat = lat_map.get('Los Angeles Rams')
-                dst_lon = lon_map.get('Los Angeles Rams')
-                dst_city = override[1]
-            elif is_intl:
-                idata = intl_data.get(game_loc, {})
-                dst_lat = idata.get('lat')
-                dst_lon = idata.get('lon')
-                dst_city = game_loc
-            else:
-                dst_lat = lat_map.get(selected_team)
-                dst_lon = lon_map.get(selected_team)
-                dst_city = city_map.get(selected_team, '')
-            if not (tv_valid_coord(src_lat) and tv_valid_coord(src_lon) and tv_valid_coord(dst_lat) and tv_valid_coord(dst_lon)):
-                continue
-            wk_num = pd.to_numeric(g.get('Week'), errors='coerce')
-            wk_lbl = f"Wk {int(wk_num)}" if pd.notna(wk_num) else 'Wk TBA'
-            miles = tv_haversine(float(src_lat), float(src_lon), float(dst_lat), float(dst_lon))
-            arc_rows.append({
-                'from': city_map.get(opponent, opponent),
-                'to': dst_city or city_map.get(selected_team, selected_team),
-                'note': f"{opponent} inbound: {wk_lbl} at {selected_team}",
-                'miles': miles,
-                'src_lon': float(src_lon), 'src_lat': float(src_lat),
-                'dst_lon': float(dst_lon), 'dst_lat': float(dst_lat),
-                'kind': 'outbound',
-                'color_hex': clr1_map.get(opponent, '#2563eb'),
+                'color_hex': l.get('color_hex', c1),
                 'color': [37, 99, 235, 180],
-            })
-            incoming_node_rows.append({
-                'name': city_map.get(opponent, opponent),
-                'lon': float(src_lon),
-                'lat': float(src_lat),
-                'size': 9000,
-                'color': [30, 64, 175, 180],
-                'home': False,
             })
 
         arc_df = pd.DataFrame(arc_rows) if arc_rows else pd.DataFrame()
@@ -3496,18 +3503,23 @@ with tabs[1]:
                 'lon': float(home_base['lon']), 'lat': float(home_base['lat']),
                 'size': 18000, 'color': [200, 16, 46, 210], 'home': True,
             })
-        for g in seq:
-            s = g['stop']
-            if tv_valid_coord(s.get('lat')) and tv_valid_coord(s.get('lon')):
-                node_rows.append({
-                    'name': s.get('city') or s.get('opponent') or 'Stop',
-                    'lon': float(s['lon']),
-                    'lat': float(s['lat']),
-                    'size': 9000,
-                    'color': [30, 64, 175, 180],
-                    'home': False,
-                })
-        node_rows.extend(incoming_node_rows)
+        for a in arc_rows:
+            node_rows.append({
+                'name': a['from'],
+                'lon': a['src_lon'],
+                'lat': a['src_lat'],
+                'size': 9000,
+                'color': [30, 64, 175, 180],
+                'home': False,
+            })
+            node_rows.append({
+                'name': a['to'],
+                'lon': a['dst_lon'],
+                'lat': a['dst_lat'],
+                'size': 9000,
+                'color': [30, 64, 175, 180],
+                'home': False,
+            })
         node_df = pd.DataFrame(node_rows).drop_duplicates(subset=['lon', 'lat']) if node_rows else pd.DataFrame()
 
         render_travel_motion_map(arc_df, node_df, f'team-travel-{abb}', height=500, initial_view=(39.5, -98.35, 4))
@@ -3516,9 +3528,9 @@ with tabs[1]:
         for i, l in enumerate(legs):
             row_bg = '#ffffff' if i % 2 == 0 else '#f8fafc'
             miles = f"{int(l['miles']):,} mi" if l['miles'] is not None else 'TBD'
-            kind = 'OUT' if l['kind'] == 'outbound' else 'RET'
-            kind_bg = '#dbeafe' if l['kind'] == 'outbound' else '#fee2e2'
-            kind_fg = '#1e3a8a' if l['kind'] == 'outbound' else '#991b1b'
+            kind = 'INTL' if l['kind'] == 'international' else 'FLT'
+            kind_bg = '#ede9fe' if l['kind'] == 'international' else '#dbeafe'
+            kind_fg = '#5b21b6' if l['kind'] == 'international' else '#1e3a8a'
             leg_rows_html += f"""
 <tr style="background:{row_bg};border-bottom:1px solid #edf0f7;">
   <td style="padding:10px 12px;">
