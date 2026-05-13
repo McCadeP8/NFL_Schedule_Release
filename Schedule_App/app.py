@@ -155,11 +155,11 @@ html, body, [class*="css"] {
 }
 .masthead-left { display: flex; align-items: center; gap: 20px; }
 .nfl-logo {
-  width: 60px; height: 60px; object-fit: contain;
+  width: 120px; height: 120px; object-fit: contain;
   filter: drop-shadow(0 2px 8px rgba(200,16,46,0.25));
 }
 .app-logo {
-  width: 76px; height: 76px; object-fit: contain;
+  width: 152px; height: 152px; object-fit: contain;
   filter: drop-shadow(0 2px 8px rgba(15,23,42,0.16));
 }
 .masthead-title {
