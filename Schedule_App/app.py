@@ -321,6 +321,13 @@ ANALYTICS_RELEASE_NOTE = """
 </div>
 """
 
+# Manual travel stay-overs: add entries here when a team does not return home
+# between two listed game weeks. Example: Jacksonville stays in London between
+# its Week 5 and Week 6 international home games.
+MANUAL_TRAVEL_STAYOVERS = [
+    {'team': 'Jacksonville Jaguars', 'from_week': 5, 'to_week': 6},
+]
+
 # ── Config ────────────────────────────────────────────────────────────────────
 DAY_CFG = {
     'wednesday': {'bg': '#002244', 'fg': '#69be28', 'border': 'none', 'label': 'Wednesday'},
@@ -378,6 +385,23 @@ def travel_haversine(lat1, lon1, lat2, lon2):
     dl = math.radians(lon2 - lon1)
     a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
     return round(R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a)))
+
+def travel_week_num(value):
+    wk = pd.to_numeric(value, errors='coerce')
+    return None if pd.isna(wk) else float(wk)
+
+def manual_travel_stayover(team, from_week, to_week):
+    if from_week is None or to_week is None:
+        return False
+    for item in MANUAL_TRAVEL_STAYOVERS:
+        if str(item.get('team', '')).strip() != str(team).strip():
+            continue
+        try:
+            if float(item.get('from_week')) == float(from_week) and float(item.get('to_week')) == float(to_week):
+                return True
+        except Exception:
+            continue
+    return False
 
 def build_team_travel(team, games, city_map, stad_map, lat_map, lon_map, tz_map, intl_data, color_map=None):
     team_games = games[(games['Home'] == team) | (games['Away'] == team)].copy()
@@ -438,14 +462,12 @@ def build_team_travel(team, games, city_map, stad_map, lat_map, lon_map, tz_map,
             'lat': lat_map.get(opponent), 'lon': lon_map.get(opponent), 'tz': tz_map.get(opponent, ''),
         }
 
-    def should_stay(cur_stop, next_stop):
+    def should_stay(cur_game, next_game):
+        cur_stop = cur_game['stop']
+        next_stop = next_game['stop']
         if not (cur_stop['travel_required'] and next_stop['travel_required']):
             return False
-        if team == 'Jacksonville Jaguars' and cur_stop['is_intl'] and next_stop['is_intl']:
-            cur_city = str(cur_stop.get('city', '')).lower()
-            nxt_city = str(next_stop.get('city', '')).lower()
-            return ('london' in cur_city) and ('london' in nxt_city)
-        return False
+        return manual_travel_stayover(team, cur_game.get('week_num'), next_game.get('week_num'))
 
     legs = []
     current = dict(home_base)
@@ -475,22 +497,25 @@ def build_team_travel(team, games, city_map, stad_map, lat_map, lon_map, tz_map,
 
     seq = []
     for _, g in team_games.iterrows():
-        wk_num = pd.to_numeric(g.get('Week'), errors='coerce')
-        if pd.notna(wk_num):
+        wk_num = travel_week_num(g.get('Week'))
+        if wk_num is not None:
             if wk_num == 18.5:
                 wk_lbl = 'Wk TBD'
             else:
                 wk_lbl = f"Wk {wk_num if wk_num != int(wk_num) else int(wk_num)}"
         else:
             wk_lbl = 'Wk TBA'
-        seq.append({'week_label': wk_lbl, 'stop': resolve_stop(g)})
+        seq.append({'week_label': wk_lbl, 'week_num': wk_num, 'stop': resolve_stop(g)})
 
     for i, game in enumerate(seq):
         stop = game['stop']
         note_base = f"{game['week_label']} vs {stop['opponent']}"
         if stop['travel_required']:
-            add_leg(current, stop, 'outbound', f"To game: {note_base}")
-            current = dict(stop)
+            if i > 0 and should_stay(seq[i - 1], game):
+                current = dict(stop)
+            else:
+                add_leg(current, stop, 'outbound', f"To game: {note_base}")
+                current = dict(stop)
         elif place_key(current) != place_key(home_base):
             add_leg(current, home_base, 'return', f"Return home before: {note_base}")
             current = dict(home_base)
@@ -500,8 +525,7 @@ def build_team_travel(team, games, city_map, stad_map, lat_map, lon_map, tz_map,
                 add_leg(current, home_base, 'return', "Return home after season")
             break
 
-        nxt = seq[i + 1]['stop']
-        if stop['travel_required'] and should_stay(stop, nxt):
+        if stop['travel_required'] and should_stay(game, seq[i + 1]):
             current = dict(stop)
         elif place_key(current) != place_key(home_base):
             add_leg(current, home_base, 'return', f"Return home after: {note_base}")
@@ -3498,8 +3522,12 @@ with tabs[1]:
             add_team_travel_leg(selected_origin, destination, opponent, wk_lbl, kind, 'to game')
             add_team_travel_leg(destination, selected_origin, opponent, wk_lbl, kind, 'return')
 
-        flights = len(travel_legs)
-        total_miles = int(sum(l['miles'] for l in travel_legs if l['miles'] is not None))
+        team_route = build_team_travel(
+            selected_team, team_games_all, city_map, stad_map, lat_map, lon_map, tz_map, intl_data, clr1_map
+        )
+        travel_legs = team_route['legs']
+        flights = team_route['flights']
+        total_miles = team_route['total_miles']
 
         def stat_card(label, value, sub='', accent=c1):
             return f'''
@@ -3519,7 +3547,7 @@ with tabs[1]:
         st.html(cards_html)
 
         arc_rows = []
-        for l in legs:
+        for l in travel_legs:
             if not (tv_valid_coord(l['src_lat']) and tv_valid_coord(l['src_lon']) and tv_valid_coord(l['dst_lat']) and tv_valid_coord(l['dst_lon'])):
                 continue
             arc_rows.append({
@@ -3564,9 +3592,9 @@ with tabs[1]:
         for i, l in enumerate(travel_legs):
             row_bg = '#ffffff' if i % 2 == 0 else '#f8fafc'
             miles = f"{int(l['miles']):,} mi" if l['miles'] is not None else 'TBD'
-            kind = 'INTL' if l['kind'] == 'international' else 'FLT'
-            kind_bg = '#ede9fe' if l['kind'] == 'international' else '#dbeafe'
-            kind_fg = '#5b21b6' if l['kind'] == 'international' else '#1e3a8a'
+            kind = 'OUT' if l['kind'] == 'outbound' else 'RET'
+            kind_bg = '#dbeafe' if l['kind'] == 'outbound' else '#fee2e2'
+            kind_fg = '#1e3a8a' if l['kind'] == 'outbound' else '#991b1b'
             leg_rows_html += f"""
 <tr style="background:{row_bg};border-bottom:1px solid #edf0f7;">
   <td style="padding:10px 12px;">
