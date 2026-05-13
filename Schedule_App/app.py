@@ -6,6 +6,8 @@ import streamlit.components.v1 as components
 import pandas as pd
 import pydeck as pdk
 
+AppLogo = "https://pbs.twimg.com/media/HIEZ_LdbAAA2GR2?format=png&name=900x900"
+
 TV_LOGO_MAP = {
     'ESPN': 'https://pbs.twimg.com/media/HH7aIPVbAAECaT8?format=png&name=360x360',
     'CBS': 'https://pbs.twimg.com/media/HH7aIPVakAAavgX?format=png&name=360x360',
@@ -156,6 +158,10 @@ html, body, [class*="css"] {
   width: 60px; height: 60px; object-fit: contain;
   filter: drop-shadow(0 2px 8px rgba(200,16,46,0.25));
 }
+.app-logo {
+  width: 76px; height: 76px; object-fit: contain;
+  filter: drop-shadow(0 2px 8px rgba(15,23,42,0.16));
+}
 .masthead-title {
   font-family: 'Bebas Neue', sans-serif;
   font-size:78px; letter-spacing: 4px;
@@ -296,28 +302,24 @@ st.html(f"""
     <img class="nfl-logo" src="{NFL_LOGO}" alt="NFL">
     <div>
       <div class="masthead-sub">Schedule Hub</div>
-      <div class="masthead-title">2025 NFL SCHEDULE</div>
+      <div class="masthead-title">2026 NFL SCHEDULE</div>
     </div>
   </div>
+  <img class="app-logo" src="{AppLogo}" alt="Schedule logo">
 </div>
 """)
 
-season_choices = sorted(
-    [s for s in ALL_GAMES['_season'].dropna().astype(str).unique().tolist() if s in ('2025', '2026')]
-)
-if not season_choices:
-    season_choices = ['2025', '2026']
-default_season = '2026' if '2026' in season_choices else season_choices[-1]
-season_col, _ = st.columns([1.2, 5.8])
-with season_col:
-    selected_season = st.selectbox(
-        "Select Season",
-        season_choices,
-        index=season_choices.index(default_season),
-        key="global_season_select",
-    )
-
+selected_season = '2026'
 Games = ALL_GAMES[ALL_GAMES['_season'].astype(str) == str(selected_season)].copy()
+
+ANALYTICS_RELEASE_NOTE = """
+<div style="margin:14px 0 4px;padding:10px 14px;border-left:4px solid #c8102e;
+     background:#fff;border-top:1px solid #e2e6ef;border-right:1px solid #e2e6ef;
+     border-bottom:1px solid #e2e6ef;border-radius:6px;font-family:'Barlow',sans-serif;
+     font-size:13px;line-height:1.5;color:#64748b;">
+  <strong style="color:#1a2030;">*</strong> These analytics are unstable until all games have been entered. Check back after the full release for the complete breakdown.
+</div>
+"""
 
 # ── Config ────────────────────────────────────────────────────────────────────
 DAY_CFG = {
@@ -1142,13 +1144,14 @@ with tabs[0]:
         with pt_col:
             primetime_choice = st.selectbox(
                 "Select Primetime Window",
-                ["Thursday Games", "Friday Games", "SNF Games", "Monday Games"],
+                ["Thursday Games", "Friday Games", "Saturday Games", "SNF Games", "Monday Games"],
                 key="lv_primetime_select",
             )
 
         primetime_key = {
             "Thursday Games": "thursday",
             "Friday Games": "friday",
+            "Saturday Games": "saturday",
             "SNF Games": "snf",
             "Monday Games": "monday",
         }[primetime_choice]
@@ -2198,7 +2201,7 @@ setTimeout(() => {
 
         top_games_table_html = f'<div style="margin-top:18px;"><div style="margin:0 0 12px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:18px;font-weight:900;letter-spacing:4px;text-transform:uppercase;color:#c8102e;">Top 75 Biggest Potential Games</div><div style="font-family:\'Barlow\',sans-serif;font-size:14px;color:#64748b;margin-top:3px;line-height:1.45;">Highest matchup strength based on combined team metrics. Weaker team at home gets 5% bonus. Late-season weighting: 1.5x weeks 14+, 1.2x weeks 10-13. Index shown includes all adjustments.</div></div><div style="display:flex;gap:12px;"><div style="flex:1;overflow-x:auto;border:1px solid #dfe5ef;border-radius:10px;background:#fff;box-shadow:0 2px 12px rgba(15,23,42,0.08);"><table style="border-collapse:collapse;width:100%;"><tbody>{table_header}<tbody>{top25_rows}</tbody></table></div><div style="flex:1;overflow-x:auto;border:1px solid #dfe5ef;border-radius:10px;background:#fff;box-shadow:0 2px 12px rgba(15,23,42,0.08);"><table style="border-collapse:collapse;width:100%;"><tbody>{table_header}<tbody>{mid25_rows}</tbody></table></div><div style="flex:1;overflow-x:auto;border:1px solid #dfe5ef;border-radius:10px;background:#fff;box-shadow:0 2px 12px rgba(15,23,42,0.08);"><table style="border-collapse:collapse;width:100%;"><tbody>{table_header}<tbody>{bottom25_rows}</tbody></table></div></div></div>'
 
-        st.html(f"""{sort_script}{cards_html}{sos_table_html}{legend_html}{sfi_table_html}{hardest_table_html}{easiest_table_html}{top_games_table_html}""")
+        st.html(f"""{sort_script}{ANALYTICS_RELEASE_NOTE}{cards_html}{sos_table_html}{legend_html}{sfi_table_html}{hardest_table_html}{easiest_table_html}{top_games_table_html}""")
 
 with tabs[1]:
 
@@ -3259,6 +3262,7 @@ with tabs[1]:
         )
 
         st.html(f"""
+{ANALYTICS_RELEASE_NOTE}
 {cards_html}
 {insight_html}
 {index_note_html}
