@@ -512,6 +512,7 @@ def build_team_travel(team, games, city_map, stad_map, lat_map, lon_map, tz_map,
         note_base = f"{game['week_label']} vs {stop['opponent']}"
         if stop['travel_required']:
             if i > 0 and should_stay(seq[i - 1], game):
+                add_leg(current, stop, 'transfer', f"Stay-over transfer: {note_base}")
                 current = dict(stop)
             else:
                 add_leg(current, stop, 'outbound', f"To game: {note_base}")
@@ -542,7 +543,7 @@ def build_team_travel(team, games, city_map, stad_map, lat_map, lon_map, tz_map,
 def travel_map_rows(legs, home_base=None, seq=None, max_arcs=None):
     arc_rows = []
     for l in legs:
-        if l.get('kind') != 'outbound':
+        if l.get('kind') not in ('outbound', 'transfer'):
             continue
         if not (
             travel_valid_coord(l.get('src_lat')) and travel_valid_coord(l.get('src_lon')) and
@@ -3592,9 +3593,9 @@ with tabs[1]:
         for i, l in enumerate(travel_legs):
             row_bg = '#ffffff' if i % 2 == 0 else '#f8fafc'
             miles = f"{int(l['miles']):,} mi" if l['miles'] is not None else 'TBD'
-            kind = 'OUT' if l['kind'] == 'outbound' else 'RET'
-            kind_bg = '#dbeafe' if l['kind'] == 'outbound' else '#fee2e2'
-            kind_fg = '#1e3a8a' if l['kind'] == 'outbound' else '#991b1b'
+            kind = 'XFER' if l['kind'] == 'transfer' else 'OUT' if l['kind'] == 'outbound' else 'RET'
+            kind_bg = '#fef3c7' if l['kind'] == 'transfer' else '#dbeafe' if l['kind'] == 'outbound' else '#fee2e2'
+            kind_fg = '#92400e' if l['kind'] == 'transfer' else '#1e3a8a' if l['kind'] == 'outbound' else '#991b1b'
             leg_rows_html += f"""
 <tr style="background:{row_bg};border-bottom:1px solid #edf0f7;">
   <td style="padding:10px 12px;">
