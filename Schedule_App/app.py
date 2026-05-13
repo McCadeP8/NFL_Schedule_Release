@@ -472,7 +472,7 @@ def build_team_travel(team, games, city_map, stad_map, lat_map, lon_map, tz_map,
     legs = []
     current = dict(home_base)
 
-    def add_leg(src, dst, kind, note):
+    def add_leg(src, dst, kind, note, week_num=None):
         if place_key(src) == place_key(dst):
             return
         if not dst.get('city') or dst.get('city') == '—':
@@ -491,6 +491,7 @@ def build_team_travel(team, games, city_map, stad_map, lat_map, lon_map, tz_map,
             'miles': miles,
             'kind': kind,
             'note': note,
+            'week_num': week_num,
             'src_lat': src.get('lat'), 'src_lon': src.get('lon'),
             'dst_lat': dst.get('lat'), 'dst_lon': dst.get('lon'),
         })
@@ -512,13 +513,13 @@ def build_team_travel(team, games, city_map, stad_map, lat_map, lon_map, tz_map,
         note_base = f"{game['week_label']} vs {stop['opponent']}"
         if stop['travel_required']:
             if i > 0 and should_stay(seq[i - 1], game):
-                add_leg(current, stop, 'transfer', f"Stay-over transfer: {note_base}")
+                add_leg(current, stop, 'transfer', f"Stay-over transfer: {note_base}", game.get('week_num'))
                 current = dict(stop)
             else:
-                add_leg(current, stop, 'outbound', f"To game: {note_base}")
+                add_leg(current, stop, 'outbound', f"To game: {note_base}", game.get('week_num'))
                 current = dict(stop)
         elif place_key(current) != place_key(home_base):
-            add_leg(current, home_base, 'return', f"Return home before: {note_base}")
+            add_leg(current, home_base, 'return', f"Return home before: {note_base}", game.get('week_num'))
             current = dict(home_base)
 
         if i == len(seq) - 1:
@@ -529,7 +530,7 @@ def build_team_travel(team, games, city_map, stad_map, lat_map, lon_map, tz_map,
         if stop['travel_required'] and should_stay(game, seq[i + 1]):
             current = dict(stop)
         elif place_key(current) != place_key(home_base):
-            add_leg(current, home_base, 'return', f"Return home after: {note_base}")
+            add_leg(current, home_base, 'return', f"Return home after: {note_base}", game.get('week_num'))
             current = dict(home_base)
 
     return {
@@ -1371,22 +1372,26 @@ with tabs[0]:
             week_options = ['Full Season'] + [f'Week {w}' for w in range(1, 19)]
             selected_week_display = st.selectbox('Filter by Week', week_options, index=0, key='league_week_filter')
 
-        if selected_week_display == 'Full Season':
-            games_to_use = Games
-        else:
-            week_num = int(selected_week_display.split()[1])
-            games_to_use = Games[pd.to_numeric(Games['Week'], errors='coerce') == week_num].copy()
+        selected_week_num = None
+        if selected_week_display != 'Full Season':
+            selected_week_num = int(selected_week_display.split()[1])
 
         league_routes = []
         team_totals = []
         for team in Team_Info.sort_values('Team')['Team'].tolist():
             route = build_team_travel(
-                team, games_to_use, lv_city_map, lv_stad_map, lv_lat_map, lv_lon_map, lv_tz_map, lv_intl_data, lv_clr_map
+                team, Games, lv_city_map, lv_stad_map, lv_lat_map, lv_lon_map, lv_tz_map, lv_intl_data, lv_clr_map
             )
-            league_routes.extend(route['legs'])
+            route_legs = route['legs']
+            if selected_week_num is not None:
+                route_legs = [
+                    leg for leg in route_legs
+                    if leg.get('week_num') is not None and float(leg.get('week_num')) == float(selected_week_num)
+                ]
+            league_routes.extend(route_legs)
             team_totals.append({
                 'Team': team,
-                'Total Miles': route['total_miles'],
+                'Total Miles': int(sum(l['miles'] for l in route_legs if l['miles'] is not None)),
             })
 
         league_total_miles = int(sum(r['Total Miles'] for r in team_totals))
