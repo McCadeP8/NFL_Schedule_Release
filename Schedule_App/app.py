@@ -3462,8 +3462,44 @@ with tabs[1]:
             else:
                 add_direct_flight(team_origin(away_team), team_origin(home_team), away_team, home_team, wk_lbl, 'flight')
 
-        flights = len(legs)
-        total_miles = int(sum(l['miles'] for l in legs if l['miles'] is not None))
+        def add_team_travel_leg(src, dst, opponent, week_label, kind, direction):
+            miles = direct_miles(src, dst)
+            travel_legs.append({
+                'from': src.get('city') or src.get('team') or 'Unknown',
+                'to': dst.get('city') or dst.get('team') or 'Unknown',
+                'miles': miles,
+                'kind': kind,
+                'note': f"{week_label}: {selected_team} {direction} vs {opponent}",
+                'src_lat': src.get('lat'), 'src_lon': src.get('lon'),
+                'dst_lat': dst.get('lat'), 'dst_lon': dst.get('lon'),
+            })
+
+        travel_legs = []
+        selected_origin = team_origin(selected_team)
+        for _, g in team_games_all.iterrows():
+            home_team = str(g.get('Home', '')).strip()
+            away_team = str(g.get('Away', '')).strip()
+            game_loc = str(g.get('Location', '') or '').strip()
+            wk_num = pd.to_numeric(g.get('Week'), errors='coerce')
+            wk_lbl = f"Wk {int(wk_num)}" if pd.notna(wk_num) else 'Wk TBA'
+            is_intl = flag_is_true(g.get('International', False))
+
+            if is_intl and game_loc:
+                opponent = away_team if home_team == selected_team else home_team
+                destination = game_site(game_loc)
+                kind = 'international'
+            elif away_team == selected_team:
+                opponent = home_team
+                destination = team_origin(home_team)
+                kind = 'flight'
+            else:
+                continue
+
+            add_team_travel_leg(selected_origin, destination, opponent, wk_lbl, kind, 'to game')
+            add_team_travel_leg(destination, selected_origin, opponent, wk_lbl, kind, 'return')
+
+        flights = len(travel_legs)
+        total_miles = int(sum(l['miles'] for l in travel_legs if l['miles'] is not None))
 
         def stat_card(label, value, sub='', accent=c1):
             return f'''
@@ -3525,7 +3561,7 @@ with tabs[1]:
         render_travel_motion_map(arc_df, node_df, f'team-travel-{abb}', height=500, initial_view=(39.5, -98.35, 4))
 
         leg_rows_html = ''
-        for i, l in enumerate(legs):
+        for i, l in enumerate(travel_legs):
             row_bg = '#ffffff' if i % 2 == 0 else '#f8fafc'
             miles = f"{int(l['miles']):,} mi" if l['miles'] is not None else 'TBD'
             kind = 'INTL' if l['kind'] == 'international' else 'FLT'
