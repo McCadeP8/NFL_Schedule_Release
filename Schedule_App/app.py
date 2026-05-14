@@ -2475,14 +2475,18 @@ with tabs[1]:
             team_games['_opp_sort'] = team_games.apply(
                 lambda r: str(r['Away'] if r['Home'] == selected_team else r['Home']), axis=1
             )
-            team_games['_week_num'] = team_games['Week'].apply(travel_week_num)
+            team_games['_has_week'] = pd.to_numeric(team_games['Week'], errors='coerce').notna().astype(int)
+            team_games['_week_num'] = pd.to_numeric(team_games['Week'], errors='coerce')
             team_games = team_games.sort_values(
-                ['_is_non_reg', '_post_order', '_week_num', '_ha_sort', '_opp_sort'],
+                ['_has_week', '_week_num', '_is_non_reg', '_post_order', '_game_type_norm', '_ha_sort', '_opp_sort'],
+                ascending=[False, True, True, True, True, True, True],
                 na_position='last'
             ).reset_index(drop=True)
-            max_wk_val = pd.to_numeric(team_games['_week_num'], errors='coerce').max()
-            max_wk = max(int(max_wk_val), int(bye_int or 0), 18) if pd.notna(max_wk_val) else max(int(bye_int or 0), 18)
-            wk_iter = list(range(1, max_wk + 1)) + [None]
+            unique_weeks = team_games['_week_num'].dropna().unique()
+            known_weeks = sorted([w if w == 18.5 else int(w) for w in unique_weeks])
+            if bye_int is not None and bye_int not in known_weeks:
+                known_weeks.append(bye_int)
+            wk_iter = sorted(known_weeks) + [None]
         else:
             max_wk_val = pd.to_numeric(Games['Week'], errors='coerce').max()
             max_wk = max(int(max_wk_val), int(bye_int or 0), 18) if pd.notna(max_wk_val) else max(int(bye_int or 0), 18)
@@ -2509,7 +2513,7 @@ with tabs[1]:
   </td>
 </tr>"""
                     bye_inserted = True
-                wk_rows = team_games[team_games['_week_num'].isna()] if '_week_num' in team_games.columns else team_games[team_week_num.isna()]
+                wk_rows = team_games[team_games['_has_week'] == 0] if '_has_week' in team_games.columns else team_games[team_week_num.isna()]
             else:
                 wk_rows = team_games[team_games['_week_num'] == wk] if '_week_num' in team_games.columns else team_games[team_week_num == wk]
 
