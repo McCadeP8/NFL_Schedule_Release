@@ -192,12 +192,17 @@ html, body, [class*="css"] {
 }
 .stTabs [data-baseweb="tab"] {
   font-family: 'Barlow Condensed', sans-serif;
-  font-size:40px; font-weight: 700;
+  font-size:40px !important; font-weight: 700;
   letter-spacing: 2.5px; text-transform: uppercase;
   color: #9aa5be; background: transparent;
   border: none; border-bottom: 2px solid transparent;
   padding: 16px 26px; margin: 0;
   transition: color 0.2s ease;
+}
+.stTabs [data-baseweb="tab"] p,
+.stTabs [data-baseweb="tab"] span {
+  font-size:40px !important;
+  line-height:1.05 !important;
 }
 .stTabs [data-baseweb="tab"]:hover { color: #4a5a78; }
 .stTabs [aria-selected="true"] {
@@ -398,7 +403,8 @@ def travel_week_num(value):
 def drop_super_bowl_travel_games(games):
     if games is None or len(games) == 0:
         return games.copy() if games is not None else games
-    wk = pd.to_numeric(games.get('Week'), errors='coerce')
+    wk_raw = games.get('Week').astype(str).str.lower().str.replace('week', '', regex=False).str.replace('wk', '', regex=False).str.strip()
+    wk = pd.to_numeric(wk_raw, errors='coerce')
     game_type = games.get('Game Type', '').astype(str).str.strip().str.lower()
     return games[(wk != 22) & (~game_type.str.contains('super bowl', na=False))].copy()
 
@@ -2479,7 +2485,9 @@ with tabs[1]:
                 ['_is_non_reg', '_post_order', '_week_num', '_ha_sort', '_opp_sort'],
                 na_position='last'
             ).reset_index(drop=True)
-            wk_iter = [None]
+            max_wk_val = pd.to_numeric(team_games['_week_num'], errors='coerce').max()
+            max_wk = max(int(max_wk_val), 18) if pd.notna(max_wk_val) else 18
+            wk_iter = range(1, max_wk + 1)
         else:
             max_wk_val = pd.to_numeric(Games['Week'], errors='coerce').max()
             max_wk = max(int(max_wk_val), 18) if pd.notna(max_wk_val) else 18
@@ -2504,7 +2512,7 @@ with tabs[1]:
 </tr>"""
 
         for wk in wk_iter:
-            wk_rows = team_games if tba_week_mode else team_games[team_week_num == wk]
+            wk_rows = team_games[team_games['_week_num'] == wk] if '_week_num' in team_games.columns else team_games[team_week_num == wk]
 
             if len(wk_rows) == 0:
                 if bye_int is not None and wk == bye_int:
@@ -2521,6 +2529,7 @@ with tabs[1]:
          letter-spacing:5px;text-transform:uppercase;color:#c8d2e0;">— BYE WEEK —</span>
   </td>
 </tr>"""
+                    bye_inserted = True
                 continue
 
             for _, g in wk_rows.iterrows():
