@@ -330,6 +330,7 @@ MANUAL_TRAVEL_STAYOVERS = [
     {'team': 'Buffalo Bills', 'from_week': 5, 'to_week': 6},
     {'team': 'Miami Dolphins', 'from_week': 1, 'to_week': 2},
     {'team': 'San Francisco 49ers', 'from_week': 10, 'to_week': 11},
+    {'team': 'New Orleans', 'from_week': 6, 'to_week': 7},
 
 ]
 
