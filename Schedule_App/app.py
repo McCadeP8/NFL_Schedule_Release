@@ -2481,11 +2481,11 @@ with tabs[1]:
                 na_position='last'
             ).reset_index(drop=True)
             max_wk_val = pd.to_numeric(team_games['_week_num'], errors='coerce').max()
-            max_wk = max(int(max_wk_val), 18) if pd.notna(max_wk_val) else 18
-            wk_iter = range(1, max_wk + 1)
+            max_wk = max(int(max_wk_val), int(bye_int or 0), 18) if pd.notna(max_wk_val) else max(int(bye_int or 0), 18)
+            wk_iter = list(range(1, max_wk + 1)) + [None]
         else:
             max_wk_val = pd.to_numeric(Games['Week'], errors='coerce').max()
-            max_wk = max(int(max_wk_val), 18) if pd.notna(max_wk_val) else 18
+            max_wk = max(int(max_wk_val), int(bye_int or 0), 18) if pd.notna(max_wk_val) else max(int(bye_int or 0), 18)
             wk_iter = range(1, max_wk + 1)
         rows_html = ''
         current_game_type = None
@@ -2493,10 +2493,28 @@ with tabs[1]:
         bye_inserted = False
 
         for wk in wk_iter:
-            wk_rows = team_games[team_games['_week_num'] == wk] if '_week_num' in team_games.columns else team_games[team_week_num == wk]
+            if wk is None:
+                if tba_week_mode and bye_int is not None and not bye_inserted:
+                    rows_html += f"""
+<tr style="background:#f8fafc;border-bottom:1px solid #edf0f7;">
+  <td style="width:5px;background:#e2e6ef;"></td>
+  <td style="padding:10px 8px 10px 12px;text-align:center;vertical-align:middle;">
+    <div style="width:34px;height:34px;border-radius:50%;background:#e2e6ef;color:#b0baca;
+         display:inline-flex;align-items:center;justify-content:center;
+         font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;">{bye_int}</div>
+  </td>
+  <td colspan="5" style="padding:12px 16px;vertical-align:middle;">
+    <span style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;
+         letter-spacing:5px;text-transform:uppercase;color:#c8d2e0;">-- BYE WEEK --</span>
+  </td>
+</tr>"""
+                    bye_inserted = True
+                wk_rows = team_games[team_games['_week_num'].isna()] if '_week_num' in team_games.columns else team_games[team_week_num.isna()]
+            else:
+                wk_rows = team_games[team_games['_week_num'] == wk] if '_week_num' in team_games.columns else team_games[team_week_num == wk]
 
             if len(wk_rows) == 0:
-                if bye_int is not None and wk == bye_int:
+                if wk is not None and bye_int is not None and wk == bye_int and not bye_inserted:
                     rows_html += f"""
 <tr style="background:#f8fafc;border-bottom:1px solid #edf0f7;">
   <td style="width:5px;background:#e2e6ef;"></td>
@@ -2510,6 +2528,7 @@ with tabs[1]:
          letter-spacing:5px;text-transform:uppercase;color:#c8d2e0;">— BYE WEEK —</span>
   </td>
 </tr>"""
+                    bye_inserted = True
                 continue
 
             for _, g in wk_rows.iterrows():
