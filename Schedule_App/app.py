@@ -192,7 +192,7 @@ html, body, [class*="css"] {
 }
 .stTabs [data-baseweb="tab"] {
   font-family: 'Barlow Condensed', sans-serif;
-  font-size:20px; font-weight: 700;
+  font-size:40px; font-weight: 700;
   letter-spacing: 2.5px; text-transform: uppercase;
   color: #9aa5be; background: transparent;
   border: none; border-bottom: 2px solid transparent;
@@ -430,6 +430,7 @@ def manual_travel_stayover_to(team, to_week):
 
 def build_team_travel(team, games, city_map, stad_map, lat_map, lon_map, tz_map, intl_data, color_map=None):
     team_games = games[(games['Home'] == team) | (games['Away'] == team)].copy()
+    team_games = drop_super_bowl_travel_games(team_games)
     team_games['_week_num'] = pd.to_numeric(team_games['Week'], errors='coerce')
     team_games['_date_num'] = pd.to_datetime(team_games['Date'], errors='coerce')
     team_games = team_games.sort_values(['_week_num', '_date_num']).reset_index(drop=True)
@@ -2485,8 +2486,9 @@ with tabs[1]:
             wk_iter = range(1, max_wk + 1)
         rows_html = ''
         current_game_type = None
+        bye_inserted = False
 
-        if tba_week_mode and bye_int is not None:
+        if False and tba_week_mode and bye_int is not None:
             rows_html += f"""
 <tr style="background:#f8fafc;border-bottom:1px solid #edf0f7;">
   <td style="width:5px;background:#e2e6ef;"></td>
@@ -2522,6 +2524,29 @@ with tabs[1]:
                 continue
 
             for _, g in wk_rows.iterrows():
+                wk_for_bye = travel_week_num(g.get('Week'))
+                if (
+                    tba_week_mode
+                    and bye_int is not None
+                    and not bye_inserted
+                    and wk_for_bye is not None
+                    and float(wk_for_bye) > float(bye_int)
+                ):
+                    rows_html += f"""
+<tr style="background:#f8fafc;border-bottom:1px solid #edf0f7;">
+  <td style="width:5px;background:#e2e6ef;"></td>
+  <td style="padding:10px 8px 10px 12px;text-align:center;vertical-align:middle;">
+    <div style="width:34px;height:34px;border-radius:50%;background:#e2e6ef;color:#b0baca;
+         display:inline-flex;align-items:center;justify-content:center;
+         font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;">{bye_int}</div>
+  </td>
+  <td colspan="5" style="padding:12px 16px;vertical-align:middle;">
+    <span style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;
+         letter-spacing:5px;text-transform:uppercase;color:#c8d2e0;">-- BYE WEEK --</span>
+  </td>
+</tr>"""
+                    bye_inserted = True
+
                 game_type = str(g.get('Game Type', '') or '').strip()
                 if game_type.lower() in ('', 'nan', 'none'):
                     game_type = 'Regular Season'
@@ -2682,6 +2707,21 @@ with tabs[1]:
   <td style="padding:12px 16px 12px 0;vertical-align:middle;text-align:right;
        white-space:nowrap;width:110px;">
     {tv_badge}
+  </td>
+</tr>"""
+
+        if tba_week_mode and bye_int is not None and not bye_inserted:
+            rows_html += f"""
+<tr style="background:#f8fafc;border-bottom:1px solid #edf0f7;">
+  <td style="width:5px;background:#e2e6ef;"></td>
+  <td style="padding:10px 8px 10px 12px;text-align:center;vertical-align:middle;">
+    <div style="width:34px;height:34px;border-radius:50%;background:#e2e6ef;color:#b0baca;
+         display:inline-flex;align-items:center;justify-content:center;
+         font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;">{bye_int}</div>
+  </td>
+  <td colspan="5" style="padding:12px 16px;vertical-align:middle;">
+    <span style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;
+         letter-spacing:5px;text-transform:uppercase;color:#c8d2e0;">-- BYE WEEK --</span>
   </td>
 </tr>"""
 
