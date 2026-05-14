@@ -1839,13 +1839,22 @@ setTimeout(() => {
         # ── Build cards ──────────────────────────────────────────────────────
         league_game_count = 285
 
-        analytics_games['_day_slot'] = analytics_games.apply(get_day_type, axis=1)
-        analytics_games['_time_slot'] = analytics_games.get('Time (ET)', '').astype(str).str.strip()
+        def lga_time_slot(value):
+            time_text = str(value or '').strip()
+            if time_text.lower() in ('', 'nan', 'none'):
+                return 'TBD'
+            if time_text.startswith(('4:05', '4:25')):
+                return '4:XX'
+            return time_text
+
+        analytics_games['_date_slot'] = pd.to_datetime(analytics_games['Date'], errors='coerce').dt.strftime('%Y-%m-%d')
+        analytics_games['_time_slot'] = analytics_games.get('Time (ET)', '').apply(lga_time_slot)
         analytics_games.loc[
             analytics_games['_time_slot'].str.lower().isin(['', 'nan', 'none']),
             '_time_slot'
         ] = 'TBD'
-        game_time_slot_count = len(analytics_games[['_day_slot', '_time_slot']].drop_duplicates())
+        regular_time_slots = analytics_games[analytics_games['_date_slot'].notna()]
+        game_time_slot_count = len(regular_time_slots.groupby(['_date_slot', '_time_slot']).size()) + 13
 
         league_intl_count = len(analytics_games[analytics_games['International'].apply(lambda v: bool(v) if not isinstance(v, float) else False)])
 
@@ -1871,7 +1880,7 @@ setTimeout(() => {
 
         cards_html = '<div style="display:flex;gap:12px;margin:18px 0;flex-wrap:wrap;">'
         cards_html += lga_card('Total Games', f'{league_game_count:,}')
-        cards_html += lga_card('Game Time Slots', f'{game_time_slot_count:,}', 'unique day/time combos')
+        cards_html += lga_card('Game Time Slots', f'{game_time_slot_count:,}', 'regular date/time slots + playoffs')
         cards_html += lga_card('International Games', f'{league_intl_count:,}')
         cards_html += lga_card('3-Game Road Trips', f'{three_game_road_trips}', 'teams with 3 straight road games')
         cards_html += '</div>'
@@ -3497,6 +3506,33 @@ with tabs[1]:
                 'color_hex': clr1_map.get(flight_team, '#2563eb'),
             })
 
+        stayover_transfer_cache = {}
+
+        def add_stayover_transfer_or_direct(flight_team, src, dst, opponent, wk_num, wk_lbl, kind):
+            transfer_leg = None
+            if manual_travel_stayover_to(flight_team, wk_num):
+                cache_key = (flight_team, float(wk_num) if wk_num is not None else None)
+                if cache_key not in stayover_transfer_cache:
+                    stayover_route = build_team_travel(
+                        flight_team, Games, city_map, stad_map, lat_map, lon_map, tz_map, intl_data, clr1_map
+                    )
+                    stayover_transfer_cache[cache_key] = next(
+                        (
+                            dict(l) for l in stayover_route['legs']
+                            if l.get('kind') == 'transfer'
+                            and l.get('week_num') is not None
+                            and wk_num is not None
+                            and float(l.get('week_num')) == float(wk_num)
+                        ),
+                        None
+                    )
+                transfer_leg = stayover_transfer_cache.get(cache_key)
+
+            if transfer_leg:
+                legs.append(transfer_leg)
+            else:
+                add_direct_flight(src, dst, flight_team, opponent, wk_lbl, kind)
+
         legs = []
         for _, g in team_games_all.iterrows():
             home_team = str(g.get('Home', '')).strip()
@@ -3507,10 +3543,8 @@ with tabs[1]:
 
             if flag_is_true(g.get('International', False)) and game_loc:
                 site = game_site(game_loc)
-                if not manual_travel_stayover_to(home_team, wk_num):
-                    add_direct_flight(team_origin(home_team), site, home_team, away_team, wk_lbl, 'international')
-                if not manual_travel_stayover_to(away_team, wk_num):
-                    add_direct_flight(team_origin(away_team), site, away_team, home_team, wk_lbl, 'international')
+                add_stayover_transfer_or_direct(home_team, team_origin(home_team), site, away_team, wk_num, wk_lbl, 'international')
+                add_stayover_transfer_or_direct(away_team, team_origin(away_team), site, home_team, wk_num, wk_lbl, 'international')
             else:
                 add_direct_flight(team_origin(away_team), team_origin(home_team), away_team, home_team, wk_lbl, 'flight')
 
