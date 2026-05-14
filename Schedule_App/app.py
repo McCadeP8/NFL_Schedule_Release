@@ -395,18 +395,6 @@ def travel_week_num(value):
     wk = pd.to_numeric(cleaned, errors='coerce')
     return None if pd.isna(wk) else float(wk)
 
-def is_super_bowl_travel_game(row):
-    game_type = str(row.get('Game Type', '') or '').strip().lower()
-    wk_num = travel_week_num(row.get('Week'))
-    return ('super bowl' in game_type) or (wk_num == 22)
-
-def drop_super_bowl_travel_games(games):
-    if games is None or len(games) == 0:
-        return games.copy() if games is not None else games
-    wk = pd.to_numeric(games.get('Week'), errors='coerce')
-    game_type = games.get('Game Type', '').astype(str).str.strip().str.lower()
-    return games[(wk != 22) & (~game_type.str.contains('super bowl', na=False))].copy()
-
 def manual_travel_stayover(team, from_week, to_week):
     if from_week is None or to_week is None:
         return False
@@ -1406,12 +1394,11 @@ with tabs[0]:
         if selected_week_display != 'Full Season':
             selected_week_num = int(selected_week_display.split()[1])
 
-        travel_games_source = drop_super_bowl_travel_games(Games)
         league_routes = []
         team_totals = []
         for team in Team_Info.sort_values('Team')['Team'].tolist():
             route = build_team_travel(
-                team, travel_games_source, lv_city_map, lv_stad_map, lv_lat_map, lv_lon_map, lv_tz_map, lv_intl_data, lv_clr_map
+                team, Games, lv_city_map, lv_stad_map, lv_lat_map, lv_lon_map, lv_tz_map, lv_intl_data, lv_clr_map
             )
             route_legs = route['legs']
             if selected_week_num is not None:
@@ -2454,7 +2441,7 @@ with tabs[1]:
             (Games['Home'] == selected_team) | (Games['Away'] == selected_team)
         ].copy().sort_values('Week').reset_index(drop=True)
 
-        team_week_num = team_games['Week'].apply(travel_week_num)
+        team_week_num = pd.to_numeric(team_games['Week'], errors='coerce')
         tba_week_mode = str(selected_season) == '2026'
         if tba_week_mode:
             team_games['_game_type_norm'] = team_games.get('Game Type', '').astype(str).str.strip()
@@ -2478,7 +2465,7 @@ with tabs[1]:
             team_games['_opp_sort'] = team_games.apply(
                 lambda r: str(r['Away'] if r['Home'] == selected_team else r['Home']), axis=1
             )
-            team_games['_week_num'] = team_games['Week'].apply(travel_week_num)
+            team_games['_week_num'] = pd.to_numeric(team_games['Week'], errors='coerce')
             team_games = team_games.sort_values(
                 ['_is_non_reg', '_post_order', '_week_num', '_ha_sort', '_opp_sort'],
                 na_position='last'
@@ -2491,7 +2478,20 @@ with tabs[1]:
         rows_html = ''
         current_game_type = None
 
-        bye_inserted = False
+        if tba_week_mode and bye_int is not None:
+            rows_html += f"""
+<tr style="background:#f8fafc;border-bottom:1px solid #edf0f7;">
+  <td style="width:5px;background:#e2e6ef;"></td>
+  <td style="padding:10px 8px 10px 12px;text-align:center;vertical-align:middle;">
+    <div style="width:34px;height:34px;border-radius:50%;background:#e2e6ef;color:#b0baca;
+         display:inline-flex;align-items:center;justify-content:center;
+         font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;">{bye_int}</div>
+  </td>
+  <td colspan="5" style="padding:12px 16px;vertical-align:middle;">
+    <span style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;
+         letter-spacing:5px;text-transform:uppercase;color:#c8d2e0;">— BYE WEEK —</span>
+  </td>
+</tr>"""
 
         for wk in wk_iter:
             wk_rows = team_games if tba_week_mode else team_games[team_week_num == wk]
@@ -2514,29 +2514,6 @@ with tabs[1]:
                 continue
 
             for _, g in wk_rows.iterrows():
-                wk_for_bye = travel_week_num(g.get('Week'))
-                if (
-                    tba_week_mode
-                    and bye_int is not None
-                    and not bye_inserted
-                    and wk_for_bye is not None
-                    and float(wk_for_bye) > float(bye_int)
-                ):
-                    rows_html += f"""
-<tr style="background:#f8fafc;border-bottom:1px solid #edf0f7;">
-  <td style="width:5px;background:#e2e6ef;"></td>
-  <td style="padding:10px 8px 10px 12px;text-align:center;vertical-align:middle;">
-    <div style="width:34px;height:34px;border-radius:50%;background:#e2e6ef;color:#b0baca;
-         display:inline-flex;align-items:center;justify-content:center;
-         font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;">{bye_int}</div>
-  </td>
-  <td colspan="5" style="padding:12px 16px;vertical-align:middle;">
-    <span style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;
-         letter-spacing:5px;text-transform:uppercase;color:#c8d2e0;">-- BYE WEEK --</span>
-  </td>
-</tr>"""
-                    bye_inserted = True
-
                 game_type = str(g.get('Game Type', '') or '').strip()
                 if game_type.lower() in ('', 'nan', 'none'):
                     game_type = 'Regular Season'
@@ -2646,8 +2623,8 @@ with tabs[1]:
                     f'<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:17px;'
                     f'font-weight:600;color:#4a5a78;">{loc_disp}</div>'
                 )
-                wk_num = travel_week_num(g.get('Week'))
-                if wk_num is not None:
+                wk_num = pd.to_numeric(g.get('Week'), errors='coerce')
+                if pd.notna(wk_num):
                     if wk_num == 18.5:
                         wk_badge = 'TBD'
                     else:
@@ -2697,21 +2674,6 @@ with tabs[1]:
   <td style="padding:12px 16px 12px 0;vertical-align:middle;text-align:right;
        white-space:nowrap;width:110px;">
     {tv_badge}
-  </td>
-</tr>"""
-
-        if tba_week_mode and bye_int is not None and not bye_inserted:
-            rows_html += f"""
-<tr style="background:#f8fafc;border-bottom:1px solid #edf0f7;">
-  <td style="width:5px;background:#e2e6ef;"></td>
-  <td style="padding:10px 8px 10px 12px;text-align:center;vertical-align:middle;">
-    <div style="width:34px;height:34px;border-radius:50%;background:#e2e6ef;color:#b0baca;
-         display:inline-flex;align-items:center;justify-content:center;
-         font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;">{bye_int}</div>
-  </td>
-  <td colspan="5" style="padding:12px 16px;vertical-align:middle;">
-    <span style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;
-         letter-spacing:5px;text-transform:uppercase;color:#c8d2e0;">-- BYE WEEK --</span>
   </td>
 </tr>"""
 
@@ -3363,7 +3325,6 @@ with tabs[1]:
         team_games_all = Games[
             (Games['Home'] == selected_team) | (Games['Away'] == selected_team)
         ].copy()
-        team_games_all = drop_super_bowl_travel_games(team_games_all)
         team_games_all['_week_num'] = pd.to_numeric(team_games_all['Week'], errors='coerce')
         team_games_all['_date_num'] = pd.to_datetime(team_games_all['Date'], errors='coerce')
         team_games_all = team_games_all.sort_values(['_week_num', '_date_num']).reset_index(drop=True)
@@ -3376,6 +3337,73 @@ with tabs[1]:
             'lon': lon_map.get(selected_team),
             'tz': tz_map.get(selected_team, ''),
         }
+
+        tz_offsets = {
+            'PT': -8, 'PST': -8, 'PDT': -7, 'MT': -7, 'MST': -7, 'MDT': -6,
+            'CT': -6, 'CST': -6, 'CDT': -5, 'ET': -5, 'EST': -5, 'EDT': -4,
+            'GMT': 0, 'BST': 1, 'CET': 1,
+        }
+
+        def tz_offset(tz_raw):
+            t = str(tz_raw or '').upper()
+            for k, v in tz_offsets.items():
+                if k in t:
+                    return v
+            return None
+
+        def place_key(p):
+            if tv_valid_coord(p.get('lat')) and tv_valid_coord(p.get('lon')):
+                return f"{round(float(p['lat']), 2)}|{round(float(p['lon']), 2)}"
+            return f"{p.get('city', '')}|{p.get('stadium', '')}"
+
+        def resolve_stop(g):
+            is_home = g['Home'] == selected_team
+            opponent = g['Away'] if is_home else g['Home']
+            game_loc = str(g.get('Location', '') or '').strip()
+            intl_val = g.get('International', False)
+            is_intl = bool(intl_val) if not isinstance(intl_val, float) else False
+            override = get_forced_venue(g)
+
+            if override:
+                return {
+                    'opponent': opponent, 'is_intl': False, 'travel_required': True,
+                    'city': override[1], 'stadium': override[0], 'lat': lat_map.get('San Francisco 49ers'),
+                    'lon': lon_map.get('San Francisco 49ers'), 'tz': 'PT',
+                }
+
+            team_city = city_map.get(selected_team, '').lower()
+            opp_city = city_map.get(opponent, '').lower()
+            game_loc_lower = game_loc.lower() if game_loc else ''
+            is_neutral = (game_loc in NEUTRAL_LOCATION_SET) or (is_intl and game_loc) or (game_loc_lower and team_city and opp_city and game_loc_lower != team_city and game_loc_lower != opp_city)
+
+            if is_neutral and game_loc:
+                idata = intl_data.get(game_loc, {})
+                return {
+                    'opponent': opponent, 'is_intl': is_intl, 'travel_required': True,
+                    'city': game_loc, 'stadium': idata.get('stad', ''),
+                    'lat': idata.get('lat'), 'lon': idata.get('lon'), 'tz': idata.get('tz', ''),
+                }
+            if is_home:
+                return {
+                    'opponent': opponent, 'is_intl': False, 'travel_required': False,
+                    'city': city_map.get(selected_team, ''), 'stadium': stad_map.get(selected_team, ''),
+                    'lat': lat_map.get(selected_team), 'lon': lon_map.get(selected_team),
+                    'tz': tz_map.get(selected_team, ''),
+                }
+            return {
+                'opponent': opponent, 'is_intl': False, 'travel_required': True,
+                'city': city_map.get(opponent, game_loc), 'stadium': stad_map.get(opponent, ''),
+                'lat': lat_map.get(opponent), 'lon': lon_map.get(opponent), 'tz': tz_map.get(opponent, ''),
+            }
+
+        def should_stay(cur_stop, next_stop):
+            if not (cur_stop['travel_required'] and next_stop['travel_required']):
+                return False
+            if selected_team == 'Jacksonville Jaguars' and cur_stop['is_intl'] and next_stop['is_intl']:
+                cur_city = str(cur_stop.get('city', '')).lower()
+                nxt_city = str(next_stop.get('city', '')).lower()
+                return ('london' in cur_city) and ('london' in nxt_city)
+            return False
 
         legs = []
         current = dict(home_base)
@@ -3397,7 +3425,7 @@ with tabs[1]:
             })
 
         seq = []
-        for _, g in team_games_all.iloc[0:0].iterrows():
+        for _, g in team_games_all.iterrows():
             wk_num = pd.to_numeric(g.get('Week'), errors='coerce')
             wk_lbl = f"Wk {int(wk_num)}" if pd.notna(wk_num) else 'Wk TBA'
             seq.append({'week_label': wk_lbl, 'stop': resolve_stop(g)})
@@ -3483,6 +3511,42 @@ with tabs[1]:
                     add_direct_flight(team_origin(away_team), site, away_team, home_team, wk_lbl, 'international')
             else:
                 add_direct_flight(team_origin(away_team), team_origin(home_team), away_team, home_team, wk_lbl, 'flight')
+
+        def add_team_travel_leg(src, dst, opponent, week_label, kind, direction):
+            miles = direct_miles(src, dst)
+            travel_legs.append({
+                'from': src.get('city') or src.get('team') or 'Unknown',
+                'to': dst.get('city') or dst.get('team') or 'Unknown',
+                'miles': miles,
+                'kind': kind,
+                'note': f"{week_label}: {selected_team} {direction} vs {opponent}",
+                'src_lat': src.get('lat'), 'src_lon': src.get('lon'),
+                'dst_lat': dst.get('lat'), 'dst_lon': dst.get('lon'),
+            })
+
+        travel_legs = []
+        selected_origin = team_origin(selected_team)
+        for _, g in team_games_all.iterrows():
+            home_team = str(g.get('Home', '')).strip()
+            away_team = str(g.get('Away', '')).strip()
+            game_loc = str(g.get('Location', '') or '').strip()
+            wk_num = pd.to_numeric(g.get('Week'), errors='coerce')
+            wk_lbl = f"Wk {int(wk_num)}" if pd.notna(wk_num) else 'Wk TBA'
+            is_intl = flag_is_true(g.get('International', False))
+
+            if is_intl and game_loc:
+                opponent = away_team if home_team == selected_team else home_team
+                destination = game_site(game_loc)
+                kind = 'international'
+            elif away_team == selected_team:
+                opponent = home_team
+                destination = team_origin(home_team)
+                kind = 'flight'
+            else:
+                continue
+
+            add_team_travel_leg(selected_origin, destination, opponent, wk_lbl, kind, 'to game')
+            add_team_travel_leg(destination, selected_origin, opponent, wk_lbl, kind, 'return')
 
         team_route = build_team_travel(
             selected_team, team_games_all, city_map, stad_map, lat_map, lon_map, tz_map, intl_data, clr1_map
