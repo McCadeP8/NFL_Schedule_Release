@@ -19,6 +19,7 @@ TV_LOGO_MAP = {
     'NBC': 'https://pbs.twimg.com/media/HH7aIPcbUAA8FJK?format=png&name=360x360',
 }
 
+@st.cache_data(ttl=300)
 def get_games() -> pd.DataFrame:
     csv_url = "https://docs.google.com/spreadsheets/d/1qjPpIEGmhV8aF3CZ8hi-ijQlIP-_z6QYJzSArjJV9d8/export?format=csv&gid=0"
     df = pd.read_csv(csv_url)
