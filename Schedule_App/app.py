@@ -137,7 +137,7 @@ html, body, [class*="css"] {
   color: #1a2030;
 }
 .stApp { background: #f4f6fa; }
-#MainMenu, footer, header { visibility: hidden; }
+footer { visibility: hidden; }
 .block-container {
   padding-top: 0 !important;
   padding-left: 2.5rem !important;
@@ -1710,9 +1710,9 @@ setTimeout(() => {
                     if pd.notna(prev_dt) and pd.notna(tg_dt):
                         tm_rest = int((tg_dt - prev_dt).days)
                         # Find opponent's previous game
-                        opp_all_games = Games[(Games['Home'] == opp) | (Games['Away'] == opp)].copy()
+                        opp_all_games = analytics_games[(analytics_games['Home'] == opp) | (analytics_games['Away'] == opp)].copy()
                         opp_all_games['_opp_date'] = pd.to_datetime(opp_all_games['Date'], errors='coerce')
-                        opp_prev_games = opp_all_games[opp_all_games['_opp_date'] < tg_dt]
+                        opp_prev_games = opp_all_games[opp_all_games['_opp_date'] < tg_dt].sort_values('_opp_date')
                         if len(opp_prev_games) > 0:
                             opp_prev_dt = pd.to_datetime(opp_prev_games.iloc[-1].get('Date'), errors='coerce')
                             if pd.notna(opp_prev_dt):
@@ -1834,10 +1834,13 @@ setTimeout(() => {
         # ── Build cards ──────────────────────────────────────────────────────
         league_game_count = 285
 
-        analytics_games['_date_str'] = pd.to_datetime(analytics_games['Date'], errors='coerce').dt.strftime('%Y-%m-%d')
-        analytics_games['_time_str'] = analytics_games.get('Time (ET)', '').astype(str).str.strip()
-        date_time_counts = analytics_games.groupby(['_date_str', '_time_str']).size()
-        league_pt_count = len(analytics_games[analytics_games.apply(lambda r: date_time_counts.get((r['_date_str'], r['_time_str']), 0) == 1, axis=1)])
+        analytics_games['_day_slot'] = analytics_games.apply(get_day_type, axis=1)
+        analytics_games['_time_slot'] = analytics_games.get('Time (ET)', '').astype(str).str.strip()
+        analytics_games.loc[
+            analytics_games['_time_slot'].str.lower().isin(['', 'nan', 'none']),
+            '_time_slot'
+        ] = 'TBD'
+        game_time_slot_count = len(analytics_games[['_day_slot', '_time_slot']].drop_duplicates())
 
         league_intl_count = len(analytics_games[analytics_games['International'].apply(lambda v: bool(v) if not isinstance(v, float) else False)])
 
@@ -1863,7 +1866,7 @@ setTimeout(() => {
 
         cards_html = '<div style="display:flex;gap:12px;margin:18px 0;flex-wrap:wrap;">'
         cards_html += lga_card('Total Games', f'{league_game_count:,}')
-        cards_html += lga_card('Primetime Games', f'{league_pt_count:,}', 'stand-alone games')
+        cards_html += lga_card('Game Time Slots', f'{game_time_slot_count:,}', 'unique day/time combos')
         cards_html += lga_card('International Games', f'{league_intl_count:,}')
         cards_html += lga_card('3-Game Road Trips', f'{three_game_road_trips}', 'teams with 3 straight road games')
         cards_html += '</div>'
@@ -2084,7 +2087,7 @@ setTimeout(() => {
         legend_html = f'<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:10px 0 14px;"><div style="font-family:\'Barlow Condensed\',sans-serif;font-size:12px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#64748b;">Opponent metric heat map (SOS Index)</div><div style="display:flex;align-items:center;gap:8px;"><span style="font-family:\'Barlow\',sans-serif;font-size:12px;color:#64748b;">Easier</span><div style="width:170px;height:12px;border-radius:3px;background:linear-gradient(90deg,#16a34a 0%,#f59e0b 50%,#be1822 100%);border:1px solid #d7deea;"></div><span style="font-family:\'Barlow\',sans-serif;font-size:12px;color:#64748b;">Harder</span></div></div>'
 
         # ── Rest Advantage/Disadvantage Table ────────────────────────────────
-        rest_sorted = sorted(team_sos_data, key=lambda d: d['rest_adv'] - d['rest_dis'], reverse=True)
+        rest_sorted = sorted(team_sos_data, key=lambda d: d['net_rest'], reverse=True)
         rest_rows = ''
         for rank, d in enumerate(rest_sorted, 1):
             tm = d['team']
@@ -3825,6 +3828,6 @@ with tabs[1]:
       <tbody>
         {travel_rows}
       </tbody>
-    </table>
+    </table>  
   </div>
 </div>""")
