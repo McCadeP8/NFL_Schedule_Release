@@ -395,6 +395,13 @@ def travel_week_num(value):
     wk = pd.to_numeric(cleaned, errors='coerce')
     return None if pd.isna(wk) else float(wk)
 
+def drop_super_bowl_travel_games(games):
+    if games is None or len(games) == 0:
+        return games.copy() if games is not None else games
+    wk = pd.to_numeric(games.get('Week'), errors='coerce')
+    game_type = games.get('Game Type', '').astype(str).str.strip().str.lower()
+    return games[(wk != 22) & (~game_type.str.contains('super bowl', na=False))].copy()
+
 def manual_travel_stayover(team, from_week, to_week):
     if from_week is None or to_week is None:
         return False
@@ -1394,11 +1401,12 @@ with tabs[0]:
         if selected_week_display != 'Full Season':
             selected_week_num = int(selected_week_display.split()[1])
 
+        travel_games_source = drop_super_bowl_travel_games(Games)
         league_routes = []
         team_totals = []
         for team in Team_Info.sort_values('Team')['Team'].tolist():
             route = build_team_travel(
-                team, Games, lv_city_map, lv_stad_map, lv_lat_map, lv_lon_map, lv_tz_map, lv_intl_data, lv_clr_map
+                team, travel_games_source, lv_city_map, lv_stad_map, lv_lat_map, lv_lon_map, lv_tz_map, lv_intl_data, lv_clr_map
             )
             route_legs = route['legs']
             if selected_week_num is not None:
@@ -3325,6 +3333,7 @@ with tabs[1]:
         team_games_all = Games[
             (Games['Home'] == selected_team) | (Games['Away'] == selected_team)
         ].copy()
+        team_games_all = drop_super_bowl_travel_games(team_games_all)
         team_games_all['_week_num'] = pd.to_numeric(team_games_all['Week'], errors='coerce')
         team_games_all['_date_num'] = pd.to_datetime(team_games_all['Date'], errors='coerce')
         team_games_all = team_games_all.sort_values(['_week_num', '_date_num']).reset_index(drop=True)
