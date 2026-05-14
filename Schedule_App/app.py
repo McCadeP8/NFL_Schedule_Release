@@ -327,6 +327,9 @@ ANALYTICS_RELEASE_NOTE = """
 # its Week 5 and Week 6 international home games.
 MANUAL_TRAVEL_STAYOVERS = [
     {'team': 'Jacksonville Jaguars', 'from_week': 5, 'to_week': 6},
+    {'team': 'Buffalo Bills', 'from_week': 5, 'to_week': 6},
+    {'team': 'Miami Dolphins', 'from_week': 1, 'to_week': 2},
+
 ]
 
 # ── Config ────────────────────────────────────────────────────────────────────
