@@ -395,16 +395,13 @@ def travel_week_num(value):
     wk = pd.to_numeric(cleaned, errors='coerce')
     return None if pd.isna(wk) else float(wk)
 
-def is_super_bowl_travel_game(row):
-    game_type = str(row.get('Game Type', '') or '').strip().lower()
-    wk_num = travel_week_num(row.get('Week'))
-    if ('super bowl' in game_type) or (wk_num == 22):
-        return True
-    dt = pd.to_datetime(row.get('Date', None), errors='coerce')
-    if pd.notna(dt) and dt.month == 2 and dt.day == 14:
-        return True
-    loc = str(row.get('Location', '') or '').strip().lower()
-    return 'sofi' in loc or 'inglewood' in loc
+def drop_super_bowl_travel_games(games):
+    if games is None or len(games) == 0:
+        return games.copy() if games is not None else games
+    wk_raw = games.get('Week').astype(str).str.lower().str.replace('week', '', regex=False).str.replace('wk', '', regex=False).str.strip()
+    wk = pd.to_numeric(wk_raw, errors='coerce')
+    game_type = games.get('Game Type', '').astype(str).str.strip().str.lower()
+    return games[(wk != 22) & (~game_type.str.contains('super bowl', na=False))].copy()
 
 def manual_travel_stayover(team, from_week, to_week):
     if from_week is None or to_week is None:
@@ -434,8 +431,7 @@ def manual_travel_stayover_to(team, to_week):
 
 def build_team_travel(team, games, city_map, stad_map, lat_map, lon_map, tz_map, intl_data, color_map=None):
     team_games = games[(games['Home'] == team) | (games['Away'] == team)].copy()
-    if len(team_games) > 0:
-        team_games = team_games[~team_games.apply(is_super_bowl_travel_game, axis=1)].copy()
+    team_games = drop_super_bowl_travel_games(team_games)
     team_games['_week_num'] = pd.to_numeric(team_games['Week'], errors='coerce')
     team_games['_date_num'] = pd.to_datetime(team_games['Date'], errors='coerce')
     team_games = team_games.sort_values(['_week_num', '_date_num']).reset_index(drop=True)
@@ -1407,7 +1403,7 @@ with tabs[0]:
         if selected_week_display != 'Full Season':
             selected_week_num = int(selected_week_display.split()[1])
 
-        travel_games_source = Games[~Games.apply(is_super_bowl_travel_game, axis=1)].copy()
+        travel_games_source = drop_super_bowl_travel_games(Games)
         league_routes = []
         team_totals = []
         for team in Team_Info.sort_values('Team')['Team'].tolist():
@@ -2484,7 +2480,9 @@ with tabs[1]:
                 ['_is_non_reg', '_post_order', '_week_num', '_ha_sort', '_opp_sort'],
                 na_position='last'
             ).reset_index(drop=True)
-            wk_iter = [None]
+            max_wk_val = pd.to_numeric(team_games['_week_num'], errors='coerce').max()
+            max_wk = max(int(max_wk_val), 18) if pd.notna(max_wk_val) else 18
+            wk_iter = range(1, max_wk + 1)
         else:
             max_wk_val = pd.to_numeric(Games['Week'], errors='coerce').max()
             max_wk = max(int(max_wk_val), 18) if pd.notna(max_wk_val) else 18
@@ -2495,7 +2493,7 @@ with tabs[1]:
         bye_inserted = False
 
         for wk in wk_iter:
-            wk_rows = team_games if tba_week_mode else team_games[team_week_num == wk]
+            wk_rows = team_games[team_games['_week_num'] == wk] if '_week_num' in team_games.columns else team_games[team_week_num == wk]
 
             if len(wk_rows) == 0:
                 if bye_int is not None and wk == bye_int:
@@ -3364,7 +3362,7 @@ with tabs[1]:
         team_games_all = Games[
             (Games['Home'] == selected_team) | (Games['Away'] == selected_team)
         ].copy()
-        team_games_all = team_games_all[~team_games_all.apply(is_super_bowl_travel_game, axis=1)].copy()
+        team_games_all = drop_super_bowl_travel_games(team_games_all)
         team_games_all['_week_num'] = pd.to_numeric(team_games_all['Week'], errors='coerce')
         team_games_all['_date_num'] = pd.to_datetime(team_games_all['Date'], errors='coerce')
         team_games_all = team_games_all.sort_values(['_week_num', '_date_num']).reset_index(drop=True)
