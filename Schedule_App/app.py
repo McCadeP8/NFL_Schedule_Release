@@ -1854,7 +1854,7 @@ setTimeout(() => {
             '_time_slot'
         ] = 'TBD'
         regular_time_slots = analytics_games[analytics_games['_date_slot'].notna()]
-        game_time_slot_count = len(regular_time_slots.groupby(['_date_slot', '_time_slot']).size()) + 13
+        game_time_slot_count = len(regular_time_slots.groupby(['_date_slot', '_time_slot']).size()) + 18
 
         league_intl_count = len(analytics_games[analytics_games['International'].apply(lambda v: bool(v) if not isinstance(v, float) else False)])
 
