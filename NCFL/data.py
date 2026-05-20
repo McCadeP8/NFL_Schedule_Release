@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from io import StringIO
-from typing import Any
+from typing import Any, Optional, Tuple
 
 import pandas as pd
 import requests
-import streamlit as st
 
 
 SLEEPER_API_BASE_URL = "https://api.sleeper.app/v1"
@@ -71,14 +70,14 @@ def get_players() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def get_rosters(league_id: int | str) -> list[dict[str, Any]]:
+def get_rosters(league_id: Any) -> list[dict[str, Any]]:
     return _get_json(f"/league/{league_id}/rosters")
 
 
 def get_roster(
-    league_id: int | str,
-    players: pd.DataFrame | None = None,
-    league_name: str | None = None,
+    league_id: Any,
+    players: Optional[pd.DataFrame] = None,
+    league_name: Optional[str] = None,
 ) -> pd.DataFrame:
     rosters = get_rosters(league_id)
     if players is None:
@@ -167,7 +166,7 @@ def _fallback_conferences(schools: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def get_data() -> tuple[pd.DataFrame, pd.DataFrame]:
+def get_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
     schools_url = "https://docs.google.com/spreadsheets/d/19bH4vYzaV7pbuQ2bcdz3HAaOWGb-BBJhQ9EgBp7YvoY/export?format=csv&gid=0"
     conferences_url = "https://docs.google.com/spreadsheets/d/1qjPpIEGmhV8aF3CZ8hi-ijQlIP-_z6QYJzSArjJV9d8/export?format=csv&gid=1436567589"
     schools = _read_csv_url(schools_url)
@@ -247,7 +246,6 @@ def enrich_rosters(rosters: pd.DataFrame, schools: pd.DataFrame) -> pd.DataFrame
     ).reset_index(drop=True)
 
 
-@st.cache_data(ttl=60 * 60 * 24, show_spinner="Loading NCAA/NFL Crossover rosters...")
 def load_all_rosters() -> pd.DataFrame:
     players = get_players()
     schools, _ = get_data()
@@ -265,8 +263,7 @@ def load_all_rosters() -> pd.DataFrame:
     return enrich_rosters(pd.concat(league_rosters, ignore_index=True), schools)
 
 
-@st.cache_data(ttl=60 * 60 * 24, show_spinner="Loading team branding...")
-def load_branding_data() -> tuple[pd.DataFrame, pd.DataFrame]:
+def load_branding_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
     return get_data()
 
 

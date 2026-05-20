@@ -5,7 +5,8 @@ import html
 import pandas as pd
 import streamlit as st
 
-from data import LEAGUES, POSITIONS, load_all_rosters, load_branding_data
+from data import LEAGUES, POSITIONS, load_all_rosters as fetch_all_rosters
+from data import load_branding_data as fetch_branding_data
 
 
 LEAGUE_NAME = "NCAA/NFL Crossover"
@@ -480,6 +481,16 @@ def masthead() -> None:
 </div>
 """
     )
+
+
+@st.cache_data(ttl=60 * 60 * 24, show_spinner="Loading team branding...")
+def load_branding_data() -> tuple[pd.DataFrame, pd.DataFrame]:
+    return fetch_branding_data()
+
+
+@st.cache_data(ttl=60 * 60 * 24, show_spinner="Loading NCAA/NFL Crossover rosters...")
+def load_all_rosters() -> pd.DataFrame:
+    return fetch_all_rosters()
 
 
 def conference_logo(conferences: pd.DataFrame, conference: str) -> str:
