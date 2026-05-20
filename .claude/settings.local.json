@@ -3,7 +3,8 @@
     "allow": [
       "Bash(python *)",
       "Bash(Get-Content \"C:\\\\Users\\\\mppac\\\\OneDrive\\\\Documents\\\\GitHub\\\\NFL_Schedule_Release\\\\branding.txt\")",
-      "Bash(Get-Content \"C:\\\\Users\\\\mppac\\\\OneDrive\\\\Documents\\\\GitHub\\\\NFL_Schedule_Release\\\\Schedule_App2\\\\app.py\")"
+      "Bash(Get-Content \"C:\\\\Users\\\\mppac\\\\OneDrive\\\\Documents\\\\GitHub\\\\NFL_Schedule_Release\\\\Schedule_App2\\\\app.py\")",
+      "Bash(python3)"
     ]
   }
 }
