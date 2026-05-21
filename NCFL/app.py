@@ -593,6 +593,90 @@ label[data-testid="stWidgetLabel"] * {
   grid-template-columns: 1fr;
   gap: 14px;
 }
+.schedule-matrix-wrap {
+  margin-top: 26px;
+}
+.schedule-matrix-title {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+.schedule-matrix-title span {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 42px;
+  letter-spacing: 3px;
+  line-height: 1;
+  color: #111827;
+}
+.schedule-matrix-title div {
+  flex: 1;
+  height: 1px;
+  background: #dde2ed;
+}
+.schedule-matrix-scroll {
+  overflow-x: auto;
+  border: 1px solid #e2e6ef;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(15,23,42,0.08);
+}
+.schedule-matrix {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 1180px;
+}
+.schedule-matrix th {
+  background: #f8fafc;
+  border-right: 1px solid #e8ecf3;
+  border-bottom: 2px solid #e2e6ef;
+  padding: 10px 8px;
+  text-align: center;
+}
+.schedule-matrix th:first-child {
+  min-width: 92px;
+}
+.schedule-matrix-team-head img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+.schedule-week-cell {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: #4a5a78;
+  background: #f8fafc;
+  border-right: 1px solid #e8ecf3;
+  border-bottom: 1px solid #edf0f7;
+  padding: 10px 12px;
+  white-space: nowrap;
+}
+.schedule-opponent-cell {
+  border-right: 1px solid #edf0f7;
+  border-bottom: 1px solid #edf0f7;
+  padding: 8px;
+  text-align: center;
+  min-width: 84px;
+  height: 58px;
+}
+.schedule-opponent-cell.win { background: #dcfce7; }
+.schedule-opponent-cell.loss { background: #fee2e2; }
+.schedule-opponent-cell.tie { background: #fef9c3; }
+.schedule-opponent-cell.pending { background: #ffffff; }
+.schedule-opponent-cell img {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+}
+.schedule-bye {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  color: #b0baca;
+}
 </style>
 """
     )
@@ -797,6 +881,81 @@ def filter_conference_schedule(
         schedule["TeamA"].isin(conference_teams)
         | schedule["TeamB"].isin(conference_teams)
     ].copy()
+
+
+def render_conference_schedule_matrix(
+    conference_schedule: pd.DataFrame,
+    scores: pd.DataFrame,
+    schools: pd.DataFrame,
+    conference: str,
+) -> None:
+    teams = team_lookup(schools)
+    conference_teams = sorted(
+        team
+        for team, info in teams.items()
+        if clean_text(info.get("conference")) == conference
+    )
+    weeks = schedule_weeks(conference_schedule)
+
+    if not conference_teams or not weeks:
+        return
+
+    scores_by_team_week = score_lookup(scores)
+    headers = ['<th class="schedule-week-head">Week</th>']
+
+    for team in conference_teams:
+        logo = clean_text(teams.get(team, {}).get("logo"))
+        if logo:
+            header = f'<img src="{esc(logo)}" alt="{esc(team)}" title="{esc(team)}">'
+        else:
+            header = f'<span class="conf-head-label">{esc(team)}</span>'
+        headers.append(f'<th class="schedule-matrix-team-head">{header}</th>')
+
+    body_rows = []
+    for week in weeks:
+        week_games = conference_schedule.loc[conference_schedule["Week"].eq(week)]
+        cells = [f'<td class="schedule-week-cell">Week {week}</td>']
+
+        for team in conference_teams:
+            game = week_games.loc[
+                week_games["TeamA"].eq(team) | week_games["TeamB"].eq(team)
+            ]
+
+            if game.empty:
+                cells.append('<td class="schedule-opponent-cell pending"><span class="schedule-bye">BYE</span></td>')
+                continue
+
+            game_row = game.iloc[0]
+            team_a = clean_text(game_row.get("TeamA"))
+            team_b = clean_text(game_row.get("TeamB"))
+            opponent = team_b if team_a == team else team_a
+            opponent_logo = clean_text(teams.get(opponent, {}).get("logo"))
+            team_score = scores_by_team_week.get((match_key(team), int(week)))
+            opponent_score = scores_by_team_week.get((match_key(opponent), int(week)))
+            result = score_class(team_score, opponent_score)
+
+            if opponent_logo:
+                content = f'<img src="{esc(opponent_logo)}" alt="{esc(opponent)}" title="{esc(opponent)}">'
+            else:
+                content = f'<span class="conf-head-label">{esc(opponent)}</span>'
+
+            cells.append(f'<td class="schedule-opponent-cell {result}">{content}</td>')
+
+        body_rows.append(f"<tr>{''.join(cells)}</tr>")
+
+    st.html(
+        f"""
+<div class="schedule-matrix-wrap">
+  <div class="schedule-matrix-title"><span>Schedule Grid</span><div></div></div>
+  <div class="schedule-matrix-scroll">
+    <table class="schedule-matrix">
+      <thead><tr>{''.join(headers)}</tr></thead>
+      <tbody>{''.join(body_rows)}</tbody>
+    </table>
+  </div>
+</div>
+"""
+    )
 
 
 def render_roster_matrix(rosters: pd.DataFrame) -> None:
@@ -1114,12 +1273,24 @@ with conference_tab:
                 schools,
                 empty_label=f"No Week {selected_week} {selected_conference} games",
             )
+            render_conference_schedule_matrix(
+                conference_schedule,
+                scores,
+                schools,
+                selected_conference,
+            )
         else:
             render_schedule_cards(
                 conference_schedule,
                 scores,
                 schools,
                 empty_label=f"No {selected_conference} games",
+            )
+            render_conference_schedule_matrix(
+                conference_schedule,
+                scores,
+                schools,
+                selected_conference,
             )
     with roster_tab:
         render_roster_matrix(conference_rosters)
