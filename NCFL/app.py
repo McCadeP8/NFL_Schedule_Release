@@ -88,10 +88,11 @@ footer { visibility: hidden; }
 .app-masthead {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 24px;
   padding: 36px 0 24px;
   border-bottom: 2px solid #e2e6ef;
+  width: 100%;
 }
 .mast-left {
   display: flex;
@@ -118,6 +119,15 @@ footer { visibility: hidden; }
   letter-spacing: 4px;
   line-height: 0.95;
   color: #111827;
+}
+.season-select-wrap {
+  min-width: 180px;
+}
+.season-select-wrap label,
+.season-select-wrap div[data-testid="stWidgetLabel"],
+.season-select-wrap div[data-testid="stWidgetLabel"] * {
+  color: #111827 !important;
+  opacity: 1 !important;
 }
 .mast-chip {
   font-family: 'Barlow Condensed', sans-serif;
@@ -683,8 +693,10 @@ label[data-testid="stWidgetLabel"] * {
 
 
 def masthead() -> None:
-    st.html(
-        f"""
+    left, right = st.columns([1, 0.16], vertical_alignment="center")
+    with left:
+        st.html(
+            f"""
 <div class="app-masthead">
   <div class="mast-left">
     <img class="league-logo" src="{LEAGUE_LOGO}" alt="{esc(LEAGUE_NAME)}">
@@ -693,7 +705,28 @@ def masthead() -> None:
       <div class="mast-title">{esc(LEAGUE_NAME)}</div>
     </div>
   </div>
-  <div class="mast-chip">12 Conferences</div>
+</div>
+"""
+        )
+    with right:
+        st.html('<div class="season-select-wrap">')
+        selected_season = st.selectbox(
+            "Season",
+            [2025],
+            index=0,
+            key="global_season",
+        )
+        st.html("</div>")
+    return selected_season
+
+
+def under_construction(label: str) -> None:
+    st.html(
+        f"""
+<div class="empty-state">
+  <img src="{LEAGUE_LOGO}" alt="{esc(LEAGUE_NAME)}">
+  <div class="empty-sub">{esc(label)}</div>
+  <div class="empty-title">Coming Soon</div>
 </div>
 """
     )
@@ -1186,7 +1219,7 @@ st.set_page_config(
 )
 
 inject_css()
-masthead()
+selected_season = masthead()
 
 schools, conferences, schedule, scores = load_branding_data()
 all_rosters = load_all_rosters()
@@ -1196,8 +1229,26 @@ league_tab, conference_tab, team_tab = st.tabs(
 )
 
 with league_tab:
-    schedule_tab, rosters_tab = st.tabs(["📅 Schedule", "👥 Rosters"])
-    with schedule_tab:
+    (
+        league_standings_tab,
+        league_schedule_tab,
+        league_scores_tab,
+        league_rankings_tab,
+        league_rosters_tab,
+        league_rules_tab,
+    ) = st.tabs(
+        [
+            "📊 Standings",
+            "📅 Schedule",
+            "🏈 Scores",
+            "⭐ Rankings",
+            "👥 Rosters",
+            "📘 Rules",
+        ]
+    )
+    with league_standings_tab:
+        under_construction("League Standings")
+    with league_schedule_tab:
         weeks = schedule_weeks(schedule)
         if weeks:
             selected_week = st.selectbox(
@@ -1220,8 +1271,14 @@ with league_tab:
                 schools,
                 empty_label="No schedule loaded",
             )
-    with rosters_tab:
+    with league_scores_tab:
+        under_construction("League Scores")
+    with league_rankings_tab:
+        under_construction("League Rankings")
+    with league_rosters_tab:
         render_league_roster_matrix(all_rosters, conferences)
+    with league_rules_tab:
+        under_construction("League Rules")
 
 with conference_tab:
     conference_options = [name for name in LEAGUES.keys() if name in set(conferences["Conference"].astype(str))]
@@ -1249,7 +1306,14 @@ with conference_tab:
 </div>
 """
     )
-    conf_schedule_tab, roster_tab = st.tabs(["📅 Schedule", "👥 Rosters"])
+    (
+        conf_standings_tab,
+        conf_schedule_tab,
+        conf_rosters_tab,
+        conf_drafts_tab,
+    ) = st.tabs(["📊 Standings", "📅 Schedule", "👥 Rosters", "🧾 Drafts"])
+    with conf_standings_tab:
+        under_construction(f"{selected_conference} Standings")
     with conf_schedule_tab:
         conference_schedule = filter_conference_schedule(
             schedule,
@@ -1292,8 +1356,10 @@ with conference_tab:
                 schools,
                 selected_conference,
             )
-    with roster_tab:
+    with conf_rosters_tab:
         render_roster_matrix(conference_rosters)
+    with conf_drafts_tab:
+        under_construction(f"{selected_conference} Drafts")
 
 with team_tab:
     team_options = (
