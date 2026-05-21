@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+from typing import Optional
 
 import pandas as pd
 import streamlit as st
@@ -32,6 +33,12 @@ POSITION_LABELS = {
     "WR": "Wide Receiver",
     "TE": "Tight End",
 }
+SCHEDULE_STATUS_COLORS = {
+    "win": "#166534",
+    "loss": "#991b1b",
+    "tie": "#4a5a78",
+    "pending": "#8a96b0",
+}
 
 
 def clean_text(value: object, fallback: str = "") -> str:
@@ -53,6 +60,10 @@ def first_value(frame: pd.DataFrame, column: str, fallback: str = "") -> str:
     values = frame[column].dropna().astype(str).str.strip()
     values = values.loc[~values.str.lower().isin(["", "nan", "none"])]
     return values.iloc[0] if len(values) else fallback
+
+
+def match_key(value: object) -> str:
+    return clean_text(value).casefold()
 
 
 def inject_css() -> None:
@@ -148,7 +159,14 @@ div[data-testid="stWidgetLabel"] p {
   font-weight: 800;
   letter-spacing: 2px;
   text-transform: uppercase;
-  color: #4a5a78;
+  color: #111827 !important;
+}
+div[data-testid="stWidgetLabel"],
+div[data-testid="stWidgetLabel"] *,
+label[data-testid="stWidgetLabel"],
+label[data-testid="stWidgetLabel"] * {
+  color: #111827 !important;
+  opacity: 1 !important;
 }
 .brand-panel {
   background: #fff;
@@ -461,6 +479,120 @@ div[data-testid="stWidgetLabel"] p {
   text-transform: uppercase;
   color: #9aa5be;
 }
+.schedule-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 10px 0 18px;
+}
+.schedule-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(390px, 1fr));
+  gap: 18px;
+}
+.schedule-card {
+  background: #ffffff;
+  border: 1px solid #e2e6ef;
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(15,23,42,0.08);
+  overflow: hidden;
+}
+.schedule-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e6ef;
+}
+.week-chip {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: #4a5a78;
+}
+.game-badge {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  color: #fff;
+  background: #1a2030;
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+.matchup-row {
+  display: grid;
+  grid-template-columns: 1fr 76px;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+  border-bottom: 1px solid #edf0f7;
+  border-left: 6px solid var(--team-color);
+}
+.matchup-row:last-child { border-bottom: none; }
+.matchup-row.winner { background: linear-gradient(90deg, rgba(22,101,52,0.08), #fff 45%); }
+.matchup-row.loser { opacity: 0.74; }
+.matchup-team {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.matchup-team img {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.matchup-name {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+  color: #1a2030;
+  line-height: 1.05;
+}
+.matchup-conf {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #8a96b0;
+  margin-top: 2px;
+}
+.score-box {
+  justify-self: end;
+  min-width: 58px;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #1a2030;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 38px;
+  letter-spacing: 1px;
+  line-height: 1;
+  text-align: center;
+  padding: 9px 10px 6px;
+}
+.score-box.win { background: #dcfce7; color: #166534; }
+.score-box.loss { background: #fee2e2; color: #991b1b; }
+.score-box.tie { background: #e2e8f0; color: #4a5a78; }
+.schedule-notes {
+  padding: 10px 14px 12px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  background: #fbfcff;
+}
+.team-schedule-stack {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
 </style>
 """
     )
@@ -484,13 +616,43 @@ def masthead() -> None:
 
 
 @st.cache_data(ttl=60 * 60 * 24, show_spinner="Loading team branding...")
-def load_branding_data() -> tuple[pd.DataFrame, pd.DataFrame]:
+def load_branding_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     return fetch_branding_data()
 
 
 @st.cache_data(ttl=60 * 60 * 24, show_spinner="Loading NCAA/NFL Crossover rosters...")
 def load_all_rosters() -> pd.DataFrame:
     return fetch_all_rosters()
+
+
+def team_lookup(schools: pd.DataFrame) -> dict[str, dict[str, str]]:
+    lookup = {}
+    for _, row in schools.iterrows():
+        team = clean_text(row.get("School"))
+        if not team:
+            continue
+        lookup[team] = {
+            "logo": clean_text(row.get("Logo")),
+            "wordmark": clean_text(row.get("Wordmark")),
+            "conference": clean_text(row.get("Conference")),
+            "color": clean_text(row.get("Color"), "#1a2030"),
+            "color2": clean_text(row.get("Color2"), "#c8102e"),
+        }
+    return lookup
+
+
+def score_lookup(scores: pd.DataFrame) -> dict[tuple[str, int], float]:
+    lookup = {}
+    if scores.empty:
+        return lookup
+    for _, row in scores.iterrows():
+        team = clean_text(row.get("Team"))
+        week = row.get("Week")
+        points = row.get("Points")
+        if not team or pd.isna(week) or pd.isna(points):
+            continue
+        lookup[(match_key(team), int(week))] = float(points)
+    return lookup
 
 
 def conference_logo(conferences: pd.DataFrame, conference: str) -> str:
@@ -513,6 +675,128 @@ def taken_color(count: int) -> str:
     if count >= 3:
         return "#dc2626"
     return "#7f1d1d"
+
+
+def score_class(points: Optional[float], opponent_points: Optional[float]) -> str:
+    if points is None or opponent_points is None:
+        return "pending"
+    if points > opponent_points:
+        return "win"
+    if points < opponent_points:
+        return "loss"
+    return "tie"
+
+
+def render_matchup_team(
+    team: str,
+    week: int,
+    points: Optional[float],
+    opponent_points: Optional[float],
+    teams: dict[str, dict[str, str]],
+) -> str:
+    info = teams.get(team, {})
+    logo = clean_text(info.get("logo"))
+    conference = clean_text(info.get("conference"))
+    color = esc(info.get("color"), "#1a2030")
+    status = score_class(points, opponent_points)
+    score_text = f"{points:.2f}" if points is not None else "-"
+    logo_html = f'<img src="{esc(logo)}" alt="{esc(team)}">' if logo else ""
+
+    return f"""
+<div class="matchup-row {status if status in ('win', 'loss') else ''}" style="--team-color:{color};">
+  <div class="matchup-team">
+    {logo_html}
+    <div>
+      <div class="matchup-name">{esc(team)}</div>
+      <div class="matchup-conf">{esc(conference)}</div>
+    </div>
+  </div>
+  <div class="score-box {status if status in ('win', 'loss', 'tie') else ''}">{score_text}</div>
+</div>
+"""
+
+
+def render_schedule_cards(
+    games: pd.DataFrame,
+    scores: pd.DataFrame,
+    schools: pd.DataFrame,
+    empty_label: str = "No games found",
+    stacked: bool = False,
+) -> None:
+    if games.empty:
+        st.html(
+            f"""
+<div class="empty-state">
+  <img src="{LEAGUE_LOGO}" alt="{esc(LEAGUE_NAME)}">
+  <div class="empty-sub">Schedule</div>
+  <div class="empty-title">{esc(empty_label)}</div>
+</div>
+"""
+        )
+        return
+
+    teams = team_lookup(schools)
+    scores_by_team_week = score_lookup(scores)
+    cards = []
+    games = games.sort_values(["Week", "TeamA", "TeamB"], na_position="last")
+
+    for _, game in games.iterrows():
+        week = int(game["Week"]) if not pd.isna(game.get("Week")) else 0
+        team_a = clean_text(game.get("TeamA"))
+        team_b = clean_text(game.get("TeamB"))
+        notes = clean_text(game.get("Notes"))
+        is_conference = bool(game.get("Conference", False))
+        score_a = scores_by_team_week.get((match_key(team_a), week))
+        score_b = scores_by_team_week.get((match_key(team_b), week))
+        badge = "Conference" if is_conference else "Non-Conf"
+
+        cards.append(
+            f"""
+<div class="schedule-card">
+  <div class="schedule-card-top">
+    <div class="week-chip">Week {week}</div>
+    <div class="game-badge">{badge}</div>
+  </div>
+  {render_matchup_team(team_a, week, score_a, score_b, teams)}
+  {render_matchup_team(team_b, week, score_b, score_a, teams)}
+  {f'<div class="schedule-notes">{esc(notes)}</div>' if notes else ''}
+</div>
+"""
+        )
+
+    container_class = "team-schedule-stack" if stacked else "schedule-grid"
+    st.html(f'<div class="{container_class}">{"".join(cards)}</div>')
+
+
+def schedule_weeks(schedule: pd.DataFrame) -> list[int]:
+    if schedule.empty or "Week" not in schedule.columns:
+        return []
+    return sorted(
+        int(week)
+        for week in schedule["Week"].dropna().unique()
+        if int(week) > 0
+    )
+
+
+def week_label(week: int) -> str:
+    return f"Week {week}"
+
+
+def filter_conference_schedule(
+    schedule: pd.DataFrame,
+    schools: pd.DataFrame,
+    conference: str,
+) -> pd.DataFrame:
+    teams = team_lookup(schools)
+    conference_teams = {
+        team
+        for team, info in teams.items()
+        if clean_text(info.get("conference")) == conference
+    }
+    return schedule.loc[
+        schedule["TeamA"].isin(conference_teams)
+        | schedule["TeamB"].isin(conference_teams)
+    ].copy()
 
 
 def render_roster_matrix(rosters: pd.DataFrame) -> None:
@@ -664,7 +948,7 @@ def render_league_roster_matrix(rosters: pd.DataFrame, conferences: pd.DataFrame
         )
 
 
-def render_team_roster(rosters: pd.DataFrame, team_name: str) -> None:
+def render_team_hero(rosters: pd.DataFrame, team_name: str) -> None:
     team = rosters.loc[rosters["team_name"].eq(team_name)].copy()
     if team.empty:
         st.warning("No roster rows found for this team.")
@@ -690,6 +974,14 @@ def render_team_roster(rosters: pd.DataFrame, team_name: str) -> None:
 """
     )
 
+
+def render_team_roster(rosters: pd.DataFrame, team_name: str) -> None:
+    team = rosters.loc[rosters["team_name"].eq(team_name)].copy()
+    if team.empty:
+        st.warning("No roster rows found for this team.")
+        return
+
+    color = first_value(team, "team_color", "#1a2030")
     cards = []
     for position in POSITIONS:
         position_team = team.loc[team["position"].eq(position)].copy()
@@ -737,13 +1029,38 @@ st.set_page_config(
 inject_css()
 masthead()
 
-schools, conferences = load_branding_data()
+schools, conferences, schedule, scores = load_branding_data()
 all_rosters = load_all_rosters()
 
-league_tab, conference_tab, team_tab = st.tabs(["League", "Conference", "Team"])
+league_tab, conference_tab, team_tab = st.tabs(
+    ["🏆 League", "🏟️ Conference", "🎓 Team"]
+)
 
 with league_tab:
-    rosters_tab = st.tabs(["Rosters"])[0]
+    schedule_tab, rosters_tab = st.tabs(["📅 Schedule", "👥 Rosters"])
+    with schedule_tab:
+        weeks = schedule_weeks(schedule)
+        if weeks:
+            selected_week = st.selectbox(
+                "Week",
+                weeks,
+                key="league_schedule_week",
+                format_func=week_label,
+            )
+            week_games = schedule.loc[schedule["Week"].eq(selected_week)].copy()
+            render_schedule_cards(
+                week_games,
+                scores,
+                schools,
+                empty_label=f"No Week {selected_week} games",
+            )
+        else:
+            render_schedule_cards(
+                schedule,
+                scores,
+                schools,
+                empty_label="No schedule loaded",
+            )
     with rosters_tab:
         render_league_roster_matrix(all_rosters, conferences)
 
@@ -773,7 +1090,37 @@ with conference_tab:
 </div>
 """
     )
-    roster_tab = st.tabs(["Rosters"])[0]
+    conf_schedule_tab, roster_tab = st.tabs(["📅 Schedule", "👥 Rosters"])
+    with conf_schedule_tab:
+        conference_schedule = filter_conference_schedule(
+            schedule,
+            schools,
+            selected_conference,
+        )
+        weeks = schedule_weeks(conference_schedule)
+        if weeks:
+            selected_week = st.selectbox(
+                "Week",
+                weeks,
+                key=f"conference_schedule_week_{selected_conference}",
+                format_func=week_label,
+            )
+            week_games = conference_schedule.loc[
+                conference_schedule["Week"].eq(selected_week)
+            ].copy()
+            render_schedule_cards(
+                week_games,
+                scores,
+                schools,
+                empty_label=f"No Week {selected_week} {selected_conference} games",
+            )
+        else:
+            render_schedule_cards(
+                conference_schedule,
+                scores,
+                schools,
+                empty_label=f"No {selected_conference} games",
+            )
     with roster_tab:
         render_roster_matrix(conference_rosters)
 
@@ -787,6 +1134,19 @@ with team_tab:
         .tolist()
     )
     selected_team = st.selectbox("Team", team_options)
-    team_roster_tab = st.tabs(["Rosters"])[0]
+    render_team_hero(all_rosters, selected_team)
+    team_schedule_tab, team_roster_tab = st.tabs(["📅 Schedule", "👥 Rosters"])
+    with team_schedule_tab:
+        team_schedule = schedule.loc[
+            schedule["TeamA"].eq(selected_team)
+            | schedule["TeamB"].eq(selected_team)
+        ].copy()
+        render_schedule_cards(
+            team_schedule,
+            scores,
+            schools,
+            empty_label=f"No {selected_team} games",
+            stacked=True,
+        )
     with team_roster_tab:
         render_team_roster(all_rosters, selected_team)

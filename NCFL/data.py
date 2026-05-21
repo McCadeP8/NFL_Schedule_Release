@@ -45,6 +45,24 @@ CONFERENCE_ALIASES = {
 
 POSITIONS = ["QB", "RB", "WR", "TE"]
 
+SCHOOL_ALIASES = {
+    "FSU": "Florida State",
+    "Miami": "Miami (FL)",
+    "SMU": "Southern Methodist",
+}
+
+COLUMN_ALIASES = {
+    "team a": "TeamA",
+    "teama": "TeamA",
+    "team_a": "TeamA",
+    "team b": "TeamB",
+    "teamb": "TeamB",
+    "team_b": "TeamB",
+}
+
+SHEET_ID = "1qjPpIEGmhV8aF3CZ8hi-ijQlIP-_z6QYJzSArjJV9d8"
+SCHOOLS_SHEET_ID = "19bH4vYzaV7pbuQ2bcdz3HAaOWGb-BBJhQ9EgBp7YvoY"
+
 
 def _get_json(endpoint: str) -> Any:
     response = requests.get(f"{SLEEPER_API_BASE_URL}{endpoint}", timeout=30)
@@ -123,7 +141,91 @@ def _read_csv_url(url: str) -> pd.DataFrame:
     headers = {"User-Agent": "Mozilla/5.0"}
     response = requests.get(url, headers=headers, timeout=30)
     response.raise_for_status()
-    return pd.read_csv(StringIO(response.text))
+    return _normalize_sheet(pd.read_csv(StringIO(response.text)))
+
+
+def _sheet_csv_url(sheet_id: str, gid: Any) -> str:
+    return f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&gid={gid}"
+
+
+def _sheet_export_url(sheet_id: str, gid: Any) -> str:
+    return f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
+
+
+def _read_google_sheet(sheet_id: str, gid: Any) -> pd.DataFrame:
+    try:
+        return _read_csv_url(_sheet_csv_url(sheet_id, gid))
+    except requests.RequestException:
+        return _read_csv_url(_sheet_export_url(sheet_id, gid))
+
+
+def _empty_schedule() -> pd.DataFrame:
+    return pd.DataFrame(
+        columns=["Week", "TeamA", "TeamB", "Conference", "Notes"]
+    )
+
+
+def _empty_scores() -> pd.DataFrame:
+    return pd.DataFrame(columns=["Team", "Week", "Points"])
+
+
+def _safe_read_csv_url(url: str, fallback: pd.DataFrame) -> pd.DataFrame:
+    try:
+        return _read_csv_url(url)
+    except requests.RequestException:
+        return fallback.copy()
+
+
+def _safe_read_google_sheet(
+    sheet_id: str,
+    gid: Any,
+    fallback: pd.DataFrame,
+) -> pd.DataFrame:
+    try:
+        return _read_google_sheet(sheet_id, gid)
+    except requests.RequestException:
+        return fallback.copy()
+
+
+def _ensure_columns(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
+    df = df.copy()
+    for column in columns:
+        if column not in df.columns:
+            df[column] = pd.NA
+    return df
+
+
+def _has_columns(df: pd.DataFrame, columns: list[str]) -> bool:
+    return all(column in df.columns for column in columns)
+
+
+def _normalize_school(value: object) -> object:
+    if pd.isna(value):
+        return value
+    text = str(value).strip()
+    return SCHOOL_ALIASES.get(text, text)
+
+
+def _normalize_school_names(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    for column in ("School", "Team", "TeamA", "TeamB"):
+        if column in df.columns:
+            df[column] = df[column].map(_normalize_school)
+    return df
+
+
+def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    rename_map = {}
+    for column in df.columns:
+        clean = str(column).strip()
+        alias_key = clean.lower().replace("-", " ").replace(".", "")
+        rename_map[column] = COLUMN_ALIASES.get(alias_key, clean)
+    return df.rename(columns=rename_map)
+
+
+def _normalize_sheet(df: pd.DataFrame) -> pd.DataFrame:
+    return _normalize_school_names(_normalize_columns(df))
 
 
 def _normalize_conference(value: object) -> str:
@@ -152,6 +254,13 @@ def _is_image_url(value: object) -> bool:
     )
 
 
+def _parse_bool(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    return text in {"true", "t", "yes", "y", "1"}
+
+
 def _fallback_conferences(schools: pd.DataFrame) -> pd.DataFrame:
     school_conferences = set(
         schools["Conference"].dropna().map(_normalize_conference).astype(str)
@@ -166,16 +275,25 @@ def _fallback_conferences(schools: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def get_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
-    schools_url = "https://docs.google.com/spreadsheets/d/19bH4vYzaV7pbuQ2bcdz3HAaOWGb-BBJhQ9EgBp7YvoY/export?format=csv&gid=0"
+def get_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    schools_url = "https://docs.google.com/spreadsheets/d/19bH4vYzaV7pbuQ2bcdz3HAaOWGb-BBJhQ9EgBp7YvoY/export?format=csv&gid=1436567589"
     conferences_url = "https://docs.google.com/spreadsheets/d/1qjPpIEGmhV8aF3CZ8hi-ijQlIP-_z6QYJzSArjJV9d8/export?format=csv&gid=1436567589"
+    schedule_url = "https://docs.google.com/spreadsheets/d/19bH4vYzaV7pbuQ2bcdz3HAaOWGb-BBJhQ9EgBp7YvoY/export?format=csv&gid=1612692704"
+    scores_url = "https://docs.google.com/spreadsheets/d/19bH4vYzaV7pbuQ2bcdz3HAaOWGb-BBJhQ9EgBp7YvoY/export?format=csv&gid=702965459"
+
     schools = _read_csv_url(schools_url)
+    if not _has_columns(schools, ["School", "TeamID"]):
+        schools = _read_google_sheet(SCHOOLS_SHEET_ID, 0)
+    schedule = _safe_read_csv_url(schedule_url, _empty_schedule())
+    scores = _safe_read_csv_url(scores_url, _empty_scores())
+    schedule = _ensure_columns(schedule, ["Week", "TeamA", "TeamB", "Conference", "Notes"])
+    scores = _ensure_columns(scores, ["Team", "Week", "Points"])
 
     try:
         conferences = _read_csv_url(conferences_url)
         if "Conference" not in conferences.columns:
             conferences = _fallback_conferences(schools)
-    except requests.HTTPError:
+    except requests.RequestException:
         conferences = _fallback_conferences(schools)
 
     conferences = conferences.copy()
@@ -209,7 +327,16 @@ def get_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
             ignore_index=True,
         )
 
-    return schools, conferences
+    if "Week" in schedule.columns:
+        schedule["Week"] = pd.to_numeric(schedule["Week"], errors="coerce")
+    if "Conference" in schedule.columns:
+        schedule["Conference"] = schedule["Conference"].map(_parse_bool)
+    if "Week" in scores.columns:
+        scores["Week"] = pd.to_numeric(scores["Week"], errors="coerce")
+    if "Points" in scores.columns:
+        scores["Points"] = pd.to_numeric(scores["Points"], errors="coerce")
+
+    return schools, conferences, schedule, scores
 
 
 def enrich_rosters(rosters: pd.DataFrame, schools: pd.DataFrame) -> pd.DataFrame:
@@ -248,7 +375,7 @@ def enrich_rosters(rosters: pd.DataFrame, schools: pd.DataFrame) -> pd.DataFrame
 
 def load_all_rosters() -> pd.DataFrame:
     players = get_players()
-    schools, _ = get_data()
+    schools, _, _, _ = get_data()
     league_rosters = []
 
     for league_name, league_id in LEAGUES.items():
@@ -263,7 +390,7 @@ def load_all_rosters() -> pd.DataFrame:
     return enrich_rosters(pd.concat(league_rosters, ignore_index=True), schools)
 
 
-def load_branding_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
+def load_branding_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     return get_data()
 
 
