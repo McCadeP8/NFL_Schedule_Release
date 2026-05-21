@@ -12,6 +12,7 @@ from data import load_branding_data as fetch_branding_data
 
 LEAGUE_NAME = "NCAA/NFL Crossover"
 LEAGUE_LOGO = "https://upload.wikimedia.org/wikipedia/en/c/cf/NCAA_football_icon_logo.svg"
+PLACEHOLDER_PLAYER_HEADSHOT = "https://www.pro-football-reference.com/req/20230307/images/headshots/HerbJu00_2025.jpg"
 LEAGUE_ROSTER_ORDER = [
     "ACC",
     "B1G",
@@ -338,6 +339,14 @@ label[data-testid="stWidgetLabel"] * {
   letter-spacing: 4px;
   text-transform: uppercase;
   opacity: 0.85;
+}
+.team-hero-record {
+  margin-top: 10px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: rgba(255,255,255,0.92);
 }
 .team-roster-grid {
   display: grid;
@@ -687,6 +696,658 @@ label[data-testid="stWidgetLabel"] * {
   font-weight: 800;
   color: #b0baca;
 }
+.standings-wrap {
+  margin: 18px 0 30px;
+}
+.standings-title {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 18px 0 10px;
+}
+.standings-title img {
+  width: 54px;
+  height: 54px;
+  object-fit: contain;
+}
+.standings-title span {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 48px;
+  letter-spacing: 3px;
+  line-height: 1;
+  color: #111827;
+}
+.standings-title div {
+  flex: 1;
+  height: 1px;
+  background: #dde2ed;
+}
+.standings-scroll {
+  overflow-x: auto;
+  border: 1px solid #e2e6ef;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(15,23,42,0.08);
+}
+.standings-table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 1180px;
+}
+.standings-table th {
+  background: #f8fafc;
+  border-bottom: 2px solid #e2e6ef;
+  border-right: 1px solid #e8ecf3;
+  padding: 10px 12px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #8a96b0;
+  text-align: right;
+  white-space: nowrap;
+}
+.standings-table th.team-col {
+  text-align: left;
+  min-width: 260px;
+}
+.standings-table td {
+  border-bottom: 1px solid #edf0f7;
+  border-right: 1px solid #edf0f7;
+  padding: 10px 12px;
+  text-align: right;
+  vertical-align: middle;
+}
+.standings-table tr:nth-child(even) td { background: #fbfcff; }
+.standings-table tr.championship-row td {
+  background: #ecfdf5;
+  box-shadow: inset 0 1px 0 rgba(22,101,52,0.12), inset 0 -1px 0 rgba(22,101,52,0.12);
+}
+.standings-team-cell {
+  border-left: 6px solid var(--team-color);
+  text-align: left !important;
+}
+.standings-team {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.standings-team img {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.standings-rank {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #eef2f7;
+  color: #4a5a78;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+}
+.standings-team-name {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #1a2030;
+  line-height: 1.05;
+}
+.standings-team-sub {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: #9aa5be;
+}
+.record-main {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 28px;
+  letter-spacing: 1px;
+  color: #1a2030;
+  line-height: 1;
+}
+.record-sub {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  color: #8a96b0;
+  margin-top: 2px;
+}
+.metric-main {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 21px;
+  font-weight: 800;
+  color: #1a2030;
+  line-height: 1;
+}
+.metric-rank {
+  display: inline-block;
+  margin-top: 4px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #64748b;
+  background: #eef2f7;
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+.rules-hero {
+  background: #ffffff;
+  border: 1px solid #e2e6ef;
+  border-left: 8px solid #c8102e;
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(15,23,42,0.08);
+  padding: 28px 32px;
+  margin: 14px 0 22px;
+}
+.rules-kicker {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  color: #c8102e;
+}
+.rules-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 68px;
+  letter-spacing: 3px;
+  line-height: 1;
+  color: #111827;
+  margin-top: 4px;
+}
+.rules-sub {
+  font-family: 'Barlow', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: #64748b;
+  max-width: 980px;
+  line-height: 1.6;
+  margin-top: 8px;
+}
+.rules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  margin: 18px 0;
+}
+.rules-grid-thirds {
+  grid-template-columns: 1fr 2fr;
+}
+.rules-card {
+  background: #ffffff;
+  border: 1px solid #e2e6ef;
+  border-top: 5px solid var(--accent);
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(15,23,42,0.07);
+  padding: 18px 20px;
+}
+.rules-card-wide {
+  grid-column: 1 / -1;
+}
+.rules-card-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 38px;
+  letter-spacing: 2px;
+  color: #111827;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+.rules-card p,
+.rules-card li {
+  font-family: 'Barlow', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.55;
+  color: #4a5a78;
+}
+.rules-card ul {
+  margin: 8px 0 0 18px;
+  padding: 0;
+}
+.rules-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #e2e6ef;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(15,23,42,0.07);
+  margin-top: 12px;
+}
+.rules-table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 720px;
+  table-layout: auto;
+}
+.rules-table th {
+  background: #f8fafc;
+  border-bottom: 2px solid #e2e6ef;
+  border-right: 1px solid #e8ecf3;
+  padding: 10px 14px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #8a96b0;
+  text-align: left;
+}
+.rules-table td {
+  border-bottom: 1px solid #edf0f7;
+  border-right: 1px solid #edf0f7;
+  padding: 10px 14px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a2030;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+.rules-table tr:nth-child(even) td { background: #fbfcff; }
+.rules-table-ranking {
+  min-width: 0;
+  table-layout: fixed;
+}
+.rules-table-ranking th:nth-child(1),
+.rules-table-ranking td:nth-child(1) {
+  width: 18%;
+}
+.rules-table-ranking th:nth-child(2),
+.rules-table-ranking td:nth-child(2) {
+  width: 14%;
+}
+.rules-table-ranking th:nth-child(3),
+.rules-table-ranking td:nth-child(3) {
+  width: 68%;
+}
+.rules-note {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-left: 5px solid #f97316;
+  border-radius: 8px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #9a3412;
+}
+.rules-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.rules-pill {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  color: #1a2030;
+  background: #eef2f7;
+  border-radius: 5px;
+  padding: 5px 10px;
+}
+.rankings-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(420px, 2fr);
+  gap: 18px;
+  align-items: start;
+}
+.poll-panel {
+  background: #fff;
+  border: 1px solid #e2e6ef;
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(15,23,42,0.08);
+  overflow: hidden;
+}
+.poll-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 18px;
+  background: #f8fafc;
+  border-bottom: 2px solid #e2e6ef;
+}
+.poll-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 46px;
+  letter-spacing: 3px;
+  color: #111827;
+  line-height: 1;
+}
+.poll-subtitle {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #8a96b0;
+}
+.poll-table-wrap {
+  overflow-x: auto;
+}
+.poll-table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 920px;
+}
+.poll-table.coaches {
+  min-width: 560px;
+}
+.poll-table.coaches th:nth-child(1),
+.poll-table.coaches td:nth-child(1) {
+  width: 54px;
+}
+.poll-table.coaches th:nth-child(2),
+.poll-table.coaches td:nth-child(2) {
+  width: 58px;
+  text-align: center;
+}
+.poll-table.coaches th:nth-child(3),
+.poll-table.coaches td:nth-child(3) {
+  min-width: 210px;
+}
+.poll-table.coaches th:nth-child(4),
+.poll-table.coaches td:nth-child(4),
+.poll-table.coaches th:nth-child(5),
+.poll-table.coaches td:nth-child(5),
+.poll-table.coaches th:nth-child(6),
+.poll-table.coaches td:nth-child(6) {
+  width: 76px;
+}
+.poll-table th {
+  background: #fbfcff;
+  border-bottom: 1px solid #e2e6ef;
+  border-right: 1px solid #edf0f7;
+  padding: 9px 10px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #8a96b0;
+  text-align: left;
+  white-space: nowrap;
+  height: 42px;
+}
+.poll-table td {
+  border-bottom: 1px solid #edf0f7;
+  border-right: 1px solid #edf0f7;
+  padding: 9px 10px;
+  vertical-align: middle;
+  height: 64px;
+}
+.poll-table tr {
+  height: 64px;
+}
+.poll-table tr:nth-child(even) td { background: #fbfcff; }
+.poll-rank {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #eef2f7;
+  color: #1a2030;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+}
+.poll-rank-cell,
+.poll-logo-cell {
+  text-align: center;
+}
+.poll-logo {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+.poll-team {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.poll-team-logo {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+}
+.poll-team-name {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #1a2030;
+  line-height: 1.05;
+}
+.poll-team-sub {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: #8a96b0;
+}
+.poll-metric {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  color: #1a2030;
+  white-space: nowrap;
+}
+.trend-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 54px;
+  border-radius: 5px;
+  padding: 3px 8px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+}
+.trend-up { background: #dcfce7; color: #166534; }
+.trend-down { background: #fee2e2; color: #991b1b; }
+.trend-flat { background: #eef2f7; color: #4a5a78; }
+.trend-new { background: #fef3c7; color: #92400e; }
+.last-game {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  color: #1a2030;
+  white-space: nowrap;
+}
+.last-game span {
+  color: #8a96b0;
+  font-size: 12px;
+}
+.orv-box {
+  padding: 14px 18px 16px;
+  background: #fbfcff;
+  border-top: 1px solid #e2e6ef;
+}
+.orv-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #8a96b0;
+  margin-bottom: 4px;
+}
+.orv-text {
+  font-family: 'Barlow', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: #1a2030;
+}
+.draft-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  background: #ffffff;
+  border: 1px solid #e2e6ef;
+  border-left: 8px solid var(--accent);
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(15,23,42,0.08);
+  padding: 20px 24px;
+  margin: 10px 0 18px;
+}
+.draft-hero-main {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.draft-hero img {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+}
+.draft-kicker {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: #8a96b0;
+}
+.draft-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 58px;
+  letter-spacing: 3px;
+  line-height: 1;
+  color: #111827;
+}
+.draft-meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.draft-chip {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  color: #1a2030;
+  background: #eef2f7;
+  border-radius: 5px;
+  padding: 7px 11px;
+}
+.draft-round {
+  margin: 18px 0 24px;
+}
+.draft-round-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 10px;
+}
+.draft-round-title span:first-child {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 42px;
+  letter-spacing: 2px;
+  color: #111827;
+  line-height: 1;
+}
+.draft-round-title img {
+  width: 46px;
+  height: 46px;
+  object-fit: contain;
+}
+.draft-round-title img + span {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 42px;
+  letter-spacing: 2px;
+  color: #111827;
+  line-height: 1;
+}
+.draft-round-title span:last-child {
+  flex: 1;
+  height: 1px;
+  background: #dde2ed;
+}
+.draft-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(112px, 1fr));
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.draft-card {
+  background: #ffffff;
+  border: 1px solid #e2e6ef;
+  border-left: 7px solid var(--team-color);
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(15,23,42,0.07);
+  padding: 10px 9px 12px;
+  min-height: 178px;
+}
+.draft-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.draft-pick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #eef2f7;
+  color: #1a2030;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+}
+.draft-team-logo {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.draft-player-photo {
+  display: block;
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  object-position: top center;
+  border-radius: 50%;
+  border: 3px solid #eef2f7;
+  background: #f8fafc;
+  margin: 2px auto 10px;
+}
+.draft-player {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 24px;
+  letter-spacing: 1px;
+  color: #111827;
+  line-height: 1;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+.draft-empty-player {
+  color: #b0baca;
+}
 </style>
 """
     )
@@ -733,7 +1394,7 @@ def under_construction(label: str) -> None:
 
 
 @st.cache_data(ttl=60 * 60 * 24, show_spinner="Loading team branding...")
-def load_branding_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def load_branding_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     return fetch_branding_data()
 
 
@@ -752,6 +1413,7 @@ def team_lookup(schools: pd.DataFrame) -> dict[str, dict[str, str]]:
             "logo": clean_text(row.get("Logo")),
             "wordmark": clean_text(row.get("Wordmark")),
             "conference": clean_text(row.get("Conference")),
+            "nickname": clean_text(row.get("Nickname")),
             "color": clean_text(row.get("Color"), "#1a2030"),
             "color2": clean_text(row.get("Color2"), "#c8102e"),
         }
@@ -810,22 +1472,24 @@ def render_matchup_team(
     points: Optional[float],
     opponent_points: Optional[float],
     teams: dict[str, dict[str, str]],
+    ap_ranks: Optional[dict[str, int]] = None,
 ) -> str:
     info = teams.get(team, {})
     logo = clean_text(info.get("logo"))
-    conference = clean_text(info.get("conference"))
+    nickname = clean_text(info.get("nickname"))
     color = esc(info.get("color"), "#1a2030")
     status = score_class(points, opponent_points)
     score_text = f"{points:.2f}" if points is not None else "-"
     logo_html = f'<img src="{esc(logo)}" alt="{esc(team)}">' if logo else ""
+    display_name = f"{rank_prefix(team, ap_ranks)}{team}"
 
     return f"""
 <div class="matchup-row {status if status in ('win', 'loss') else ''}" style="--team-color:{color};">
   <div class="matchup-team">
     {logo_html}
     <div>
-      <div class="matchup-name">{esc(team)}</div>
-      <div class="matchup-conf">{esc(conference)}</div>
+      <div class="matchup-name">{esc(display_name)}</div>
+      <div class="matchup-conf">{esc(nickname)}</div>
     </div>
   </div>
   <div class="score-box {status if status in ('win', 'loss', 'tie') else ''}">{score_text}</div>
@@ -837,8 +1501,10 @@ def render_schedule_cards(
     games: pd.DataFrame,
     scores: pd.DataFrame,
     schools: pd.DataFrame,
+    rankings: Optional[pd.DataFrame] = None,
     empty_label: str = "No games found",
     stacked: bool = False,
+    sort_by_rank: bool = True,
 ) -> None:
     if games.empty:
         st.html(
@@ -855,7 +1521,21 @@ def render_schedule_cards(
     teams = team_lookup(schools)
     scores_by_team_week = score_lookup(scores)
     cards = []
-    games = games.sort_values(["Week", "TeamA", "TeamB"], na_position="last")
+    games = games.copy()
+    games["_team_b_sort"] = games["TeamB"].map(lambda value: clean_text(value).casefold())
+    games["_team_a_sort"] = games["TeamA"].map(lambda value: clean_text(value).casefold())
+    games["_week_sort"] = pd.to_numeric(games["Week"], errors="coerce").fillna(0)
+    if sort_by_rank:
+        games["_rank_sort"] = games.apply(lambda row: schedule_game_rank_sort(row, rankings), axis=1)
+        games = games.sort_values(
+            ["_rank_sort", "_team_b_sort", "_team_a_sort", "_week_sort"],
+            na_position="last",
+        )
+    else:
+        games = games.sort_values(
+            ["_week_sort", "_team_b_sort", "_team_a_sort"],
+            na_position="last",
+        )
 
     for _, game in games.iterrows():
         week = int(game["Week"]) if not pd.isna(game.get("Week")) else 0
@@ -866,6 +1546,7 @@ def render_schedule_cards(
         score_a = scores_by_team_week.get((match_key(team_a), week))
         score_b = scores_by_team_week.get((match_key(team_b), week))
         badge = "Conference" if is_conference else "Non-Conf"
+        game_ranks = schedule_ap_top25(rankings, week)
 
         cards.append(
             f"""
@@ -874,8 +1555,8 @@ def render_schedule_cards(
     <div class="week-chip">Week {week}</div>
     <div class="game-badge">{badge}</div>
   </div>
-  {render_matchup_team(team_a, week, score_a, score_b, teams)}
-  {render_matchup_team(team_b, week, score_b, score_a, teams)}
+  {render_matchup_team(team_a, week, score_a, score_b, teams, game_ranks)}
+  {render_matchup_team(team_b, week, score_b, score_a, teams, game_ranks)}
   {f'<div class="schedule-notes">{esc(notes)}</div>' if notes else ''}
 </div>
 """
@@ -895,8 +1576,24 @@ def schedule_weeks(schedule: pd.DataFrame) -> list[int]:
     )
 
 
+def ranking_weeks(rankings: pd.DataFrame) -> list[int]:
+    if rankings.empty or "Week" not in rankings.columns:
+        return []
+    return sorted(
+        int(week)
+        for week in rankings["Week"].dropna().unique()
+        if int(week) >= 0
+    )
+
+
 def week_label(week: int) -> str:
     return f"Week {week}"
+
+
+def filter_by_season(df: pd.DataFrame, season: int) -> pd.DataFrame:
+    if df.empty or "Year" not in df.columns:
+        return df.copy()
+    return df.loc[pd.to_numeric(df["Year"], errors="coerce").eq(season)].copy()
 
 
 def filter_conference_schedule(
@@ -989,6 +1686,1001 @@ def render_conference_schedule_matrix(
 </div>
 """
     )
+
+
+def pct(wins: float, losses: float, ties: float) -> float:
+    games = wins + losses + ties
+    if games == 0:
+        return 0.0
+    return (wins + (0.5 * ties)) / games
+
+
+def format_pct(value: float) -> str:
+    return f"{value:.3f}".lstrip("0")
+
+
+def rank_label(rank: object) -> str:
+    if pd.isna(rank):
+        return "-"
+    return f"#{int(rank)}"
+
+
+def record_html(wins: int, losses: int, ties: int, win_pct: float) -> str:
+    record = f"{wins}-{losses}" if ties == 0 else f"{wins}-{losses}-{ties}"
+    return f"""
+<div class="record-main">{record}</div>
+<div class="record-sub">{format_pct(win_pct)}</div>
+"""
+
+
+def record_text(wins: int, losses: int, ties: int) -> str:
+    return f"{wins}-{losses}" if ties == 0 else f"{wins}-{losses}-{ties}"
+
+
+def metric_html(value: float, rank: object) -> str:
+    return f"""
+<div class="metric-main">{value:,.2f}</div>
+<div class="metric-rank">{rank_label(rank)}</div>
+"""
+
+
+def empty_standing(team: str, info: dict[str, str]) -> dict[str, object]:
+    return {
+        "team": team,
+        "conference": clean_text(info.get("conference")),
+        "nickname": clean_text(info.get("nickname")),
+        "logo": clean_text(info.get("logo")),
+        "color": clean_text(info.get("color"), "#1a2030"),
+        "league_wins": 0,
+        "league_losses": 0,
+        "league_ties": 0,
+        "league_pf": 0.0,
+        "league_pa": 0.0,
+        "conf_wins": 0,
+        "conf_losses": 0,
+        "conf_ties": 0,
+        "conf_pf": 0.0,
+        "conf_pa": 0.0,
+    }
+
+
+def apply_game_result(row: dict[str, object], points: float, opponent_points: float, prefix: str) -> None:
+    row[f"{prefix}_pf"] += points
+    row[f"{prefix}_pa"] += opponent_points
+    if points > opponent_points:
+        row[f"{prefix}_wins"] += 1
+    elif points < opponent_points:
+        row[f"{prefix}_losses"] += 1
+    else:
+        row[f"{prefix}_ties"] += 1
+
+
+def build_standings(schedule: pd.DataFrame, scores: pd.DataFrame, schools: pd.DataFrame) -> pd.DataFrame:
+    teams = team_lookup(schools)
+    standings = {
+        team: empty_standing(team, info)
+        for team, info in teams.items()
+    }
+    scores_by_team_week = score_lookup(scores)
+
+    for _, game in schedule.iterrows():
+        week = game.get("Week")
+        if pd.isna(week) or int(week) <= 0:
+            continue
+
+        week = int(week)
+        team_a = clean_text(game.get("TeamA"))
+        team_b = clean_text(game.get("TeamB"))
+        if not team_a or not team_b:
+            continue
+
+        score_a = scores_by_team_week.get((match_key(team_a), week))
+        score_b = scores_by_team_week.get((match_key(team_b), week))
+        if score_a is None or score_b is None:
+            continue
+
+        if team_a not in standings:
+            standings[team_a] = empty_standing(team_a, {})
+        if team_b not in standings:
+            standings[team_b] = empty_standing(team_b, {})
+
+        is_conference = bool(game.get("Conference", False))
+        apply_game_result(standings[team_a], score_a, score_b, "league")
+        apply_game_result(standings[team_b], score_b, score_a, "league")
+        if is_conference:
+            apply_game_result(standings[team_a], score_a, score_b, "conf")
+            apply_game_result(standings[team_b], score_b, score_a, "conf")
+
+    df = pd.DataFrame(standings.values())
+    for prefix in ("league", "conf"):
+        df[f"{prefix}_games"] = df[f"{prefix}_wins"] + df[f"{prefix}_losses"] + df[f"{prefix}_ties"]
+        df[f"{prefix}_win_pct"] = df.apply(
+            lambda row: pct(row[f"{prefix}_wins"], row[f"{prefix}_losses"], row[f"{prefix}_ties"]),
+            axis=1,
+        )
+        df[f"{prefix}_pd"] = df[f"{prefix}_pf"] - df[f"{prefix}_pa"]
+    return df
+
+
+def h2h_score(
+    team: str,
+    tied_teams: set[str],
+    schedule: pd.DataFrame,
+    scores: pd.DataFrame,
+    conference_only: bool = False,
+) -> float:
+    scores_by_team_week = score_lookup(scores)
+    wins = losses = ties = 0
+
+    for _, game in schedule.iterrows():
+        if conference_only and not bool(game.get("Conference", False)):
+            continue
+
+        week = game.get("Week")
+        if pd.isna(week) or int(week) <= 0:
+            continue
+
+        team_a = clean_text(game.get("TeamA"))
+        team_b = clean_text(game.get("TeamB"))
+        if team not in {team_a, team_b} or team_a not in tied_teams or team_b not in tied_teams:
+            continue
+
+        week = int(week)
+        score_a = scores_by_team_week.get((match_key(team_a), week))
+        score_b = scores_by_team_week.get((match_key(team_b), week))
+        if score_a is None or score_b is None:
+            continue
+
+        team_score = score_a if team == team_a else score_b
+        opponent_score = score_b if team == team_a else score_a
+        if team_score > opponent_score:
+            wins += 1
+        elif team_score < opponent_score:
+            losses += 1
+        else:
+            ties += 1
+
+    return pct(wins, losses, ties)
+
+
+def sort_standings(
+    df: pd.DataFrame,
+    prefix: str = "league",
+    points_prefix: Optional[str] = None,
+    schedule: Optional[pd.DataFrame] = None,
+    scores: Optional[pd.DataFrame] = None,
+    use_h2h: bool = False,
+) -> pd.DataFrame:
+    df = df.copy()
+    pct_col = f"{prefix}_win_pct"
+    points_prefix = points_prefix or prefix
+    pf_col = f"{points_prefix}_pf"
+    sort_cols = [pct_col, pf_col, "team"]
+    ascending = [False, False, True]
+
+    if use_h2h and schedule is not None and scores is not None:
+        df["h2h_score"] = 0.0
+        for _, tied_group in df.groupby(pct_col):
+            if len(tied_group) <= 1:
+                continue
+            tied_teams = set(tied_group["team"])
+            for index, row in tied_group.iterrows():
+                df.loc[index, "h2h_score"] = h2h_score(
+                    row["team"],
+                    tied_teams,
+                    schedule,
+                    scores,
+                    conference_only=prefix == "conf",
+                )
+        sort_cols = [pct_col, "h2h_score", pf_col, "team"]
+        ascending = [False, False, False, True]
+
+    return df.sort_values(
+        sort_cols,
+        ascending=ascending,
+    ).reset_index(drop=True)
+
+
+def render_standings_section(
+    standings: pd.DataFrame,
+    schedule: pd.DataFrame,
+    scores: pd.DataFrame,
+    conferences: pd.DataFrame,
+    conference: str,
+    ap_ranks: Optional[dict[str, int]] = None,
+    sort_prefix: str = "league",
+    show_championship_cut: bool = False,
+) -> None:
+    section = standings.loc[standings["conference"].eq(conference)].copy()
+    if section.empty:
+        under_construction(f"{conference} Standings")
+        return
+
+    section = sort_standings(
+        section,
+        prefix=sort_prefix,
+        points_prefix="league" if sort_prefix == "conf" else sort_prefix,
+        schedule=schedule,
+        scores=scores,
+        use_h2h=sort_prefix == "conf",
+    )
+    active_conf = section["conf_games"] > 0
+    section["conf_pf_rank"] = pd.NA
+    section["conf_pa_rank"] = pd.NA
+    section.loc[active_conf, "conf_pf_rank"] = section.loc[active_conf, "conf_pf"].rank(
+        ascending=False,
+        method="min",
+    )
+    section.loc[active_conf, "conf_pa_rank"] = section.loc[active_conf, "conf_pa"].rank(
+        ascending=True,
+        method="min",
+    )
+    conf_logo = conference_logo(conferences, conference)
+
+    rows = []
+    for index, row in section.iterrows():
+        logo = clean_text(row.get("logo"))
+        logo_html = f'<img src="{esc(logo)}" alt="{esc(row["team"])}">' if logo else ""
+        championship_row = show_championship_cut and section["conf_games"].sum() > 0 and index < 2
+        display_name = f"{rank_prefix(row['team'], ap_ranks)}{clean_text(row['team'])}"
+        rows.append(
+            f"""
+<tr class="{'championship-row' if championship_row else ''}">
+  <td class="standings-team-cell" style="--team-color:{esc(row.get("color"), "#1a2030")};">
+    <div class="standings-team">
+      <span class="standings-rank">{index + 1}</span>
+      {logo_html}
+      <div>
+        <div class="standings-team-name">{esc(display_name)}</div>
+        <div class="standings-team-sub">{esc(row.get("nickname"))}</div>
+      </div>
+    </div>
+  </td>
+  <td>{record_html(int(row["league_wins"]), int(row["league_losses"]), int(row["league_ties"]), float(row["league_win_pct"]))}</td>
+  <td>{metric_html(float(row["league_pf"]), row["league_pf_rank"])}</td>
+  <td>{metric_html(float(row["league_pa"]), row["league_pa_rank"])}</td>
+  <td>{record_html(int(row["conf_wins"]), int(row["conf_losses"]), int(row["conf_ties"]), float(row["conf_win_pct"]))}</td>
+  <td>{metric_html(float(row["conf_pf"]), row["conf_pf_rank"])}</td>
+  <td>{metric_html(float(row["conf_pa"]), row["conf_pa_rank"])}</td>
+</tr>
+"""
+        )
+
+    st.html(
+        f"""
+<div class="standings-wrap">
+  <div class="standings-title">
+    {'<img src="' + esc(conf_logo) + '" alt="' + esc(conference) + '">' if conf_logo else ''}
+    <span>{esc(conference)}</span>
+    <div></div>
+  </div>
+  <div class="standings-scroll">
+    <table class="standings-table">
+      <thead>
+        <tr>
+          <th class="team-col">Team</th>
+          <th>League Record</th>
+          <th>Points For</th>
+          <th>Points Against</th>
+          <th>Conf Record</th>
+          <th>Conf Points For</th>
+          <th>Conf Points Against</th>
+        </tr>
+      </thead>
+      <tbody>{''.join(rows)}</tbody>
+    </table>
+  </div>
+</div>
+"""
+    )
+
+
+def render_league_standings(
+    schedule: pd.DataFrame,
+    scores: pd.DataFrame,
+    schools: pd.DataFrame,
+    conferences: pd.DataFrame,
+    rankings: Optional[pd.DataFrame] = None,
+) -> None:
+    standings = build_standings(schedule, scores, schools)
+    ap_ranks = latest_ap_top25(rankings)
+    for prefix in ("league", "conf"):
+        active = standings[f"{prefix}_games"] > 0
+        standings[f"{prefix}_pf_rank"] = pd.NA
+        standings[f"{prefix}_pa_rank"] = pd.NA
+        standings.loc[active, f"{prefix}_pf_rank"] = standings.loc[active, f"{prefix}_pf"].rank(ascending=False, method="min")
+        standings.loc[active, f"{prefix}_pa_rank"] = standings.loc[active, f"{prefix}_pa"].rank(ascending=True, method="min")
+
+    season_has_real_scores = (standings["league_pf"] + standings["league_pa"]).sum() > 0
+    for conference in LEAGUE_ROSTER_ORDER:
+        conference_rows = standings.loc[standings["conference"].eq(conference)]
+        if season_has_real_scores and conference_rows["league_games"].sum() == 0:
+            continue
+        render_standings_section(
+            standings,
+            schedule,
+            scores,
+            conferences,
+            conference,
+            ap_ranks=ap_ranks,
+            sort_prefix="league",
+            show_championship_cut=False,
+        )
+
+
+def render_conference_standings(
+    schedule: pd.DataFrame,
+    scores: pd.DataFrame,
+    schools: pd.DataFrame,
+    conferences: pd.DataFrame,
+    rankings: Optional[pd.DataFrame],
+    conference: str,
+) -> None:
+    standings = build_standings(schedule, scores, schools)
+    ap_ranks = latest_ap_top25(rankings)
+    for prefix in ("league", "conf"):
+        active = standings[f"{prefix}_games"] > 0
+        standings[f"{prefix}_pf_rank"] = pd.NA
+        standings[f"{prefix}_pa_rank"] = pd.NA
+        standings.loc[active, f"{prefix}_pf_rank"] = standings.loc[active, f"{prefix}_pf"].rank(ascending=False, method="min")
+        standings.loc[active, f"{prefix}_pa_rank"] = standings.loc[active, f"{prefix}_pa"].rank(ascending=True, method="min")
+
+    render_standings_section(
+        standings,
+        schedule,
+        scores,
+        conferences,
+        conference,
+        ap_ranks=ap_ranks,
+        sort_prefix="conf",
+        show_championship_cut=True,
+    )
+
+
+def team_record_text(
+    schedule: pd.DataFrame,
+    scores: pd.DataFrame,
+    schools: pd.DataFrame,
+    team_name: str,
+    rankings: Optional[pd.DataFrame] = None,
+) -> str:
+    standings = build_standings(schedule, scores, schools)
+    team = standings.loc[standings["team"].eq(team_name)]
+    if team.empty:
+        return ""
+
+    row = team.iloc[0]
+    overall = record_text(
+        int(row["league_wins"]),
+        int(row["league_losses"]),
+        int(row["league_ties"]),
+    )
+    conference = record_text(
+        int(row["conf_wins"]),
+        int(row["conf_losses"]),
+        int(row["conf_ties"]),
+    )
+    return f"{rank_prefix(team_name, latest_ap_top25(rankings))}{overall} ({conference})"
+
+
+def render_rules() -> None:
+    st.html(
+        """
+<div class="rules-hero">
+  <div class="rules-kicker">Official League Guide</div>
+  <div class="rules-title">NCAA/NFL College Football Crossover</div>
+  <div class="rules-sub">
+    A 12-conference, 144-team dynasty ecosystem built around college football structure:
+    conference play, non-conference games, conference championships, bowl season,
+    weekly rankings, and the College Football Playoff.
+  </div>
+</div>
+
+<div class="rules-grid">
+  <div class="rules-card" style="--accent:#c8102e;">
+    <div class="rules-card-title">Overview</div>
+    <p>
+      The NCAA/NFL Football Crossover consists of 12, 12-team conferences, each
+      representing a conference in the college football landscape.
+    </p>
+    <p>
+      The league includes in-conference and out-of-conference games, conference
+      championships, bowl season, weekly rankings, and a playoff.
+    </p>
+  </div>
+  <div class="rules-card" style="--accent:#1d4ed8;">
+    <div class="rules-card-title">Setup</div>
+    <p>There are two groups of conferences in the league.</p>
+    <div class="rules-table-wrap">
+      <table class="rules-table">
+        <thead><tr><th>Power 6</th><th>Group of 6</th></tr></thead>
+        <tbody>
+          <tr><td>Big XII</td><td>Sun Belt</td></tr>
+          <tr><td>Big Ten</td><td>MAC</td></tr>
+          <tr><td>PAC</td><td>American</td></tr>
+          <tr><td>ACC</td><td>AAC</td></tr>
+          <tr><td>SEC</td><td>C-USA</td></tr>
+          <tr><td>The 6ix</td><td>The 12</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul>
+      <li>Owners may own one Power 6 team and one Group of 6 team at the same time.</li>
+      <li>Power 6 orphans are offered to Group of 6 owners before the public.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="rules-grid">
+  <div class="rules-card" style="--accent:#16a34a;">
+    <div class="rules-card-title">Roster</div>
+    <p>All teams use the same general roster size.</p>
+    <div class="rules-pill-row">
+      <span class="rules-pill">8 Starters</span>
+      <span class="rules-pill">12 Bench</span>
+      <span class="rules-pill">5 Taxi</span>
+    </div>
+    <div class="rules-note">Taxi size changed for 2026.</div>
+    <div class="rules-table-wrap">
+      <table class="rules-table">
+        <thead><tr><th>Slot</th><th>Power 6</th><th>Group of 6</th></tr></thead>
+        <tbody>
+          <tr><td>Starter 1</td><td>QB</td><td>QB</td></tr>
+          <tr><td>Starter 2</td><td>RB</td><td>RB</td></tr>
+          <tr><td>Starter 3</td><td>RB</td><td>RB</td></tr>
+          <tr><td>Starter 4</td><td>WR</td><td>WR</td></tr>
+          <tr><td>Starter 5</td><td>WR</td><td>WR</td></tr>
+          <tr><td>Starter 6</td><td>TE</td><td>TE</td></tr>
+          <tr><td>Starter 7</td><td>SUPERFLEX</td><td>FLEX</td></tr>
+          <tr><td>Starter 8</td><td>FLEX</td><td>FLEX</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The Power 6 receives a slight lineup advantage without removing the Group of 6's ability to compete.</p>
+  </div>
+  <div class="rules-card" style="--accent:#7c3aed;">
+    <div class="rules-card-title">Taxi Squad</div>
+    <p>All teams have 5 taxi slots at their disposal.</p>
+    <p>Taxi slots lock at the beginning of the NFL season.</p>
+    <div class="rules-note">A Week 4 lock was discussed but did not receive enough support, so the existing lock timing remains.</div>
+  </div>
+</div>
+
+<div class="rules-grid">
+  <div class="rules-card" style="--accent:#0f766e;">
+    <div class="rules-card-title">Schedule</div>
+    <div class="rules-note">Schedule format changed for 2026.</div>
+    <div class="rules-table-wrap">
+      <table class="rules-table">
+        <thead><tr><th>Weeks</th><th>Stage</th></tr></thead>
+        <tbody>
+          <tr><td>Week 1</td><td>Out-of-conference game</td></tr>
+          <tr><td>Weeks 2-12</td><td>Conference play</td></tr>
+          <tr><td>Week 13</td><td>Conference championship; non-title teams play an OOC game</td></tr>
+          <tr><td>Weeks 14-17</td><td>College Football Playoff / Bowl SZN</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>There are playoff games in Weeks 13 and 14. Teams have 12 weeks to prepare for these byes.</p>
+  </div>
+  <div class="rules-card" style="--accent:#d97706;">
+    <div class="rules-card-title">College Football Playoff</div>
+    <div class="rules-note">Playoff qualification changed for 2026.</div>
+    <p>12 teams qualify through a mix of auto-bids and at-large selections.</p>
+    <div class="rules-table-wrap">
+      <table class="rules-table">
+        <thead><tr><th>Bid</th><th>Qualifier</th></tr></thead>
+        <tbody>
+          <tr><td>P6 Auto-Bid 1</td><td>Big XII conference champion</td></tr>
+          <tr><td>P6 Auto-Bid 2</td><td>Big Ten conference champion</td></tr>
+          <tr><td>P6 Auto-Bid 3</td><td>ACC conference champion</td></tr>
+          <tr><td>P6 Auto-Bid 4</td><td>SEC conference champion</td></tr>
+          <tr><td>P6 Auto-Bid 5</td><td>PAC conference champion</td></tr>
+          <tr><td>P6 Auto-Bid 6</td><td>6IX conference champion</td></tr>
+          <tr><td>Go6 Auto-Bid 1</td><td>Highest ranked Group of 6 conference champion</td></tr>
+          <tr><td>Go6 Auto-Bid 2</td><td>Second highest ranked Group of 6 conference champion</td></tr>
+          <tr><td>At-large 1-4</td><td>Four highest ranked non-auto-bid teams</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The CFP is not necessarily the top 12 teams in the nation. Group of 6 teams need some loving too.</p>
+  </div>
+</div>
+
+<div class="rules-grid">
+  <div class="rules-card rules-card-wide" style="--accent:#2563eb;">
+    <div class="rules-card-title">Ranking System</div>
+    <p>Work in progress. Current ranking framework:</p>
+    <div class="rules-table-wrap">
+      <table class="rules-table rules-table-ranking">
+        <thead><tr><th>Category</th><th>Weight</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td>Wins</td><td>30%</td><td>Wins compared to the other 143 teams</td></tr>
+          <tr><td>Points For</td><td>30%</td><td>PF compared to the other 143 teams</td></tr>
+          <tr><td>SOS</td><td>10%</td><td>Quality of opponents; teams 51-144 are weighted the same</td></tr>
+          <tr><td>Last Week</td><td>30%</td><td>Prior week ranking to reduce massive week-to-week fluctuations</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="rules-grid rules-grid-thirds">
+  <div class="rules-card" style="--accent:#991b1b;">
+    <div class="rules-card-title">Tiebreakers</div>
+    <p>Standings are determined by:</p>
+    <div class="rules-pill-row">
+      <span class="rules-pill">1. Conference Record</span>
+      <span class="rules-pill">2. Head-to-Head</span>
+      <span class="rules-pill">3. Total PF</span>
+      <span class="rules-pill">4. Total Record</span>
+    </div>
+  </div>
+  <div class="rules-card" style="--accent:#4a5a78;">
+    <div class="rules-card-title">Draft Order</div>
+    <p>Draft order is determined by Max PF at the conclusion of the full season, after Week 18.</p>
+    <ul>
+      <li>Conference champion picks 12th.</li>
+      <li>Conference runner-up picks 11th.</li>
+      <li>National champion, if different from conference champion, automatically picks 12th in his conference.</li>
+    </ul>
+  </div>
+</div>
+"""
+    )
+
+
+def through_week(schedule: pd.DataFrame, scores: pd.DataFrame, week: int) -> tuple[pd.DataFrame, pd.DataFrame]:
+    schedule_part = schedule.loc[schedule["Week"].le(week)].copy()
+    scores_part = scores.loc[scores["Week"].le(week)].copy()
+    return schedule_part, scores_part
+
+
+def rank_map(rankings: pd.DataFrame, poll_type: str, week: int) -> dict[str, int]:
+    poll = rankings.loc[
+        rankings["Type"].astype(str).eq(poll_type)
+        & rankings["Week"].eq(week)
+        & rankings["Rank"].notna()
+    ]
+    return {
+        clean_text(row["Team"]): int(row["Rank"])
+        for _, row in poll.iterrows()
+    }
+
+
+def ap_top25_for_week(rankings: Optional[pd.DataFrame], week: int) -> dict[str, int]:
+    if rankings is None or rankings.empty:
+        return {}
+    if not {"Type", "Week", "Rank", "Team"}.issubset(rankings.columns):
+        return {}
+
+    poll = rankings.loc[rankings["Type"].astype(str).eq("AP Poll")].copy()
+    if poll.empty:
+        return {}
+
+    poll["Week"] = pd.to_numeric(poll["Week"], errors="coerce")
+    poll["Rank"] = pd.to_numeric(poll["Rank"], errors="coerce")
+    poll = poll.loc[poll["Week"].eq(week) & poll["Rank"].notna()]
+    poll = poll.loc[poll["Rank"].between(1, 25, inclusive="both")]
+    return {
+        clean_text(row["Team"]): int(row["Rank"])
+        for _, row in poll.sort_values("Rank").iterrows()
+    }
+
+
+def latest_ap_top25(rankings: Optional[pd.DataFrame]) -> dict[str, int]:
+    if rankings is None or rankings.empty:
+        return {}
+    if not {"Type", "Week"}.issubset(rankings.columns):
+        return {}
+
+    ap_poll = rankings.loc[rankings["Type"].astype(str).eq("AP Poll")].copy()
+    if ap_poll.empty:
+        return {}
+
+    ap_poll["Week"] = pd.to_numeric(ap_poll["Week"], errors="coerce")
+    weeks = ap_poll["Week"].dropna()
+    if weeks.empty:
+        return {}
+    return ap_top25_for_week(rankings, int(weeks.max()))
+
+
+def schedule_ap_top25(rankings: Optional[pd.DataFrame], game_week: int) -> dict[str, int]:
+    previous_week = max(int(game_week) - 1, 0)
+    previous_ranks = ap_top25_for_week(rankings, previous_week)
+    return previous_ranks or latest_ap_top25(rankings)
+
+
+def schedule_game_rank_sort(game: pd.Series, rankings: Optional[pd.DataFrame]) -> int:
+    week = int(game["Week"]) if not pd.isna(game.get("Week")) else 0
+    game_ranks = schedule_ap_top25(rankings, week)
+    team_a_rank = rank_for_team(game.get("TeamA"), game_ranks) or 999
+    team_b_rank = rank_for_team(game.get("TeamB"), game_ranks) or 999
+    return min(team_a_rank, team_b_rank)
+
+
+def rank_for_team(team: object, ap_ranks: Optional[dict[str, int]]) -> Optional[int]:
+    if not ap_ranks:
+        return None
+
+    team_name = clean_text(team)
+    rank = ap_ranks.get(team_name)
+    if rank is None:
+        folded = match_key(team_name)
+        rank = next(
+            (value for ranked_team, value in ap_ranks.items() if match_key(ranked_team) == folded),
+            None,
+        )
+    return rank
+
+
+def rank_prefix(team: object, ap_ranks: Optional[dict[str, int]]) -> str:
+    rank = rank_for_team(team, ap_ranks)
+    if rank is None or rank > 25:
+        return ""
+    return f"No. {rank} "
+
+
+def trend_html(current_rank: int, previous_rank: Optional[int]) -> str:
+    if previous_rank is None:
+        return '<span class="trend-badge trend-new">NEW</span>'
+    diff = previous_rank - current_rank
+    if diff > 0:
+        return f'<span class="trend-badge trend-up">▲ {diff}</span>'
+    if diff < 0:
+        return f'<span class="trend-badge trend-down">▼ {abs(diff)}</span>'
+    return '<span class="trend-badge trend-flat">–</span>'
+
+
+def team_stats_for_week(
+    standings: pd.DataFrame,
+    team: str,
+) -> dict[str, object]:
+    row = standings.loc[standings["team"].eq(team)]
+    if row.empty:
+        return {
+            "record": "0-0",
+            "conf_record": "0-0",
+            "pf": 0.0,
+        }
+    row = row.iloc[0]
+    return {
+        "record": record_text(int(row["league_wins"]), int(row["league_losses"]), int(row["league_ties"])),
+        "conf_record": record_text(int(row["conf_wins"]), int(row["conf_losses"]), int(row["conf_ties"])),
+        "pf": float(row["league_pf"]),
+    }
+
+
+def last_game_html(
+    schedule: pd.DataFrame,
+    scores: pd.DataFrame,
+    team: str,
+    week: int,
+) -> str:
+    games = schedule.loc[
+        schedule["Week"].eq(week)
+        & (schedule["TeamA"].eq(team) | schedule["TeamB"].eq(team))
+    ]
+    if games.empty:
+        return '<span class="last-game">Idle<span>Week off</span></span>'
+
+    game = games.iloc[0]
+    team_a = clean_text(game.get("TeamA"))
+    team_b = clean_text(game.get("TeamB"))
+    opponent = team_b if team_a == team else team_a
+    scores_by_team_week = score_lookup(scores)
+    team_score = scores_by_team_week.get((match_key(team), week))
+    opponent_score = scores_by_team_week.get((match_key(opponent), week))
+    if team_score is None or opponent_score is None:
+        return f'<span class="last-game">vs {esc(opponent)}<span>Pending</span></span>'
+
+    result = "Win" if team_score > opponent_score else "Loss" if team_score < opponent_score else "Tie"
+    return f"""
+<span class="last-game">
+  {result} vs {esc(opponent)}
+  <span>{team_score:,.2f}-{opponent_score:,.2f}</span>
+</span>
+"""
+
+
+def poll_rows_html(
+    poll: pd.DataFrame,
+    standings: pd.DataFrame,
+    previous_ranks: dict[str, int],
+    teams: dict[str, dict[str, str]],
+    conferences: pd.DataFrame,
+    schedule: pd.DataFrame,
+    scores: pd.DataFrame,
+    week: int,
+    include_last_game: bool,
+) -> str:
+    rows = []
+    poll = poll.sort_values(["Rank", "Team"])
+    for _, item in poll.iterrows():
+        rank = int(item["Rank"])
+        team = clean_text(item["Team"])
+        info = teams.get(team, {})
+        conf = clean_text(info.get("conference"))
+        conf_logo = conference_logo(conferences, conf)
+        team_logo = clean_text(info.get("logo"))
+        nickname = clean_text(info.get("nickname"))
+        stats = team_stats_for_week(standings, team)
+        previous_rank = previous_ranks.get(team)
+        last_rank = previous_rank if previous_rank is not None else "-"
+        last_game = last_game_html(schedule, scores, team, week) if include_last_game else ""
+
+        extra_cells = ""
+        if include_last_game:
+            extra_cells = f"""
+  <td class="poll-metric">{last_rank}</td>
+  <td>{trend_html(rank, previous_rank)}</td>
+  <td>{last_game}</td>
+"""
+
+        rows.append(
+            f"""
+<tr>
+  <td class="poll-rank-cell"><span class="poll-rank">{rank}</span></td>
+  <td class="poll-logo-cell">{f'<img class="poll-logo" src="{esc(conf_logo)}" alt="{esc(conf)}">' if conf_logo else ''}</td>
+  <td>
+    <div class="poll-team">
+      {f'<img class="poll-team-logo" src="{esc(team_logo)}" alt="{esc(team)}">' if team_logo else ''}
+      <div>
+        <div class="poll-team-name">{esc(team)}</div>
+        <div class="poll-team-sub">{esc(nickname)}</div>
+      </div>
+    </div>
+  </td>
+  <td class="poll-metric">{stats["record"]}</td>
+  <td class="poll-metric">{stats["conf_record"]}</td>
+  <td class="poll-metric">{stats["pf"]:,.2f}</td>
+  {extra_cells}
+</tr>
+"""
+        )
+    return "".join(rows)
+
+
+def render_rankings(
+    rankings: pd.DataFrame,
+    schedule: pd.DataFrame,
+    scores: pd.DataFrame,
+    schools: pd.DataFrame,
+    conferences: pd.DataFrame,
+) -> None:
+    weeks = ranking_weeks(rankings)
+    if not weeks:
+        under_construction("Rankings")
+        with st.expander("Rankings data check"):
+            st.write("Rankings columns", rankings.columns.tolist())
+            st.write("Rankings rows", len(rankings))
+            st.dataframe(rankings.head(25), use_container_width=True, hide_index=True)
+        return
+
+    selected_week = st.selectbox(
+        "Week",
+        weeks,
+        key="rankings_week",
+        format_func=lambda week: "Preseason" if week == 0 else week_label(week),
+    )
+    selected_week = int(selected_week)
+    schedule_part, scores_part = through_week(schedule, scores, selected_week)
+    standings = build_standings(schedule_part, scores_part, schools)
+    teams = team_lookup(schools)
+
+    ap_poll = rankings.loc[
+        rankings["Type"].astype(str).eq("AP Poll")
+        & rankings["Week"].eq(selected_week)
+        & rankings["Rank"].notna()
+    ].copy()
+    coaches_poll = rankings.loc[
+        rankings["Type"].astype(str).eq("Coaches Poll")
+        & rankings["Week"].eq(selected_week)
+        & rankings["Rank"].notna()
+    ].copy()
+    previous_ap = rank_map(rankings, "AP Poll", selected_week - 1)
+
+    ap_top = ap_poll.loc[ap_poll["Rank"].le(25)].copy()
+    ap_orv = (
+        ap_poll.loc[ap_poll["Rank"].eq(26), "Team"]
+        .dropna()
+        .map(clean_text)
+    )
+    ap_orv = sorted(set(team for team in ap_orv if team))
+    coaches_top = coaches_poll.loc[coaches_poll["Rank"].le(25)].copy()
+    title_week = "Preseason" if selected_week == 0 else f"Week {selected_week}"
+
+    ap_rows = poll_rows_html(
+        ap_top,
+        standings,
+        previous_ap,
+        teams,
+        conferences,
+        schedule,
+        scores,
+        selected_week,
+        include_last_game=True,
+    )
+    coaches_rows = poll_rows_html(
+        coaches_top,
+        standings,
+        {},
+        teams,
+        conferences,
+        schedule,
+        scores,
+        selected_week,
+        include_last_game=False,
+    )
+    orv_text = ", ".join(ap_orv) if ap_orv else "None"
+
+    st.html(
+        f"""
+<div class="rankings-layout">
+  <div class="poll-panel">
+    <div class="poll-header">
+      <div>
+        <div class="poll-title">AP Poll</div>
+        <div class="poll-subtitle">{esc(title_week)} Rankings</div>
+      </div>
+    </div>
+    <div class="poll-table-wrap">
+      <table class="poll-table">
+        <thead>
+          <tr>
+            <th>Rk</th>
+            <th>Conf</th>
+            <th>Team</th>
+            <th>Record</th>
+            <th>Conf</th>
+            <th>PF</th>
+            <th>Last Week</th>
+            <th>Trend</th>
+            <th>Last Game</th>
+          </tr>
+        </thead>
+        <tbody>{ap_rows}</tbody>
+      </table>
+    </div>
+    <div class="orv-box">
+      <div class="orv-title">Other Receiving Votes</div>
+      <div class="orv-text">{esc(orv_text)}</div>
+    </div>
+  </div>
+  <div class="poll-panel">
+    <div class="poll-header">
+      <div>
+        <div class="poll-title">Coaches Poll</div>
+        <div class="poll-subtitle">{esc(title_week)} Rankings</div>
+      </div>
+    </div>
+    <div class="poll-table-wrap">
+      <table class="poll-table coaches">
+        <thead>
+          <tr>
+            <th>Rk</th>
+            <th>Conf</th>
+            <th>Team</th>
+            <th>Total</th>
+            <th>Conf</th>
+            <th>PF</th>
+          </tr>
+        </thead>
+        <tbody>{coaches_rows}</tbody>
+      </table>
+    </div>
+  </div>
+</div>
+"""
+    )
+
+
+def render_draft_board(
+    drafts: pd.DataFrame,
+    schools: pd.DataFrame,
+    conferences: pd.DataFrame,
+    season: int,
+    conference: Optional[str] = None,
+) -> None:
+    if drafts.empty:
+        under_construction("Draft Board")
+        return
+
+    board = drafts.loc[pd.to_numeric(drafts["Year"], errors="coerce").eq(season)].copy()
+    if conference is not None:
+        board = board.loc[board["Conference"].astype(str).eq(conference)].copy()
+    if board.empty:
+        label = f"{season} {conference} Draft Board" if conference else f"{season} Draft Board"
+        under_construction(label)
+        return
+
+    board["Round"] = pd.to_numeric(board["Round"], errors="coerce")
+    board["Pick"] = pd.to_numeric(board["Pick"], errors="coerce")
+    board["Conference"] = board["Conference"].astype(str)
+    board["_conference_order"] = board["Conference"].map(
+        {name: index for index, name in enumerate(LEAGUE_ROSTER_ORDER)}
+    ).fillna(999)
+    board = board.sort_values(
+        ["_conference_order", "Conference", "Round", "Pick", "Team", "Player"],
+        na_position="last",
+    )
+
+    teams = team_lookup(schools)
+    conf_logo = conference_logo(conferences, conference) if conference else LEAGUE_LOGO
+    rounds = int(board["Round"].nunique())
+    picks = int(len(board))
+    drafted = int(board["Player"].map(clean_text).ne("").sum())
+    board_title = f"{conference} Draft Board" if conference else "League Draft Board"
+    board_kicker = f"{season} Conference Draft" if conference else f"{season} League Draft"
+
+    st.html(
+        f"""
+<div class="draft-hero" style="--accent:#c8102e;">
+  <div class="draft-hero-main">
+    <img src="{esc(conf_logo)}" alt="{esc(board_title)}">
+    <div>
+      <div class="draft-kicker">{esc(board_kicker)}</div>
+      <div class="draft-title">{esc(board_title)}</div>
+    </div>
+  </div>
+  <div class="draft-meta">
+    <span class="draft-chip">{rounds} Rounds</span>
+    <span class="draft-chip">{picks} Picks</span>
+    <span class="draft-chip">{drafted} Drafted</span>
+  </div>
+</div>
+"""
+    )
+
+    groups = [(conference, board)] if conference else [
+        (conf, conf_board)
+        for conf, conf_board in board.groupby("Conference", sort=False)
+    ]
+
+    sections = []
+    for group_conference, group_board in groups:
+        if conference is None:
+            group_logo = conference_logo(conferences, clean_text(group_conference))
+            sections.append(
+                f"""
+<div class="draft-round-title"><img class="conf-logo" src="{esc(group_logo)}" alt="{esc(group_conference)}"><span>{esc(group_conference)}</span><span></span></div>
+"""
+            )
+        for round_number, round_rows in group_board.groupby("Round", dropna=False):
+            round_label = "Round -" if pd.isna(round_number) else f"Round {int(round_number)}"
+            cards = []
+            for _, row in round_rows.iterrows():
+                team = clean_text(row.get("Team"))
+                player = clean_text(row.get("Player"))
+                pick = row.get("Pick")
+                pick_label = "-" if pd.isna(pick) else str(int(pick))
+                info = teams.get(team, {})
+                logo = clean_text(info.get("logo"))
+                nickname = clean_text(info.get("nickname"))
+                color = esc(info.get("color"), "#1a2030")
+                cards.append(
+                    f"""
+<div class="draft-card" style="--team-color:{color};">
+  <div class="draft-card-top">
+    <span class="draft-pick">{esc(pick_label)}</span>
+    {f'<img class="draft-team-logo" src="{esc(logo)}" alt="{esc(team)}">' if logo else '<span></span>'}
+  </div>
+  <img class="draft-player-photo" src="{PLACEHOLDER_PLAYER_HEADSHOT}" alt="{esc(player, 'Player')}">
+  <div class="draft-player {'draft-empty-player' if not player else ''}">{esc(player, 'TBD')}</div>
+</div>
+"""
+                )
+
+            sections.append(
+                f"""
+<section class="draft-round">
+  <div class="draft-round-title"><span>{esc(round_label)}</span><span></span></div>
+  <div class="draft-grid">{''.join(cards)}</div>
+</section>
+"""
+            )
+
+    st.html("".join(sections))
 
 
 def render_roster_matrix(rosters: pd.DataFrame) -> None:
@@ -1140,7 +2832,7 @@ def render_league_roster_matrix(rosters: pd.DataFrame, conferences: pd.DataFrame
         )
 
 
-def render_team_hero(rosters: pd.DataFrame, team_name: str) -> None:
+def render_team_hero(rosters: pd.DataFrame, team_name: str, record: str = "") -> None:
     team = rosters.loc[rosters["team_name"].eq(team_name)].copy()
     if team.empty:
         st.warning("No roster rows found for this team.")
@@ -1159,6 +2851,7 @@ def render_team_hero(rosters: pd.DataFrame, team_name: str) -> None:
   <div>
     <div class="team-hero-sub">{esc(conference)} Roster</div>
     <div class="team-hero-title">{esc(team_name)}</div>
+    {f'<div class="team-hero-record">{esc(record)}</div>' if record else ''}
   </div>
   <img class="team-hero-wordmark" src="{esc(hero_image)}" alt="{esc(team_name)}">
   <img class="team-hero-logo" src="{esc(logo)}" alt="{esc(team_name)}">
@@ -1221,7 +2914,11 @@ st.set_page_config(
 inject_css()
 selected_season = masthead()
 
-schools, conferences, schedule, scores = load_branding_data()
+schools, conferences, schedule, scores, rankings, drafts = load_branding_data()
+schedule = filter_by_season(schedule, selected_season)
+scores = filter_by_season(scores, selected_season)
+rankings = filter_by_season(rankings, selected_season)
+drafts = filter_by_season(drafts, selected_season)
 all_rosters = load_all_rosters()
 
 league_tab, conference_tab, team_tab = st.tabs(
@@ -1235,6 +2932,7 @@ with league_tab:
         league_scores_tab,
         league_rankings_tab,
         league_rosters_tab,
+        league_drafts_tab,
         league_rules_tab,
     ) = st.tabs(
         [
@@ -1243,11 +2941,12 @@ with league_tab:
             "🏈 Scores",
             "⭐ Rankings",
             "👥 Rosters",
+            "🧾 Drafts",
             "📘 Rules",
         ]
     )
     with league_standings_tab:
-        under_construction("League Standings")
+        render_league_standings(schedule, scores, schools, conferences, rankings)
     with league_schedule_tab:
         weeks = schedule_weeks(schedule)
         if weeks:
@@ -1262,6 +2961,7 @@ with league_tab:
                 week_games,
                 scores,
                 schools,
+                rankings=rankings,
                 empty_label=f"No Week {selected_week} games",
             )
         else:
@@ -1269,16 +2969,19 @@ with league_tab:
                 schedule,
                 scores,
                 schools,
+                rankings=rankings,
                 empty_label="No schedule loaded",
             )
     with league_scores_tab:
         under_construction("League Scores")
     with league_rankings_tab:
-        under_construction("League Rankings")
+        render_rankings(rankings, schedule, scores, schools, conferences)
     with league_rosters_tab:
         render_league_roster_matrix(all_rosters, conferences)
+    with league_drafts_tab:
+        under_construction("League Drafts")
     with league_rules_tab:
-        under_construction("League Rules")
+        render_rules()
 
 with conference_tab:
     conference_options = [name for name in LEAGUES.keys() if name in set(conferences["Conference"].astype(str))]
@@ -1313,7 +3016,14 @@ with conference_tab:
         conf_drafts_tab,
     ) = st.tabs(["📊 Standings", "📅 Schedule", "👥 Rosters", "🧾 Drafts"])
     with conf_standings_tab:
-        under_construction(f"{selected_conference} Standings")
+        render_conference_standings(
+            schedule,
+            scores,
+            schools,
+            conferences,
+            rankings,
+            selected_conference,
+        )
     with conf_schedule_tab:
         conference_schedule = filter_conference_schedule(
             schedule,
@@ -1335,6 +3045,7 @@ with conference_tab:
                 week_games,
                 scores,
                 schools,
+                rankings=rankings,
                 empty_label=f"No Week {selected_week} {selected_conference} games",
             )
             render_conference_schedule_matrix(
@@ -1348,6 +3059,7 @@ with conference_tab:
                 conference_schedule,
                 scores,
                 schools,
+                rankings=rankings,
                 empty_label=f"No {selected_conference} games",
             )
             render_conference_schedule_matrix(
@@ -1359,7 +3071,13 @@ with conference_tab:
     with conf_rosters_tab:
         render_roster_matrix(conference_rosters)
     with conf_drafts_tab:
-        under_construction(f"{selected_conference} Drafts")
+        render_draft_board(
+            drafts,
+            schools,
+            conferences,
+            selected_season,
+            selected_conference,
+        )
 
 with team_tab:
     team_options = (
@@ -1371,7 +3089,8 @@ with team_tab:
         .tolist()
     )
     selected_team = st.selectbox("Team", team_options)
-    render_team_hero(all_rosters, selected_team)
+    selected_team_record = team_record_text(schedule, scores, schools, selected_team, rankings)
+    render_team_hero(all_rosters, selected_team, selected_team_record)
     team_schedule_tab, team_roster_tab = st.tabs(["📅 Schedule", "👥 Rosters"])
     with team_schedule_tab:
         team_schedule = schedule.loc[
@@ -1382,8 +3101,10 @@ with team_tab:
             team_schedule,
             scores,
             schools,
+            rankings=rankings,
             empty_label=f"No {selected_team} games",
             stacked=True,
+            sort_by_rank=False,
         )
     with team_roster_tab:
         render_team_roster(all_rosters, selected_team)
