@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import hashlib
 from typing import Optional
 
 import pandas as pd
@@ -273,30 +274,31 @@ label[data-testid="stWidgetLabel"] * {
 .roster-table {
   border-collapse: collapse;
   width: 100%;
-  min-width: 1180px;
+  min-width: 0;
+  table-layout: fixed;
 }
 .roster-table th {
-  min-width: 138px;
+  min-width: 0;
   background: #f8fafc;
   border-bottom: 2px solid #e2e6ef;
   border-right: 1px solid #e8ecf3;
-  padding: 10px 8px;
+  padding: 8px 5px;
   vertical-align: bottom;
 }
 .team-head {
   border-top: 5px solid var(--team-color);
 }
 .team-head img {
-  max-width: 112px;
-  max-height: 44px;
+  max-width: 72px;
+  max-height: 38px;
   object-fit: contain;
 }
 .roster-table td {
   border-right: 1px solid #edf0f7;
   border-bottom: 1px solid #edf0f7;
-  padding: 7px 10px;
+  padding: 6px 5px;
   font-family: 'Barlow', sans-serif;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: #1a2030;
   white-space: nowrap;
@@ -383,6 +385,16 @@ label[data-testid="stWidgetLabel"] * {
   align-items: center;
   gap: 10px;
 }
+.player-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: top center;
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  flex-shrink: 0;
+}
 .player-name {
   font-family: 'Barlow', sans-serif;
   font-size: 14px;
@@ -421,31 +433,64 @@ label[data-testid="stWidgetLabel"] * {
   font-weight: 800;
 }
 .league-matrix {
-  min-width: 1120px;
+  min-width: 0;
+  table-layout: fixed;
 }
 .league-matrix .player-col {
-  min-width: 230px;
+  min-width: 0;
+  width: 170px;
+  max-width: 170px;
   text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.league-player {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.league-player img {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: top center;
+  flex-shrink: 0;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+.league-player span {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .league-matrix .taken-col {
-  min-width: 66px;
+  min-width: 0;
+  width: 42px;
   text-align: center;
+}
+.league-matrix th {
+  min-width: 0;
+  padding: 6px 4px;
+}
+.league-matrix td {
+  padding: 5px 4px;
 }
 .taken-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 26px;
+  width: 28px;
+  height: 24px;
   border-radius: 5px;
   font-family: 'Rajdhani', sans-serif;
   font-size: 16px;
   font-weight: 800;
   color: #fff;
 }
-.conf-head img {
-  width: 108px;
-  height: 68px;
+.league-matrix .conf-head img {
+  width: 58px;
+  height: 42px;
   object-fit: contain;
 }
 .conf-head-label {
@@ -461,9 +506,121 @@ label[data-testid="stWidgetLabel"] * {
   vertical-align: middle;
 }
 .team-logo-cell img {
-  max-width: 34px;
-  max-height: 34px;
+  max-width: 28px;
+  max-height: 28px;
   object-fit: contain;
+}
+.roster-player-cell {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.roster-player-cell img {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: top center;
+  flex-shrink: 0;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+.roster-player-cell span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.team-roster-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(260px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.team-roster-status {
+  background: #ffffff;
+  border: 1px solid #e2e6ef;
+  border-top: 7px solid var(--team-color);
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(15,23,42,0.08);
+  overflow: hidden;
+}
+.team-roster-status-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  background: #05070b;
+  color: #ffffff;
+  padding: 12px 14px 8px;
+}
+.team-roster-status-title span:first-child {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 34px;
+  letter-spacing: 2px;
+  line-height: 1;
+}
+.team-roster-status-title span:last-child {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 14px;
+  font-weight: 900;
+  color: #b0baca;
+}
+.team-roster-player {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid #edf0f7;
+}
+.team-roster-player:nth-child(even) {
+  background: #fbfcff;
+}
+.team-roster-player img {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: top center;
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+}
+.team-roster-player-name {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #111827;
+  line-height: 1.05;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.team-roster-player-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 4px;
+}
+.position-chip {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 12px;
+  font-weight: 900;
+  color: #111827;
+  background: #eef2f7;
+}
+.team-roster-empty {
+  padding: 18px 14px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  color: #9aa5be;
+  text-align: center;
 }
 .empty-state {
   min-height: 260px;
@@ -516,6 +673,7 @@ label[data-testid="stWidgetLabel"] * {
   border-radius: 10px;
   box-shadow: 0 2px 12px rgba(15,23,42,0.08);
   overflow: hidden;
+  margin-bottom: 8px;
 }
 .schedule-card-top {
   display: flex;
@@ -606,6 +764,346 @@ label[data-testid="stWidgetLabel"] * {
   font-weight: 600;
   color: #64748b;
   background: #fbfcff;
+}
+.schedule-card-divider {
+  height: 1px;
+  background: #dde2ed;
+  margin: 2px 0 18px;
+}
+div[data-testid="stDialog"] {
+  width: 95vw !important;
+  max-width: 95vw !important;
+}
+div[data-testid="stDialog"] > div {
+  width: 95vw !important;
+  max-width: 95vw !important;
+}
+div[data-testid="stButton"] button {
+  background: #05070b !important;
+  color: #ffffff !important;
+  border: 1px solid #05070b !important;
+  border-radius: 4px !important;
+  font-family: 'Barlow Condensed', sans-serif !important;
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  letter-spacing: 1.8px !important;
+  text-transform: uppercase !important;
+}
+.boxscore-matchup-card {
+  background: #ffffff;
+  border: 1px solid #e2e6ef;
+  border-radius: 14px;
+  box-shadow: 0 8px 30px rgba(15,23,42,0.13);
+  overflow: hidden;
+  margin-bottom: 18px;
+}
+.boxscore-matchup-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 170px minmax(0, 1fr);
+  align-items: stretch;
+}
+.boxscore-team-panel {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  align-items: center;
+  gap: 18px;
+  padding: 22px 24px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--team-color) 16%, white), #ffffff 70%);
+  border-top: 8px solid var(--team-color);
+}
+.boxscore-team-panel.right {
+  grid-template-columns: minmax(0, 1fr) 104px;
+  text-align: right;
+  background: linear-gradient(270deg, color-mix(in srgb, var(--team-color) 16%, white), #ffffff 70%);
+}
+.boxscore-team-panel img {
+  width: 104px;
+  height: 104px;
+  object-fit: contain;
+}
+.boxscore-rank {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  color: #ffffff;
+  background: #05070b;
+  border-radius: 4px;
+  padding: 3px 8px;
+  display: inline-block;
+  margin-bottom: 6px;
+}
+.boxscore-team-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 56px;
+  letter-spacing: 3px;
+  line-height: 0.95;
+  color: #111827;
+}
+.boxscore-team-sub {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  color: #8a96b0;
+}
+.boxscore-record {
+  display: inline-flex;
+  margin-top: 8px;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: #4a5a78;
+  padding: 4px 10px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 14px;
+  font-weight: 900;
+}
+.boxscore-center {
+  background: #05070b;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 18px 12px;
+}
+.boxscore-week-label {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: #b0baca;
+}
+.boxscore-week-number {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 62px;
+  letter-spacing: 4px;
+  line-height: 0.95;
+}
+.boxscore-vs {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 32px;
+  letter-spacing: 4px;
+  color: #8a96b0;
+  line-height: 1;
+  margin-top: 5px;
+}
+.boxscore-score-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 170px minmax(0, 1fr);
+  align-items: center;
+  border-top: 1px solid #e2e6ef;
+}
+.boxscore-score-cell {
+  padding: 12px 24px 16px;
+  background: #fbfcff;
+}
+.boxscore-score-cell.right {
+  text-align: right;
+}
+.boxscore-score-label {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: #8a96b0;
+}
+.boxscore-score-value {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 82px;
+  letter-spacing: 3px;
+  line-height: 0.95;
+  color: #111827;
+}
+.boxscore-score-mid {
+  height: 100%;
+  background: #f8fafc;
+  border-left: 1px solid #e2e6ef;
+  border-right: 1px solid #e2e6ef;
+}
+.win-prob {
+  position: relative;
+  height: 46px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--left-color) 0%, var(--left-color) var(--left-pct), var(--right-color) var(--left-pct), var(--right-color) 100%);
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,0.75), 0 2px 12px rgba(15,23,42,0.12);
+  margin: 6px 0 22px;
+}
+.win-prob-marker {
+  position: absolute;
+  top: 50%;
+  left: var(--left-pct);
+  transform: translate(-50%, -50%);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 4px solid #05070b;
+  box-shadow: 0 2px 10px rgba(15,23,42,0.25);
+}
+.win-prob-label {
+  position: absolute;
+  top: 50%;
+  left: var(--label-pct);
+  transform: translate(-50%, -50%);
+  background: #05070b;
+  color: #ffffff;
+  border-radius: 5px;
+  padding: 5px 9px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.boxscore-section-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 40px;
+  letter-spacing: 2px;
+  color: #ffffff;
+  background: #05070b;
+  border-radius: 8px;
+  padding: 8px 14px 5px;
+  margin: 12px 0 8px;
+}
+.boxscore-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  background: #ffffff;
+  border: 1px solid #e2e6ef;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(15,23,42,0.08);
+}
+.boxscore-table th:nth-child(1),
+.boxscore-table td:nth-child(1),
+.boxscore-table th:nth-child(5),
+.boxscore-table td:nth-child(5) {
+  width: 33%;
+}
+.boxscore-table th:nth-child(2),
+.boxscore-table td:nth-child(2),
+.boxscore-table th:nth-child(4),
+.boxscore-table td:nth-child(4) {
+  width: 11%;
+}
+.boxscore-table th:nth-child(3),
+.boxscore-table td:nth-child(3) {
+  width: 12%;
+  text-align: center;
+}
+.boxscore-table th {
+  background: #f8fafc;
+  border-bottom: 2px solid #e2e6ef;
+  padding: 10px 12px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #8a96b0;
+}
+.boxscore-table td {
+  border-bottom: 1px solid #edf0f7;
+  padding: 9px 12px;
+  vertical-align: middle;
+}
+.boxscore-player-left,
+.boxscore-player-right {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #111827;
+}
+.boxscore-player-right {
+  text-align: right;
+}
+.boxscore-player-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.boxscore-player-right .boxscore-player-wrap {
+  justify-content: flex-end;
+}
+.boxscore-headshot {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: top center;
+  border: 2px solid #e2e8f0;
+  background: #f8fafc;
+  flex-shrink: 0;
+}
+.boxscore-player-name {
+  font-size: 20px;
+  line-height: 1.05;
+}
+.boxscore-stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.boxscore-player-right .boxscore-stat-row {
+  justify-content: flex-end;
+}
+.boxscore-stat-pill {
+  display: inline-flex;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: #4a5a78;
+  padding: 2px 6px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.boxscore-points {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  color: #111827;
+  text-align: center;
+}
+.boxscore-proj {
+  display: inline-flex;
+  margin-top: 3px;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: #64748b;
+  padding: 1px 7px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 12px;
+  font-weight: 900;
+}
+.boxscore-slot {
+  text-align: center;
+}
+.slot-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 54px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  color: #111827;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 14px;
+  font-weight: 900;
+}
+.boxscore-total td {
+  background: #05070b !important;
+  color: #ffffff !important;
+  border-bottom: none;
+}
+.boxscore-total .boxscore-player-left,
+.boxscore-total .boxscore-player-right,
+.boxscore-total .boxscore-points {
+  color: #ffffff !important;
 }
 .team-schedule-stack {
   display: grid;
@@ -1473,6 +1971,7 @@ def render_matchup_team(
     opponent_points: Optional[float],
     teams: dict[str, dict[str, str]],
     ap_ranks: Optional[dict[str, int]] = None,
+    record: str = "",
 ) -> str:
     info = teams.get(team, {})
     logo = clean_text(info.get("logo"))
@@ -1489,7 +1988,7 @@ def render_matchup_team(
     {logo_html}
     <div>
       <div class="matchup-name">{esc(display_name)}</div>
-      <div class="matchup-conf">{esc(nickname)}</div>
+      <div class="matchup-conf">{esc(nickname)}{f' {esc(record)}' if record else ''}</div>
     </div>
   </div>
   <div class="score-box {status if status in ('win', 'loss', 'tie') else ''}">{score_text}</div>
@@ -1497,14 +1996,363 @@ def render_matchup_team(
 """
 
 
+STARTER_SLOTS = [
+    ("QB", ["QB"], "#ef4444"),
+    ("RB", ["RB"], "#f97316"),
+    ("RB", ["RB"], "#f97316"),
+    ("WR", ["WR"], "#eab308"),
+    ("WR", ["WR"], "#eab308"),
+    ("TE", ["TE"], "#22c55e"),
+    ("FLX", ["RB", "WR", "TE"], "#7dd3fc"),
+    ("FLX", ["RB", "WR", "TE"], "#7dd3fc"),
+]
+BOXSCORE_STATS = [
+    ("Pass Yds", 80, 390),
+    ("Pass TD", 0, 4),
+    ("2PC", 0, 2),
+    ("Int", 0, 3),
+    ("Rush Yds", 0, 145),
+    ("Rush TD", 0, 3),
+    ("Rec", 0, 11),
+    ("Rec Yds", 0, 155),
+    ("Rec TD", 0, 3),
+    ("ST TD", 0, 1),
+    ("FF", 0, 1),
+    ("FR", 0, 1),
+    ("FL", 0, 1),
+    ("F TD", 0, 1),
+]
+
+
+def seeded_float(*parts: object, low: float = 0.0, high: float = 1.0) -> float:
+    seed = "|".join(clean_text(part) for part in parts)
+    digest = hashlib.sha256(seed.encode("utf-8")).hexdigest()
+    value = int(digest[:12], 16) / float(0xFFFFFFFFFFFF)
+    return low + ((high - low) * value)
+
+
+def boxscore_points(team: str, week: int, player: str, slot: str) -> float:
+    return round(seeded_float(team, week, player, slot, low=1.8, high=28.6), 2)
+
+
+def boxscore_projection(team: str, week: int, player: str, slot: str) -> float:
+    return round(seeded_float(team, week, player, slot, "projection", low=4.0, high=24.0), 1)
+
+
+def boxscore_total(rows: list[dict[str, object]], team: str, week: int) -> float:
+    total = 0.0
+    for row in rows:
+        player = clean_text(row.get("player"))
+        slot = clean_text(row.get("slot"))
+        if player and player != "TBD":
+            total += boxscore_points(team, week, player, slot)
+    return total
+
+
+def player_stat_pills(team: str, week: int, player: str, slot: str) -> str:
+    if not player or player == "TBD":
+        return ""
+
+    stat_count = int(seeded_float(team, week, player, slot, "stat-count", low=2, high=5.99))
+    stats = sorted(
+        BOXSCORE_STATS,
+        key=lambda stat: seeded_float(team, week, player, slot, stat[0], "stat-order"),
+    )[:stat_count]
+    pills = []
+    for label, low, high in stats:
+        value = int(round(seeded_float(team, week, player, slot, label, low=low, high=high)))
+        if value == 0 and label not in {"Int", "FL"}:
+            value = 1
+        pills.append(f'<span class="boxscore-stat-pill">{esc(label)}: {value}</span>')
+    return f'<div class="boxscore-stat-row">{"".join(pills)}</div>'
+
+
+def team_boxscore_players(rosters: pd.DataFrame, team: str) -> dict[str, list[dict[str, object]]]:
+    team_roster = rosters.loc[rosters["team_name"].eq(team)].copy()
+    if team_roster.empty:
+        return {"Starters": [], "Bench": [], "Injured Reserve": [], "Taxi": []}
+
+    team_roster["status_sort"] = team_roster["roster_spot"].map(ROSTER_STATUS_ORDER).fillna(9)
+    team_roster = team_roster.sort_values(["status_sort", "position", "player_name"], na_position="last")
+    starters_pool = team_roster.loc[team_roster["roster_spot"].eq("Starter")].copy()
+    used_indexes: set[int] = set()
+    starters = []
+
+    for slot, eligible_positions, color in STARTER_SLOTS:
+        available = starters_pool.loc[
+            starters_pool["position"].isin(eligible_positions)
+            & ~starters_pool.index.isin(used_indexes)
+        ]
+        if available.empty:
+            starters.append(
+                {
+                    "player": "TBD",
+                    "position": "",
+                    "slot": slot,
+                    "color": color,
+                }
+            )
+            continue
+
+        player = available.iloc[0]
+        used_indexes.add(int(player.name))
+        starters.append(
+            {
+                "player": clean_text(player.get("player_name"), "TBD"),
+                "position": clean_text(player.get("position")),
+                "slot": slot,
+                "color": color,
+            }
+        )
+
+    groups = {"Starters": starters, "Bench": [], "Injured Reserve": [], "Taxi": []}
+    status_labels = {
+        "Bench": "Bench",
+        "Reserve": "Injured Reserve",
+        "Taxi": "Taxi",
+    }
+    for roster_spot, label in status_labels.items():
+        rows = team_roster.loc[team_roster["roster_spot"].eq(roster_spot)].copy()
+        for _, row in rows.iterrows():
+            groups[label].append(
+                {
+                    "player": clean_text(row.get("player_name"), "TBD"),
+                    "position": clean_text(row.get("position")),
+                    "slot": clean_text(row.get("position"), label[:2].upper()),
+                    "color": "#e5e7eb",
+                }
+            )
+
+    return groups
+
+
+def boxscore_team_header(
+    team: str,
+    teams: dict[str, dict[str, str]],
+    ranks: dict[str, int],
+    record: str,
+    side: str = "left",
+) -> str:
+    info = teams.get(team, {})
+    logo = clean_text(info.get("logo"))
+    nickname = clean_text(info.get("nickname"))
+    color = esc(info.get("color"), "#1a2030")
+    rank = rank_for_team(team, ranks)
+    return f"""
+<div class="boxscore-team-panel {side}" style="--team-color:{color};">
+  {f'<img src="{esc(logo)}" alt="{esc(team)}">' if logo and side == 'left' else ''}
+  <div>
+    {f'<span class="boxscore-rank">No. {rank}</span>' if rank is not None and rank <= 25 else ''}
+    <div class="boxscore-team-name">{esc(team)}</div>
+    <div class="boxscore-team-sub">{esc(nickname)}</div>
+    {f'<div class="boxscore-record">{esc(record)}</div>' if record else ''}
+  </div>
+  {f'<img src="{esc(logo)}" alt="{esc(team)}">' if logo and side == 'right' else ''}
+</div>
+"""
+
+
+def boxscore_rows_html(
+    left_rows: list[dict[str, object]],
+    right_rows: list[dict[str, object]],
+    left_team: str,
+    right_team: str,
+    week: int,
+    include_total: bool = True,
+) -> str:
+    row_count = max(len(left_rows), len(right_rows))
+    rows = []
+    left_total = 0.0
+    right_total = 0.0
+
+    for index in range(row_count):
+        left = left_rows[index] if index < len(left_rows) else {"player": "", "slot": "", "color": "#e5e7eb"}
+        right = right_rows[index] if index < len(right_rows) else {"player": "", "slot": "", "color": "#e5e7eb"}
+        slot = clean_text(left.get("slot")) or clean_text(right.get("slot"))
+        color = clean_text(left.get("color"), clean_text(right.get("color"), "#e5e7eb"))
+        left_player = clean_text(left.get("player"))
+        right_player = clean_text(right.get("player"))
+        left_points = boxscore_points(left_team, week, left_player, slot) if left_player and left_player != "TBD" else 0.0
+        right_points = boxscore_points(right_team, week, right_player, slot) if right_player and right_player != "TBD" else 0.0
+        left_projection = boxscore_projection(left_team, week, left_player, slot) if left_player and left_player != "TBD" else None
+        right_projection = boxscore_projection(right_team, week, right_player, slot) if right_player and right_player != "TBD" else None
+        left_stats = player_stat_pills(left_team, week, left_player, slot)
+        right_stats = player_stat_pills(right_team, week, right_player, slot)
+        left_total += left_points
+        right_total += right_points
+        left_player_html = (
+            f"""
+    <div class="boxscore-player-wrap">
+      <img class="boxscore-headshot" src="{PLACEHOLDER_PLAYER_HEADSHOT}" alt="{esc(left_player)}">
+      <div>
+        <div class="boxscore-player-name">{esc(left_player)}</div>
+        {left_stats}
+      </div>
+    </div>
+"""
+            if left_player
+            else ""
+        )
+        right_player_html = (
+            f"""
+    <div class="boxscore-player-wrap">
+      <div>
+        <div class="boxscore-player-name">{esc(right_player)}</div>
+        {right_stats}
+      </div>
+      <img class="boxscore-headshot" src="{PLACEHOLDER_PLAYER_HEADSHOT}" alt="{esc(right_player)}">
+    </div>
+"""
+            if right_player
+            else ""
+        )
+        left_points_html = (
+            f'{left_points:.2f}<br><span class="boxscore-proj">{left_projection:.1f}</span>'
+            if left_projection is not None
+            else ""
+        )
+        right_points_html = (
+            f'{right_points:.2f}<br><span class="boxscore-proj">{right_projection:.1f}</span>'
+            if right_projection is not None
+            else ""
+        )
+        rows.append(
+            f"""
+<tr>
+  <td class="boxscore-player-left">{left_player_html}</td>
+  <td class="boxscore-points">{left_points_html}</td>
+  <td class="boxscore-slot"><span class="slot-pill" style="background:{esc(color)};">{esc(slot)}</span></td>
+  <td class="boxscore-points">{right_points_html}</td>
+  <td class="boxscore-player-right">{right_player_html}</td>
+</tr>
+"""
+        )
+
+    if include_total:
+        rows.append(
+            f"""
+<tr class="boxscore-total">
+  <td class="boxscore-player-left">Total</td>
+  <td class="boxscore-points">{left_total:.2f}</td>
+  <td class="boxscore-slot">Total</td>
+  <td class="boxscore-points">{right_total:.2f}</td>
+  <td class="boxscore-player-right">Total</td>
+</tr>
+"""
+        )
+    return "".join(rows)
+
+
+@st.dialog("Box Score", width="large")
+def render_box_score_dialog(
+    game: dict[str, object],
+    schedule: pd.DataFrame,
+    scores: pd.DataFrame,
+    schools: pd.DataFrame,
+    rankings: Optional[pd.DataFrame],
+    rosters: pd.DataFrame,
+) -> None:
+    week = int(game["Week"]) if not pd.isna(game.get("Week")) else 0
+    team_a = clean_text(game.get("TeamA"))
+    team_b = clean_text(game.get("TeamB"))
+    teams = team_lookup(schools)
+    ranks = schedule_ap_top25(rankings, week)
+    team_a_color = clean_text(teams.get(team_a, {}).get("color"), "#1a2030")
+    team_b_color = clean_text(teams.get(team_b, {}).get("color"), "#c8102e")
+    win_probability = seeded_float(team_a, team_b, week, "win-probability", low=0.05, high=0.95)
+    favorite = team_a if win_probability >= 0.5 else team_b
+    favorite_probability = win_probability if favorite == team_a else 1 - win_probability
+    label_pct = min(max(win_probability * 100, 14), 86)
+    team_a_rows = team_boxscore_players(rosters, team_a)
+    team_b_rows = team_boxscore_players(rosters, team_b)
+    team_a_total = boxscore_total(team_a_rows["Starters"], team_a, week)
+    team_b_total = boxscore_total(team_b_rows["Starters"], team_b, week)
+    record_week = max(week - 1, 0)
+    team_a_record = team_record_through_week(schedule, scores, schools, team_a, record_week)
+    team_b_record = team_record_through_week(schedule, scores, schools, team_b, record_week)
+
+    sections = []
+    for section_name, include_total in [
+        ("Starters", True),
+        ("Bench", False),
+        ("Injured Reserve", False),
+        ("Taxi", False),
+    ]:
+        left_section = team_a_rows.get(section_name, [])
+        right_section = team_b_rows.get(section_name, [])
+        if section_name in {"Injured Reserve", "Taxi"} and not left_section and not right_section:
+            continue
+
+        rows_html = boxscore_rows_html(
+            left_section,
+            right_section,
+            team_a,
+            team_b,
+            week,
+            include_total=include_total,
+        )
+        sections.append(
+            f"""
+<div class="boxscore-section-title">{esc(section_name)}</div>
+<table class="boxscore-table">
+  <thead>
+    <tr>
+      <th>{esc(team_a)}</th>
+      <th>Points</th>
+      <th>Position</th>
+      <th>Points</th>
+      <th>{esc(team_b)}</th>
+    </tr>
+  </thead>
+  <tbody>{rows_html}</tbody>
+</table>
+"""
+        )
+
+    st.html(
+        f"""
+<div class="boxscore-matchup-card">
+  <div class="boxscore-matchup-top">
+    {boxscore_team_header(team_a, teams, ranks, team_a_record, "left")}
+    <div class="boxscore-center">
+      <div class="boxscore-week-label">Matchup</div>
+      <div class="boxscore-week-number">W{week}</div>
+      <div class="boxscore-vs">VS</div>
+    </div>
+    {boxscore_team_header(team_b, teams, ranks, team_b_record, "right")}
+  </div>
+  <div class="boxscore-score-row">
+    <div class="boxscore-score-cell" style="--team-color:{esc(team_a_color)};">
+      <div class="boxscore-score-label">Total Score</div>
+    <div class="boxscore-score-value">{team_a_total:.2f}</div>
+    </div>
+    <div class="boxscore-score-mid"></div>
+    <div class="boxscore-score-cell right" style="--team-color:{esc(team_b_color)};">
+      <div class="boxscore-score-label">Total Score</div>
+      <div class="boxscore-score-value">{team_b_total:.2f}</div>
+    </div>
+  </div>
+</div>
+<div class="win-prob" style="--left-color:{esc(team_a_color)}; --right-color:{esc(team_b_color)}; --left-pct:{win_probability * 100:.2f}%; --label-pct:{label_pct:.2f}%;">
+  <div class="win-prob-marker"></div>
+  <div class="win-prob-label">{esc(favorite)} {favorite_probability * 100:.0f}% to win</div>
+</div>
+{''.join(sections)}
+"""
+    )
+
+
 def render_schedule_cards(
     games: pd.DataFrame,
     scores: pd.DataFrame,
     schools: pd.DataFrame,
     rankings: Optional[pd.DataFrame] = None,
+    rosters: Optional[pd.DataFrame] = None,
+    schedule_context: Optional[pd.DataFrame] = None,
     empty_label: str = "No games found",
     stacked: bool = False,
     sort_by_rank: bool = True,
+    key_prefix: str = "schedule",
 ) -> None:
     if games.empty:
         st.html(
@@ -1520,7 +2368,7 @@ def render_schedule_cards(
 
     teams = team_lookup(schools)
     scores_by_team_week = score_lookup(scores)
-    cards = []
+    full_schedule = schedule_context if schedule_context is not None else games
     games = games.copy()
     games["_team_b_sort"] = games["TeamB"].map(lambda value: clean_text(value).casefold())
     games["_team_a_sort"] = games["TeamA"].map(lambda value: clean_text(value).casefold())
@@ -1537,7 +2385,17 @@ def render_schedule_cards(
             na_position="last",
         )
 
-    for _, game in games.iterrows():
+    rendered_games = list(games.iterrows())
+    if stacked:
+        card_slots = [st.container() for _ in rendered_games]
+    else:
+        card_slots = []
+        for start in range(0, len(rendered_games), 3):
+            columns = st.columns(3)
+            card_slots.extend(columns[: len(rendered_games) - start])
+
+    safe_rosters = rosters if rosters is not None else pd.DataFrame()
+    for slot_container, (_, game) in zip(card_slots, rendered_games):
         week = int(game["Week"]) if not pd.isna(game.get("Week")) else 0
         team_a = clean_text(game.get("TeamA"))
         team_b = clean_text(game.get("TeamB"))
@@ -1547,23 +2405,40 @@ def render_schedule_cards(
         score_b = scores_by_team_week.get((match_key(team_b), week))
         badge = "Conference" if is_conference else "Non-Conf"
         game_ranks = schedule_ap_top25(rankings, week)
+        record_week = max(week - 1, 0)
+        team_a_record = team_record_through_week(full_schedule, scores, schools, team_a, record_week)
+        team_b_record = team_record_through_week(full_schedule, scores, schools, team_b, record_week)
 
-        cards.append(
-            f"""
+        with slot_container:
+            st.html(
+                f"""
 <div class="schedule-card">
   <div class="schedule-card-top">
     <div class="week-chip">Week {week}</div>
     <div class="game-badge">{badge}</div>
   </div>
-  {render_matchup_team(team_a, week, score_a, score_b, teams, game_ranks)}
-  {render_matchup_team(team_b, week, score_b, score_a, teams, game_ranks)}
+  {render_matchup_team(team_a, week, score_a, score_b, teams, game_ranks, team_a_record)}
+  {render_matchup_team(team_b, week, score_b, score_a, teams, game_ranks, team_b_record)}
   {f'<div class="schedule-notes">{esc(notes)}</div>' if notes else ''}
 </div>
 """
-        )
-
-    container_class = "team-schedule-stack" if stacked else "schedule-grid"
-    st.html(f'<div class="{container_class}">{"".join(cards)}</div>')
+            )
+            _, button_col = st.columns([0.66, 0.34])
+            with button_col:
+                if st.button(
+                    "View Box Score",
+                    key=f"{key_prefix}_box_score_{week}_{match_key(team_a)}_{match_key(team_b)}",
+                    use_container_width=True,
+                ):
+                    render_box_score_dialog(
+                        game.to_dict(),
+                        full_schedule,
+                        scores,
+                        schools,
+                        rankings,
+                        safe_rosters,
+                    )
+            st.html('<div class="schedule-card-divider"></div>')
 
 
 def schedule_weeks(schedule: pd.DataFrame) -> list[int]:
@@ -2061,6 +2936,33 @@ def team_record_text(
         int(row["conf_ties"]),
     )
     return f"{rank_prefix(team_name, latest_ap_top25(rankings))}{overall} ({conference})"
+
+
+def team_record_through_week(
+    schedule: pd.DataFrame,
+    scores: pd.DataFrame,
+    schools: pd.DataFrame,
+    team_name: str,
+    week: int,
+) -> str:
+    schedule_part, scores_part = through_week(schedule, scores, week)
+    standings = build_standings(schedule_part, scores_part, schools)
+    team = standings.loc[standings["team"].eq(team_name)]
+    if team.empty:
+        return ""
+
+    row = team.iloc[0]
+    overall = record_text(
+        int(row["league_wins"]),
+        int(row["league_losses"]),
+        int(row["league_ties"]),
+    )
+    conference = record_text(
+        int(row["conf_wins"]),
+        int(row["conf_losses"]),
+        int(row["conf_ties"]),
+    )
+    return f"{overall} ({conference})"
 
 
 def render_rules() -> None:
@@ -2733,7 +3635,20 @@ def render_roster_matrix(rosters: pd.DataFrame) -> None:
             for team in teams:
                 team_name = clean_text(team.get("team_name"))
                 player = team_players.get(team_name, [])
-                cells.append(f"<td>{esc(player[idx]) if idx < len(player) else ''}</td>")
+                player_name = player[idx] if idx < len(player) else ""
+                if player_name:
+                    cells.append(
+                        f"""
+<td>
+  <div class="roster-player-cell">
+    <img src="{PLACEHOLDER_PLAYER_HEADSHOT}" alt="{esc(player_name)}">
+    <span>{esc(player_name)}</span>
+  </div>
+</td>
+"""
+                    )
+                else:
+                    cells.append("<td></td>")
             body_rows.append(f"<tr>{''.join(cells)}</tr>")
 
         st.html(
@@ -2752,10 +3667,18 @@ def render_roster_matrix(rosters: pd.DataFrame) -> None:
 
 
 def render_league_roster_matrix(rosters: pd.DataFrame, conferences: pd.DataFrame) -> None:
-    conference_order = [conference for conference in LEAGUE_ROSTER_ORDER if conference in set(rosters["league_name"])]
+    active_conferences = set(rosters["league_name"])
+    conference_order = [
+        conference if conference in active_conferences else f"SEC Preview {index + 1}"
+        for index, conference in enumerate(LEAGUE_ROSTER_ORDER)
+    ]
+    conference_sources = {
+        display_conference: display_conference if display_conference in active_conferences else "SEC"
+        for display_conference in conference_order
+    }
     conference_logos = {
-        conference: conference_logo(conferences, conference)
-        for conference in conference_order
+        display_conference: conference_logo(conferences, source_conference)
+        for display_conference, source_conference in conference_sources.items()
     }
 
     for position in POSITIONS:
@@ -2771,10 +3694,10 @@ def render_league_roster_matrix(rosters: pd.DataFrame, conferences: pd.DataFrame
                 "player_name": player_name,
                 "taken_count": player_rows["league_name"].nunique(),
             }
-            for conference in conference_order:
-                match = player_rows.loc[player_rows["league_name"].eq(conference)]
-                row[conference] = first_value(match, "team_logo", "")
-                row[f"{conference}_team"] = first_value(match, "team_name", "")
+            for display_conference, source_conference in conference_sources.items():
+                match = player_rows.loc[player_rows["league_name"].eq(source_conference)]
+                row[display_conference] = first_value(match, "team_logo", "")
+                row[f"{display_conference}_team"] = first_value(match, "team_name", "")
             rows.append(row)
 
         matrix = pd.DataFrame(rows).sort_values(
@@ -2801,7 +3724,16 @@ def render_league_roster_matrix(rosters: pd.DataFrame, conferences: pd.DataFrame
 
         body_rows = []
         for _, row in matrix.iterrows():
-            cells = [f'<td class="player-col">{esc(row["player_name"])}</td>']
+            cells = [
+                f"""
+<td class="player-col">
+  <div class="league-player">
+    <img src="{PLACEHOLDER_PLAYER_HEADSHOT}" alt="{esc(row["player_name"])}">
+    <span>{esc(row["player_name"])}</span>
+  </div>
+</td>
+"""
+            ]
             for conference in conference_order:
                 logo = clean_text(row.get(conference))
                 team = clean_text(row.get(f"{conference}_team"))
@@ -2830,6 +3762,44 @@ def render_league_roster_matrix(rosters: pd.DataFrame, conferences: pd.DataFrame
 </div>
 """
         )
+
+
+def unique_player_download(rosters: pd.DataFrame) -> pd.DataFrame:
+    player_rows = rosters.loc[rosters["position"].isin(POSITIONS)].copy()
+    if player_rows.empty:
+        return pd.DataFrame(
+            columns=[
+                "PlayerID",
+                "Player",
+                "Position",
+                "NFLTeam",
+                "InjuryStatus",
+                "TakenCount",
+                "Leagues",
+                "Teams",
+                "HeadshotURL",
+            ]
+        )
+
+    rows = []
+    for player_id, group in player_rows.groupby("player_id", dropna=False):
+        leagues = sorted(group["league_name"].dropna().astype(str).unique())
+        teams = sorted(group["team_name"].dropna().astype(str).unique())
+        rows.append(
+            {
+                "PlayerID": player_id,
+                "Player": first_value(group, "player_name", str(player_id)),
+                "Position": first_value(group, "position"),
+                "NFLTeam": first_value(group, "nfl_team"),
+                "InjuryStatus": first_value(group, "injury_status"),
+                "TakenCount": len(leagues),
+                "Leagues": ", ".join(leagues),
+                "Teams": ", ".join(teams),
+                "HeadshotURL": "",
+            }
+        )
+
+    return pd.DataFrame(rows).sort_values(["Position", "Player"]).reset_index(drop=True)
 
 
 def render_team_hero(rosters: pd.DataFrame, team_name: str, record: str = "") -> None:
@@ -2867,41 +3837,62 @@ def render_team_roster(rosters: pd.DataFrame, team_name: str) -> None:
         return
 
     color = first_value(team, "team_color", "#1a2030")
+    team["status_sort"] = team["roster_spot"].map(ROSTER_STATUS_ORDER).fillna(9)
+    team["position_sort"] = team["position"].map({position: index for index, position in enumerate(POSITIONS)}).fillna(9)
+    status_groups = [
+        ("Starter", "Starters"),
+        ("Bench", "Bench"),
+        ("Taxi", "Taxi Squad"),
+        ("Reserve", "Injured Reserve"),
+    ]
     cards = []
-    for position in POSITIONS:
-        position_team = team.loc[team["position"].eq(position)].copy()
-        position_team["status_sort"] = position_team["roster_spot"].map(ROSTER_STATUS_ORDER).fillna(9)
-        players = (
-            position_team[["player_name", "roster_spot", "nfl_team", "injury_status", "status_sort"]]
+
+    for roster_spot, label in status_groups:
+        group = (
+            team.loc[team["roster_spot"].eq(roster_spot)]
             .dropna(subset=["player_name"])
-            .sort_values(["status_sort", "player_name"])
-            .to_dict("records")
+            .sort_values(["position_sort", "player_name"])
         )
-        rows = "".join(
-            f"""
-<div class="player-row">
-  <div class="player-main">
-    <div class="player-name">{esc(player["player_name"])}</div>
-    {f'<span class="injury-chip">{esc(clean_text(player.get("injury_status"))[:1].upper())}</span>' if clean_text(player.get("injury_status")) else ''}
+        rows = []
+        for _, player in group.iterrows():
+            injury = clean_text(player.get("injury_status"))
+            position = clean_text(player.get("position"))
+            position_color = {
+                "QB": "#ef4444",
+                "RB": "#f97316",
+                "WR": "#eab308",
+                "TE": "#22c55e",
+            }.get(position, "#e5e7eb")
+            rows.append(
+                f"""
+<div class="team-roster-player">
+  <img src="{PLACEHOLDER_PLAYER_HEADSHOT}" alt="{esc(player.get("player_name"))}">
+  <div>
+    <div class="team-roster-player-name">{esc(player.get("player_name"))}</div>
+    <div class="team-roster-player-meta">
+      <span class="position-chip" style="background:{position_color};">{esc(position)}</span>
+      {f'<span class="nfl-chip">{esc(player.get("nfl_team"))}</span>' if clean_text(player.get("nfl_team")) else ''}
+      {f'<span class="injury-chip">{esc(injury[:1].upper())}</span>' if injury else ''}
+    </div>
   </div>
-  <div class="player-meta">
-    {f'<span class="nfl-chip">{esc(player.get("nfl_team"))}</span>' if clean_text(player.get("nfl_team")) else ''}
-    <span>{esc(player["roster_spot"])}</span>
-  </div>
+  <span class="nfl-chip">{len(rows) + 1}</span>
 </div>
 """
-            for player in players
-        )
+            )
+
         cards.append(
             f"""
-<div class="position-card" style="--team-color:{esc(color)};">
-  <div class="position-card-title">{POSITION_LABELS.get(position, position)}</div>
-  {rows or '<div class="player-row"><div class="player-name"></div></div>'}
-</div>
+<section class="team-roster-status" style="--team-color:{esc(color)};">
+  <div class="team-roster-status-title">
+    <span>{esc(label)}</span>
+    <span>{len(group)}</span>
+  </div>
+  {''.join(rows) if rows else '<div class="team-roster-empty">No players</div>'}
+</section>
 """
         )
 
-    st.html(f'<div class="team-roster-grid">{"".join(cards)}</div>')
+    st.html(f'<div class="team-roster-board">{"".join(cards)}</div>')
 
 
 st.set_page_config(
@@ -2929,7 +3920,6 @@ with league_tab:
     (
         league_standings_tab,
         league_schedule_tab,
-        league_scores_tab,
         league_rankings_tab,
         league_rosters_tab,
         league_drafts_tab,
@@ -2938,7 +3928,6 @@ with league_tab:
         [
             "📊 Standings",
             "📅 Schedule",
-            "🏈 Scores",
             "⭐ Rankings",
             "👥 Rosters",
             "🧾 Drafts",
@@ -2962,7 +3951,10 @@ with league_tab:
                 scores,
                 schools,
                 rankings=rankings,
+                rosters=all_rosters,
+                schedule_context=schedule,
                 empty_label=f"No Week {selected_week} games",
+                key_prefix="league_schedule",
             )
         else:
             render_schedule_cards(
@@ -2970,13 +3962,22 @@ with league_tab:
                 scores,
                 schools,
                 rankings=rankings,
+                rosters=all_rosters,
+                schedule_context=schedule,
                 empty_label="No schedule loaded",
+                key_prefix="league_schedule_empty",
             )
-    with league_scores_tab:
-        under_construction("League Scores")
     with league_rankings_tab:
         render_rankings(rankings, schedule, scores, schools, conferences)
     with league_rosters_tab:
+        # player_download = unique_player_download(all_rosters)
+        # st.download_button(
+        #     "Download unique player CSV",
+        #     data=player_download.to_csv(index=False).encode("utf-8"),
+        #     file_name=f"ncaa_nfl_crossover_unique_players_{selected_season}.csv",
+        #     mime="text/csv",
+        #     use_container_width=True,
+        # )
         render_league_roster_matrix(all_rosters, conferences)
     with league_drafts_tab:
         under_construction("League Drafts")
@@ -3046,7 +4047,10 @@ with conference_tab:
                 scores,
                 schools,
                 rankings=rankings,
+                rosters=all_rosters,
+                schedule_context=schedule,
                 empty_label=f"No Week {selected_week} {selected_conference} games",
+                key_prefix=f"conference_schedule_{match_key(selected_conference)}",
             )
             render_conference_schedule_matrix(
                 conference_schedule,
@@ -3060,7 +4064,10 @@ with conference_tab:
                 scores,
                 schools,
                 rankings=rankings,
+                rosters=all_rosters,
+                schedule_context=schedule,
                 empty_label=f"No {selected_conference} games",
+                key_prefix=f"conference_schedule_empty_{match_key(selected_conference)}",
             )
             render_conference_schedule_matrix(
                 conference_schedule,
@@ -3102,9 +4109,12 @@ with team_tab:
             scores,
             schools,
             rankings=rankings,
+            rosters=all_rosters,
+            schedule_context=schedule,
             empty_label=f"No {selected_team} games",
             stacked=True,
             sort_by_rank=False,
+            key_prefix=f"team_schedule_{match_key(selected_team)}",
         )
     with team_roster_tab:
         render_team_roster(all_rosters, selected_team)
