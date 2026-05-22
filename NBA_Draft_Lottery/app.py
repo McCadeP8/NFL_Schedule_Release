@@ -454,15 +454,20 @@ def protected_pick_display(picks: dict[int, str], pick_number: int, original_tea
     pelicans_pick = next((pick for pick, team in picks.items() if team == "Pelicans"), None)
     bucks_pick = next((pick for pick, team in picks.items() if team == "Bucks"), None)
 
-    if original_team in {"Pelicans", "Bucks"} and pelicans_pick and bucks_pick:
-        better_pick = min(pelicans_pick, bucks_pick)
-        worse_pick = max(pelicans_pick, bucks_pick)
-        if pick_number == better_pick:
-            if original_team == "Bucks":
-                return "Pelicans", "from MIL", "pelicans_better"
+    if original_team in {"Pelicans", "Bucks"}:
+        if pelicans_pick and bucks_pick:
+            better_pick = min(pelicans_pick, bucks_pick)
+            worse_pick = max(pelicans_pick, bucks_pick)
+            if pick_number == better_pick:
+                if original_team == "Bucks":
+                    return "Pelicans", "from MIL", "pelicans_better"
+                return "Pelicans", "", "pelicans_better"
+            if pick_number == worse_pick and pick_number > 4:
+                return "Hawks", f"from {TEAM_BY_NAME[original_team]['abbr']}", "hawks_worse"
+        elif original_team == "Bucks" and pick_number > 4:
+            return "Hawks", "from MIL", "hawks_worse"
+        elif original_team == "Pelicans":
             return "Pelicans", "", "pelicans_better"
-        if pick_number == worse_pick and pick_number > 4:
-            return "Hawks", f"from {TEAM_BY_NAME[original_team]['abbr']}", "hawks_worse"
 
     if original_team == "Clippers":
         return "Thunder", "from LAC", "clippers_thunder"
@@ -900,10 +905,10 @@ div[data-testid="stButton"] button[kind="primary"]:hover {
 
 .odds-count {
   min-width: 52px;
-  border: 2px solid rgba(255,255,255,0.9);
+  border: 2px solid rgba(255,255,255,0.72);
   border-radius: 999px;
-  background: #ffffff;
-  color: #0D1117;
+  background: #05070b;
+  color: #ffffff;
   font-size: 13px;
   font-weight: 900;
   line-height: 1;
@@ -1102,6 +1107,13 @@ div[data-testid="stButton"] button[kind="primary"]:hover {
 .odds-team-cell {
   min-width: 120px;
   text-align: left !important;
+}
+
+.odds-rank-cell {
+  color: #C3DDFD !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  min-width: 34px;
 }
 
 .odds-team {
@@ -1529,7 +1541,7 @@ def lottery_odds_table_data(
         )
 
     profiles = {}
-    for row in rows:
+    for row_number, row in enumerate(rows, start=1):
         profiles.setdefault(row["profile"], []).append(row)
 
     for profile_rows in profiles.values():
@@ -1545,7 +1557,7 @@ def lottery_odds_table_data(
             row["avg"] = averaged_avg
 
     balls_profiles = {}
-    for row in rows:
+    for row_number, row in enumerate(rows, start=1):
         balls_profiles.setdefault(row["profile"][0], []).append(row)
 
     for profile_rows in balls_profiles.values():
@@ -1566,7 +1578,7 @@ def lottery_odds_table_data(
             for row in eligible_rows:
                 row["odds"][pick_index] = average_value
 
-    for row in rows:
+    for row_number, row in enumerate(rows, start=1):
         row["avg"] = sum(
             (pick_index + 1) * float(row["odds"][pick_index]) / 100
             for pick_index in range(16)
@@ -1601,7 +1613,7 @@ def render_lottery_odds_table() -> None:
         )
 
     body_rows = []
-    for row in rows:
+    for row_number, row in enumerate(rows, start=1):
         team_name = str(row["team"])
         old_avg = float(row["old_avg"])
         new_avg = float(row["avg"])
@@ -1614,6 +1626,7 @@ def render_lottery_odds_table() -> None:
         body_rows.append(
             f"""
 <tr>
+  <td class="odds-rank-cell">{row_number}</td>
   <td class="odds-team-cell">
     <div class="odds-team">
       <img src="{esc(row['logo'])}" alt="{esc(team_name)}">
@@ -1635,6 +1648,7 @@ def render_lottery_odds_table() -> None:
   <table class="odds-table">
     <thead>
       <tr>
+        <th>#</th>
         <th class="odds-team-cell">Team</th>
         {header}
         <th>Old Avg</th>
