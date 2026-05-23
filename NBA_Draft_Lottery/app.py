@@ -464,14 +464,22 @@ def protected_pick_display(picks: dict[int, str], pick_number: int, original_tea
                 return "Pelicans", "", "pelicans_better"
             if pick_number == worse_pick and pick_number > 4:
                 return "Hawks", f"from {TEAM_BY_NAME[original_team]['abbr']}", "hawks_worse"
+            if pick_number == worse_pick:
+                if original_team == "Bucks":
+                    return "Pelicans", "from MIL", "pelicans_better"
+                return "Pelicans", "", "pelicans_better"
         elif original_team == "Bucks" and pick_number > 4:
             return "Hawks", "from MIL", "hawks_worse"
+        elif original_team == "Bucks":
+            return "Pelicans", "from MIL", "pelicans_better"
+        elif original_team == "Pelicans" and pick_number > 4:
+            return "Hawks", "from NOP", "hawks_worse"
         elif original_team == "Pelicans":
             return "Pelicans", "", "pelicans_better"
 
     if original_team == "Clippers":
         return "Thunder", "from LAC", "clippers_thunder"
-    if original_team == "Heat" and pick_number in {15, 16}:
+    if original_team == "Heat" and pick_number > 14:
         return "Hornets", "from MIA", "heat_hornets"
     if original_team == "Jazz":
         return "Grizzlies", "from UTA", "jazz_grizzlies"
@@ -1458,7 +1466,7 @@ def render_pick_protections_note() -> None:
     <div class="protection-item"><sup>1</sup> Atlanta receives the worse of New Orleans and Milwaukee if that pick lands outside the top 4.</div>
     <div class="protection-item"><sup>2</sup> New Orleans receives the better of its own pick and Milwaukee's pick.</div>
     <div class="protection-item"><sup>3</sup> Oklahoma City receives the Clippers pick.</div>
-    <div class="protection-item"><sup>4</sup> Charlotte receives Miami's pick only if it lands 15 or 16.</div>
+    <div class="protection-item"><sup>4</sup> Charlotte receives Miami's pick only if it lands outside the top 14.</div>
     <div class="protection-item"><sup>5</sup> Memphis receives Utah's pick.</div>
     <div class="protection-item"><sup>6</sup> Charlotte receives Dallas' pick if it lands outside the top 2.</div>
     <div class="protection-item"><sup>7</sup> Houston receives Brooklyn's pick.</div>
