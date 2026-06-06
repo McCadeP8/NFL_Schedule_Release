@@ -1871,8 +1871,8 @@ def masthead() -> None:
         st.html('<div class="season-select-wrap">')
         selected_season = st.selectbox(
             "Season",
-            [2025],
-            index=0,
+            [2023, 2024, 2025, 2026],
+            index=2,
             key="global_season",
         )
         st.html("</div>")
@@ -1892,7 +1892,7 @@ def under_construction(label: str) -> None:
 
 
 @st.cache_data(ttl=60 * 60 * 24, show_spinner="Loading team branding...")
-def load_branding_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def load_branding_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     return fetch_branding_data()
 
 
@@ -2003,8 +2003,8 @@ STARTER_SLOTS = [
     ("WR", ["WR"], "#eab308"),
     ("WR", ["WR"], "#eab308"),
     ("TE", ["TE"], "#22c55e"),
-    ("FLX", ["RB", "WR", "TE"], "#7dd3fc"),
-    ("FLX", ["RB", "WR", "TE"], "#7dd3fc"),
+    ("FLX", ["QB", "RB", "WR", "TE"], "#7dd3fc"),
+    ("FLX", ["QB", "RB", "WR", "TE"], "#7dd3fc"),
 ]
 BOXSCORE_STATS = [
     ("Pass Yds", 80, 390),
@@ -2045,7 +2045,11 @@ def boxscore_total(rows: list[dict[str, object]], team: str, week: int) -> float
         player = clean_text(row.get("player"))
         slot = clean_text(row.get("slot"))
         if player and player != "TBD":
-            total += boxscore_points(team, week, player, slot)
+            actual_points = pd.to_numeric(row.get("points"), errors="coerce")
+            if not pd.isna(actual_points):
+                total += float(actual_points)
+            else:
+                total += boxscore_points(team, week, player, slot)
     return total
 
 
@@ -2126,6 +2130,67 @@ def team_boxscore_players(rosters: pd.DataFrame, team: str) -> dict[str, list[di
     return groups
 
 
+def team_boxscore_from_starters(starters: pd.DataFrame, team: str, week: int) -> dict[str, list[dict[str, object]]]:
+    groups = {"Starters": [], "Bench": [], "Injured Reserve": [], "Taxi": []}
+    if starters.empty:
+        return groups
+
+    rows = starters.loc[
+        starters["Team"].astype(str).eq(team)
+        & pd.to_numeric(starters["Week"], errors="coerce").eq(week)
+    ].copy()
+    if rows.empty:
+        return groups
+
+    position_order = {"QB": 0, "RB": 1, "WR": 2, "TE": 3}
+    rows["position_sort"] = rows["Position"].map(position_order).fillna(9)
+    rows = rows.sort_values(["position_sort", "Player"], na_position="last")
+    available = rows.to_dict("records")
+    used_indexes: set[int] = set()
+
+    def take_player(slot: str, eligible_positions: list[str], color: str) -> dict[str, object]:
+        for index, player in enumerate(available):
+            if index in used_indexes:
+                continue
+            if clean_text(player.get("Position")) in eligible_positions:
+                used_indexes.add(index)
+                return {
+                    "player": clean_text(player.get("Player"), "TBD"),
+                    "position": clean_text(player.get("Position")),
+                    "slot": slot,
+                    "color": color,
+                    "points": player.get("Points"),
+                }
+        return {"player": "TBD", "position": "", "slot": slot, "color": color, "points": pd.NA}
+
+    for slot, eligible_positions, color in STARTER_SLOTS:
+        groups["Starters"].append(take_player(slot, eligible_positions, color))
+
+    return groups
+
+
+def starter_points_for_team_week(starters: pd.DataFrame, team: str, week: int) -> Optional[float]:
+    if starters.empty or not {"Team", "Week", "Points"}.issubset(starters.columns):
+        return None
+
+    rows = starters.loc[
+        starters["Team"].astype(str).eq(team)
+        & pd.to_numeric(starters["Week"], errors="coerce").eq(week)
+    ].copy()
+    if rows.empty:
+        return None
+
+    if "TeamPoints" in rows.columns:
+        team_points = pd.to_numeric(rows["TeamPoints"], errors="coerce").dropna()
+        if not team_points.empty:
+            return float(team_points.iloc[0])
+
+    points = pd.to_numeric(rows["Points"], errors="coerce").sum(min_count=1)
+    if pd.isna(points):
+        return None
+    return float(points)
+
+
 def boxscore_team_header(
     team: str,
     teams: dict[str, dict[str, str]],
@@ -2172,8 +2237,22 @@ def boxscore_rows_html(
         color = clean_text(left.get("color"), clean_text(right.get("color"), "#e5e7eb"))
         left_player = clean_text(left.get("player"))
         right_player = clean_text(right.get("player"))
-        left_points = boxscore_points(left_team, week, left_player, slot) if left_player and left_player != "TBD" else 0.0
-        right_points = boxscore_points(right_team, week, right_player, slot) if right_player and right_player != "TBD" else 0.0
+        left_actual = pd.to_numeric(left.get("points"), errors="coerce")
+        right_actual = pd.to_numeric(right.get("points"), errors="coerce")
+        left_points = (
+            float(left_actual)
+            if not pd.isna(left_actual)
+            else boxscore_points(left_team, week, left_player, slot)
+            if left_player and left_player != "TBD"
+            else 0.0
+        )
+        right_points = (
+            float(right_actual)
+            if not pd.isna(right_actual)
+            else boxscore_points(right_team, week, right_player, slot)
+            if right_player and right_player != "TBD"
+            else 0.0
+        )
         left_projection = boxscore_projection(left_team, week, left_player, slot) if left_player and left_player != "TBD" else None
         right_projection = boxscore_projection(right_team, week, right_player, slot) if right_player and right_player != "TBD" else None
         left_stats = player_stat_pills(left_team, week, left_player, slot)
@@ -2251,6 +2330,7 @@ def render_box_score_dialog(
     schools: pd.DataFrame,
     rankings: Optional[pd.DataFrame],
     rosters: pd.DataFrame,
+    starters: pd.DataFrame,
 ) -> None:
     week = int(game["Week"]) if not pd.isna(game.get("Week")) else 0
     team_a = clean_text(game.get("TeamA"))
@@ -2263,8 +2343,12 @@ def render_box_score_dialog(
     favorite = team_a if win_probability >= 0.5 else team_b
     favorite_probability = win_probability if favorite == team_a else 1 - win_probability
     label_pct = min(max(win_probability * 100, 14), 86)
-    team_a_rows = team_boxscore_players(rosters, team_a)
-    team_b_rows = team_boxscore_players(rosters, team_b)
+    team_a_rows = team_boxscore_from_starters(starters, team_a, week)
+    team_b_rows = team_boxscore_from_starters(starters, team_b, week)
+    if not team_a_rows["Starters"]:
+        team_a_rows = team_boxscore_players(rosters, team_a)
+    if not team_b_rows["Starters"]:
+        team_b_rows = team_boxscore_players(rosters, team_b)
     team_a_total = boxscore_total(team_a_rows["Starters"], team_a, week)
     team_b_total = boxscore_total(team_b_rows["Starters"], team_b, week)
     record_week = max(week - 1, 0)
@@ -2280,7 +2364,7 @@ def render_box_score_dialog(
     ]:
         left_section = team_a_rows.get(section_name, [])
         right_section = team_b_rows.get(section_name, [])
-        if section_name in {"Injured Reserve", "Taxi"} and not left_section and not right_section:
+        if section_name != "Starters" and not left_section and not right_section:
             continue
 
         rows_html = boxscore_rows_html(
@@ -2348,6 +2432,7 @@ def render_schedule_cards(
     schools: pd.DataFrame,
     rankings: Optional[pd.DataFrame] = None,
     rosters: Optional[pd.DataFrame] = None,
+    starters: Optional[pd.DataFrame] = None,
     schedule_context: Optional[pd.DataFrame] = None,
     empty_label: str = "No games found",
     stacked: bool = False,
@@ -2369,6 +2454,7 @@ def render_schedule_cards(
     teams = team_lookup(schools)
     scores_by_team_week = score_lookup(scores)
     full_schedule = schedule_context if schedule_context is not None else games
+    safe_starters = starters if starters is not None else pd.DataFrame()
     games = games.copy()
     games["_team_b_sort"] = games["TeamB"].map(lambda value: clean_text(value).casefold())
     games["_team_a_sort"] = games["TeamA"].map(lambda value: clean_text(value).casefold())
@@ -2401,8 +2487,12 @@ def render_schedule_cards(
         team_b = clean_text(game.get("TeamB"))
         notes = clean_text(game.get("Notes"))
         is_conference = bool(game.get("Conference", False))
-        score_a = scores_by_team_week.get((match_key(team_a), week))
-        score_b = scores_by_team_week.get((match_key(team_b), week))
+        score_a = starter_points_for_team_week(safe_starters, team_a, week)
+        score_b = starter_points_for_team_week(safe_starters, team_b, week)
+        if score_a is None:
+            score_a = scores_by_team_week.get((match_key(team_a), week))
+        if score_b is None:
+            score_b = scores_by_team_week.get((match_key(team_b), week))
         badge = "Conference" if is_conference else "Non-Conf"
         game_ranks = schedule_ap_top25(rankings, week)
         record_week = max(week - 1, 0)
@@ -2437,6 +2527,7 @@ def render_schedule_cards(
                         schools,
                         rankings,
                         safe_rosters,
+                        safe_starters,
                     )
             st.html('<div class="schedule-card-divider"></div>')
 
@@ -2469,6 +2560,41 @@ def filter_by_season(df: pd.DataFrame, season: int) -> pd.DataFrame:
     if df.empty or "Year" not in df.columns:
         return df.copy()
     return df.loc[pd.to_numeric(df["Year"], errors="coerce").eq(season)].copy()
+
+
+def aggregate_scores_from_starters(starters: pd.DataFrame, fallback_scores: pd.DataFrame) -> pd.DataFrame:
+    if starters.empty or not {"Team", "Week", "Points"}.issubset(starters.columns):
+        return fallback_scores.copy()
+
+    starter_scores = starters.copy()
+    starter_scores["Points"] = pd.to_numeric(starter_scores["Points"], errors="coerce")
+    if "TeamPoints" in starter_scores.columns:
+        starter_scores["TeamPoints"] = pd.to_numeric(starter_scores["TeamPoints"], errors="coerce")
+    starter_scores["Week"] = pd.to_numeric(starter_scores["Week"], errors="coerce")
+    starter_scores = starter_scores.dropna(subset=["Team", "Week"])
+    if starter_scores.empty:
+        return fallback_scores.copy()
+
+    group_columns = ["Team", "Week"]
+    if "Year" in starter_scores.columns:
+        group_columns.insert(0, "Year")
+
+    if "TeamPoints" in starter_scores.columns and pd.to_numeric(starter_scores["TeamPoints"], errors="coerce").notna().any():
+        starter_scores["TeamPoints"] = pd.to_numeric(starter_scores["TeamPoints"], errors="coerce")
+        scores = (
+            starter_scores.dropna(subset=["TeamPoints"])
+            .groupby(group_columns, dropna=False)["TeamPoints"]
+            .first()
+            .reset_index()
+            .rename(columns={"TeamPoints": "Points"})
+        )
+    else:
+        scores = (
+            starter_scores.groupby(group_columns, dropna=False)["Points"]
+            .sum(min_count=1)
+            .reset_index()
+        )
+    return scores.dropna(subset=["Points"]).reset_index(drop=True)
 
 
 def filter_conference_schedule(
@@ -3685,6 +3811,8 @@ def render_league_roster_matrix(rosters: pd.DataFrame, conferences: pd.DataFrame
         pos_rosters = rosters.loc[rosters["position"].eq(position)].copy()
         if pos_rosters.empty:
             continue
+        unique_players = pos_rosters["player_id"].nunique()
+        per_team = len(pos_rosters) / 144
 
         rows = []
         for player_id, player_rows in pos_rosters.groupby("player_id"):
@@ -3752,7 +3880,7 @@ def render_league_roster_matrix(rosters: pd.DataFrame, conferences: pd.DataFrame
         st.html(
             f"""
 <div class="roster-section">
-  <div class="position-label"><span>{POSITION_LABELS.get(position, position)}</span><div></div></div>
+  <div class="position-label"><span>{POSITION_LABELS.get(position, position)} · {unique_players} Unique · {per_team:.1f} Per Team</span><div></div></div>
   <div class="roster-scroll">
     <table class="roster-table league-matrix">
       <thead><tr>{''.join(headers)}</tr></thead>
@@ -3857,12 +3985,20 @@ def render_team_roster(rosters: pd.DataFrame, team_name: str) -> None:
         for _, player in group.iterrows():
             injury = clean_text(player.get("injury_status"))
             position = clean_text(player.get("position"))
+            display_position = position if roster_spot == "Starter" else {
+                "Bench": "Bench",
+                "Reserve": "IR",
+                "Taxi": "Taxi",
+            }.get(roster_spot, position)
             position_color = {
                 "QB": "#ef4444",
                 "RB": "#f97316",
                 "WR": "#eab308",
                 "TE": "#22c55e",
-            }.get(position, "#e5e7eb")
+                "Bench": "#e5e7eb",
+                "IR": "#fee2e2",
+                "Taxi": "#dbeafe",
+            }.get(display_position, "#e5e7eb")
             rows.append(
                 f"""
 <div class="team-roster-player">
@@ -3870,7 +4006,7 @@ def render_team_roster(rosters: pd.DataFrame, team_name: str) -> None:
   <div>
     <div class="team-roster-player-name">{esc(player.get("player_name"))}</div>
     <div class="team-roster-player-meta">
-      <span class="position-chip" style="background:{position_color};">{esc(position)}</span>
+      <span class="position-chip" style="background:{position_color};">{esc(display_position)}</span>
       {f'<span class="nfl-chip">{esc(player.get("nfl_team"))}</span>' if clean_text(player.get("nfl_team")) else ''}
       {f'<span class="injury-chip">{esc(injury[:1].upper())}</span>' if injury else ''}
     </div>
@@ -3905,11 +4041,13 @@ st.set_page_config(
 inject_css()
 selected_season = masthead()
 
-schools, conferences, schedule, scores, rankings, drafts = load_branding_data()
+schools, conferences, schedule, scores, rankings, drafts, starters = load_branding_data()
 schedule = filter_by_season(schedule, selected_season)
 scores = filter_by_season(scores, selected_season)
 rankings = filter_by_season(rankings, selected_season)
 drafts = filter_by_season(drafts, selected_season)
+starters = filter_by_season(starters, selected_season)
+scores = aggregate_scores_from_starters(starters, scores)
 all_rosters = load_all_rosters()
 
 league_tab, conference_tab, team_tab = st.tabs(
@@ -3952,6 +4090,7 @@ with league_tab:
                 schools,
                 rankings=rankings,
                 rosters=all_rosters,
+                starters=starters,
                 schedule_context=schedule,
                 empty_label=f"No Week {selected_week} games",
                 key_prefix="league_schedule",
@@ -3963,6 +4102,7 @@ with league_tab:
                 schools,
                 rankings=rankings,
                 rosters=all_rosters,
+                starters=starters,
                 schedule_context=schedule,
                 empty_label="No schedule loaded",
                 key_prefix="league_schedule_empty",
@@ -4048,6 +4188,7 @@ with conference_tab:
                 schools,
                 rankings=rankings,
                 rosters=all_rosters,
+                starters=starters,
                 schedule_context=schedule,
                 empty_label=f"No Week {selected_week} {selected_conference} games",
                 key_prefix=f"conference_schedule_{match_key(selected_conference)}",
@@ -4065,6 +4206,7 @@ with conference_tab:
                 schools,
                 rankings=rankings,
                 rosters=all_rosters,
+                starters=starters,
                 schedule_context=schedule,
                 empty_label=f"No {selected_conference} games",
                 key_prefix=f"conference_schedule_empty_{match_key(selected_conference)}",
@@ -4110,6 +4252,7 @@ with team_tab:
             schools,
             rankings=rankings,
             rosters=all_rosters,
+            starters=starters,
             schedule_context=schedule,
             empty_label=f"No {selected_team} games",
             stacked=True,

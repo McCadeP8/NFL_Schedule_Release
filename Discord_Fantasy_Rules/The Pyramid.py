@@ -149,6 +149,23 @@ def styles():
             leading=10,
             alignment=TA_CENTER,
         ),
+        "pyramid_label": ParagraphStyle(
+            "pyramid_label",
+            fontName="Helvetica-Bold",
+            fontSize=8.8,
+            textColor=DARK_BG,
+            leading=10,
+            alignment=TA_CENTER,
+        ),
+        "section_top": ParagraphStyle(
+            "section_top",
+            fontName="Helvetica-Bold",
+            fontSize=15,
+            textColor=GOLD_ELITE,
+            leading=18,
+            spaceBefore=0,
+            spaceAfter=8,
+        ),
         "callout": ParagraphStyle(
             "callout",
             fontName="Helvetica-Bold",
@@ -207,24 +224,54 @@ def pyramid_logo(style_map, width):
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
     ]
-    total_cols = 15
+    total_cols = 25
+    top_width = 9
     for row_idx, (prestige, label) in enumerate(layers):
-        start = 7 - row_idx
-        end = 7 + row_idx
+        layer_width = top_width + (row_idx * 2)
+        start = (total_cols - layer_width) // 2
+        end = start + layer_width - 1
         row = [""] * total_cols
-        row[start] = Paragraph(label, style_map["small_dark"])
+        row[start] = Paragraph(label, style_map["pyramid_label"])
         rows.append(row)
         commands.extend(
             [
                 ("SPAN", (start, row_idx), (end, row_idx)),
                 ("BACKGROUND", (start, row_idx), (end, row_idx), DIVISION_COLORS[prestige]),
-                ("BOX", (start, row_idx), (end, row_idx), 0.35, DARK_BG),
-                ("TOPPADDING", (start, row_idx), (end, row_idx), 2),
-                ("BOTTOMPADDING", (start, row_idx), (end, row_idx), 2),
+                ("BOX", (start, row_idx), (end, row_idx), 0.7, DARK_BG),
+                ("LINEBELOW", (start, row_idx), (end, row_idx), 0.45, HexColor("#F8F9FA")),
+                ("TOPPADDING", (start, row_idx), (end, row_idx), 3),
+                ("BOTTOMPADDING", (start, row_idx), (end, row_idx), 3),
             ]
         )
-    table = Table(rows, colWidths=[width / total_cols] * total_cols, rowHeights=[0.16 * inch] * len(rows))
+    table = Table(rows, colWidths=[width / total_cols] * total_cols, rowHeights=[0.2 * inch] * len(rows))
     table.setStyle(TableStyle(commands))
+    return table
+
+
+def fine_print_rules(style_map, width):
+    rules = [
+        ("Prize Percentages", "Exact payout percentages will be announced once the final number of teams is locked."),
+        ("Tiebreakers", "Promotion, relegation, and payout ties are broken by head-to-head record, then total points, then max points."),
+        ("Trades", "Trades are always allowed. During Weeks 1-9, trades are only within your draft division. During Weeks 10-18, trades can happen among all teams. The commissioner has final say on fairness to prevent collusion."),
+        ("Inactive Managers", "Teams that quit or fail to set lineups will be relegated and may be removed from the league."),
+        ("Expansion Teams", "New expansion teams always start at the very bottom, with the possibility of more aggressive upside for winning a new conference league."),
+        ("Fantrax Flexibility", "Any rule listed here may be adjusted if Fantrax settings, software behavior, or platform limitations do not play nice with the intended format."),
+    ]
+    rows = [[Paragraph(f"<b>{title}:</b> {body}", style_map["body_left"])] for title, body in rules]
+    table = Table(rows, colWidths=[width])
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), CARD_BG),
+                ("BOX", (0, 0), (-1, -1), 1.2, CARD_BORDER),
+                ("LEFTPADDING", (0, 0), (-1, -1), 12),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ("LINEBELOW", (0, 0), (-1, -2), 0.4, DIVIDER),
+            ]
+        )
+    )
     return table
 
 
@@ -294,8 +341,8 @@ def division_example(style_map, width):
         [1, 1, 1, 1, 1, 1, 4, 10],
     ]
     destinations = [
-        ["Diamond", "Diamond", "Silver", "Gold", "Bronze", "Crimson", "Crimson", "Emerald"],
-        ["Diamond", "Diamond", "Gold", "Silver", "Bronze", "Crimson", "Sapphire", "Sapphire"],
+        ["Diamond", "Diamond", "Diamond", "Gold", "Silver", "Bronze", "Crimson", "Emerald"],
+        ["Diamond", "Diamond", "Gold", "Silver", "Bronze", "Crimson", "Emerald", "Sapphire"],
         ["Diamond", "Gold", "Gold", "Silver", "Bronze", "Crimson", "Emerald", "Sapphire"],
         ["Diamond", "Gold", "Silver", "Bronze", "Crimson", "Emerald", "Sapphire", "Sapphire"],
         ["Diamond", "Gold", "Silver", "Bronze", "Crimson", "Emerald", "Sapphire", "Iron"],
@@ -305,11 +352,30 @@ def division_example(style_map, width):
         ["Gold", "Silver", "Bronze", "Crimson", "Emerald", "Sapphire", "Iron", "Iron"],
         ["Silver", "Bronze", "Crimson", "Emerald", "Sapphire", "Iron", "Iron", "Iron"],
     ]
-    data = [headers] + [[str(x) for x in row] for row in matrix]
+    prestige_order = {name: idx for idx, name in enumerate(headers)}
+    sorted_matrix = [[None for _ in headers] for _ in range(10)]
+    sorted_destinations = [[None for _ in headers] for _ in range(10)]
+    for col in range(len(headers)):
+        cells = [(matrix[row][col], destinations[row][col]) for row in range(10)]
+        cells.sort(key=lambda cell: (cell[0], prestige_order[cell[1]]))
+        for row, (slot, destination) in enumerate(cells):
+            sorted_matrix[row][col] = slot
+            sorted_destinations[row][col] = destination
+    matrix = sorted_matrix
+    destinations = sorted_destinations
+
+    def place_label(value):
+        suffix = "th"
+        if value % 100 not in {11, 12, 13}:
+            suffix = {1: "st", 2: "nd", 3: "rd"}.get(value % 10, "th")
+        return f"{value}{suffix} Place"
+
+    data = [headers] + [[place_label(x) for x in row] for row in matrix]
     table = Table(data, colWidths=[width / 8] * 8, rowHeights=[0.24 * inch] + [0.2 * inch] * 10)
     commands = [
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 7.5),
+        ("FONTSIZE", (0, 0), (-1, 0), 7.5),
+        ("FONTSIZE", (0, 1), (-1, -1), 6.2),
         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("GRID", (0, 0), (-1, -1), 0.35, DARK_BG),
@@ -323,6 +389,8 @@ def division_example(style_map, width):
             bg = DIVISION_COLORS[destination]
             commands.append(("BACKGROUND", (col, row), (col, row), bg))
             commands.append(("TEXTCOLOR", (col, row), (col, row), WHITE if destination in {"Crimson", "Sapphire", "Iron"} else DARK_BG))
+    commands.append(("TEXTCOLOR", (0, 0), (-1, -1), colors.black))
+    commands.append(("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"))
     table.setStyle(TableStyle(commands))
     return table
 
@@ -334,7 +402,7 @@ def build():
         pagesize=letter,
         leftMargin=0.7 * inch,
         rightMargin=0.7 * inch,
-        topMargin=0.75 * inch,
+        topMargin=0.58 * inch,
         bottomMargin=0.65 * inch,
     )
     frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id="main")
@@ -377,7 +445,7 @@ def build():
     story.append(Paragraph("DRAFT AND ROSTERS", s["section"]))
     story.append(
         Paragraph(
-            "Drafts run in groups of 10 and can be slow drafts or live drafts. Each draft is 16 rounds: 10 starters and 6 bench spots.",
+            "Drafts start on August 1. Drafts run in groups of 10, and anytime a new division fills up, that division will begin drafting through a slow draft on Fantrax software. Each draft is 16 rounds: 10 starters and 6 bench spots.",
             s["body"],
         )
     )
@@ -390,26 +458,26 @@ def build():
         )
     )
 
-    story.append(hr(w))
-    story.append(Paragraph("SCORING AND WAIVERS", s["section"]))
-    story.append(
-        Paragraph(
-            "Scoring is standard PPR with a few intentional tweaks. Return yards receive small yardage bonuses because if your player is "
-            "on the field, they deserve the chance to score points. Passing touchdowns are worth 6 points, while sacks cost QB points to "
-            "keep quarterback scoring closer to normal. Whenever possible, scoring is continuous instead of discrete. Full scoring lives on Fantrax.",
-            s["body"],
-        )
-    )
-    story.append(
-        Paragraph(
-            "Waivers process Thursday mornings at 10:00 AM ET. The league uses FAAB with a $100 season budget. Minimum bid follows the Fantrax league setting.",
-            s["body"],
-        )
-    )
-
     story.append(PageBreak())
+    story.append(
+        KeepTogether(
+            [
+                Paragraph("SCORING AND WAIVERS", s["section_top"]),
+                Paragraph(
+                    "Scoring is standard PPR with a few intentional tweaks. Return yards receive small yardage bonuses because if your player is "
+                    "on the field, they deserve the chance to score points. Passing touchdowns are worth 6 points, while sacks cost QB points to "
+                    "keep quarterback scoring closer to normal. Whenever possible, scoring is continuous instead of discrete. Full scoring lives on Fantrax.",
+                    s["body"],
+                ),
+                Paragraph(
+                    "Waivers process Thursday mornings at 10:00 AM ET. The league uses FAAB with a $100 season budget. Minimum bid follows the Fantrax league setting.",
+                    s["body"],
+                ),
+            ]
+        )
+    )
 
-    story.append(Paragraph("THE TWO-SEASON LADDER", s["section"]))
+    story.append(Paragraph("THE TWO-SEASON LADDER", s["section_top"]))
     story.append(
         Paragraph(
             "The Pyramid does something most fantasy leagues cannot: it turns a giant league into a ladder. The first half of the NFL season "
@@ -434,6 +502,7 @@ def build():
     )
 
     story.append(hr(w))
+    story.append(PageBreak())
     story.append(Paragraph("EIGHT-DIVISION EXAMPLE", s["section"]))
     story.append(
         Paragraph(
@@ -452,15 +521,17 @@ def build():
         )
     )
 
-    story.append(PageBreak())
-
     story.append(Paragraph("PAYOUTS, ADMIN, AND FINE PRINT", s["section"]))
     story.append(info_card("$", "Entry Fee Philosophy", "$10 is meant to create enough buy-in that people actually play without pricing out anyone who wants to participate.", s, w, GOLD_ELITE))
     story.append(info_card("0", "Admin Take", "Discord Admins take zero dollars. Hosting comes first, then prizes or league operations for champions and league merchandise.", s, w, PROMOTE_GREEN))
     story.append(info_card("P", "Payout Weighting", "All divisions can receive payouts, but payouts are weighted by prestige. Higher divisions carry higher rewards because the climb matters.", s, w, ACCENT_CYAN))
     story.append(info_card("F", "Final Rules", "All other league rules are listed on Fantrax or handled at the discretion of the Discord Admins.", s, w, SILVER_SHINE))
 
-    story.append(hr(w, before=12, after=12))
+    story.append(hr(w, before=10, after=8))
+    story.append(Paragraph("FINAL RULE NOTES", s["section"]))
+    story.append(fine_print_rules(s, w))
+
+    story.append(hr(w, before=10, after=10))
     invite = (
         '<a href="https://www.fantrax.com/fantasy/league/bq663faompbqd2n5/join">'
         '<font color="#00B4D8"><b>Click here to start your journey climbing The Pyramid</b></font></a>'
