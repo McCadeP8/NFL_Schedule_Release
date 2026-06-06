@@ -32,13 +32,13 @@ CONFERENCE_LOGOS = {
     "Big 12": "https://a.espncdn.com/i/teamlogos/ncaa_conf/500/big_12.png",
     "SEC": "https://a.espncdn.com/i/teamlogos/ncaa_conf/500/sec.png",
     "Pac-12": "https://a.espncdn.com/i/teamlogos/ncaa_conf/500/pac_12.png",
-    "G6": "https://pbs.twimg.com/media/HKGo2LnaYAANhaA?format=jpg&name=large",
+    "G6": "https://pbs.twimg.com/media/HKGr3--bcAAfQQ5?format=jpg&name=large",
     "MW": "https://a.espncdn.com/i/teamlogos/ncaa_conf/500/mountain_west.png",
     "AAC": "https://a.espncdn.com/i/teamlogos/ncaa_conf/500/american.png",
     "MAC": "https://a.espncdn.com/i/teamlogos/ncaa_conf/500/mac.png",
     "C-USA": "https://a.espncdn.com/i/teamlogos/ncaa_conf/500/conference_usa.png",
     "SBC": "https://a.espncdn.com/i/teamlogos/ncaa_conf/500/sun_belt.png",
-    "F12": "https://pbs.twimg.com/media/HKGo2LlasAAh__Y?format=jpg&name=large",
+    "F12": "https://pbs.twimg.com/media/HKGr3_FaIAEmdgB?format=jpg&name=large",
 }
 
 CONFERENCE_ALIASES = {
