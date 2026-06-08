@@ -41,6 +41,7 @@ SCHEDULE_STATUS_COLORS = {
     "tie": "#4a5a78",
     "pending": "#8a96b0",
 }
+CACHE_TTL_SECONDS = 60 * 60 * 24
 
 
 def clean_text(value: object, fallback: str = "") -> str:
@@ -277,7 +278,6 @@ label[data-testid="stWidgetLabel"] * {
   min-width: 0;
   table-layout: fixed;
 }
-CACHE_TTL_SECONDS = 60 * 60 * 24
 .roster-table th {
   min-width: 0;
   background: #f8fafc;
