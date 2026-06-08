@@ -432,9 +432,10 @@ def enrich_rosters(rosters: pd.DataFrame, schools: pd.DataFrame) -> pd.DataFrame
     ).reset_index(drop=True)
 
 
-def load_all_rosters() -> pd.DataFrame:
+def load_all_rosters(schools: Optional[pd.DataFrame] = None) -> pd.DataFrame:
     players = get_players()
-    schools, _, _, _, _, _, _ = get_data()
+    if schools is None:
+        schools, _, _, _, _, _, _ = get_data()
     league_rosters = []
 
     for league_name, league_id in LEAGUES.items():

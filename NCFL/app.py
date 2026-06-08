@@ -277,6 +277,7 @@ label[data-testid="stWidgetLabel"] * {
   min-width: 0;
   table-layout: fixed;
 }
+CACHE_TTL_SECONDS = 60 * 60 * 24
 .roster-table th {
   min-width: 0;
   background: #f8fafc;
@@ -1879,6 +1880,19 @@ def masthead() -> None:
     return selected_season
 
 
+def render_data_controls() -> None:
+    with st.sidebar:
+        st.subheader("Data Controls")
+        st.caption("Published data is cached for 24 hours.")
+        if st.button(
+            "Refresh All Data",
+            key="refresh_all_data",
+            use_container_width=True,
+        ):
+            st.cache_data.clear()
+            st.rerun()
+
+
 def under_construction(label: str) -> None:
     st.html(
         f"""
@@ -1891,16 +1905,17 @@ def under_construction(label: str) -> None:
     )
 
 
-@st.cache_data(ttl=60 * 60 * 24, show_spinner="Loading team branding...")
+@st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner="Loading team branding...")
 def load_branding_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     return fetch_branding_data()
 
 
-@st.cache_data(ttl=60 * 60 * 24, show_spinner="Loading NCAA/NFL Crossover rosters...")
-def load_all_rosters() -> pd.DataFrame:
-    return fetch_all_rosters()
+@st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner="Loading NCAA/NFL Crossover rosters...")
+def load_all_rosters(schools: pd.DataFrame) -> pd.DataFrame:
+    return fetch_all_rosters(schools)
 
 
+@st.cache_data(show_spinner=False, max_entries=16)
 def team_lookup(schools: pd.DataFrame) -> dict[str, dict[str, str]]:
     lookup = {}
     for _, row in schools.iterrows():
@@ -1918,6 +1933,7 @@ def team_lookup(schools: pd.DataFrame) -> dict[str, dict[str, str]]:
     return lookup
 
 
+@st.cache_data(show_spinner=False, max_entries=32)
 def score_lookup(scores: pd.DataFrame) -> dict[tuple[str, int], float]:
     lookup = {}
     if scores.empty:
@@ -2191,6 +2207,37 @@ def starter_points_for_team_week(starters: pd.DataFrame, team: str, week: int) -
     return float(points)
 
 
+@st.cache_data(show_spinner=False, max_entries=16)
+def starter_score_lookup(starters: pd.DataFrame) -> dict[tuple[str, int], float]:
+    if starters.empty or not {"Team", "Week", "Points"}.issubset(starters.columns):
+        return {}
+
+    rows = starters.copy()
+    rows["Week"] = pd.to_numeric(rows["Week"], errors="coerce")
+    rows["Points"] = pd.to_numeric(rows["Points"], errors="coerce")
+    rows = rows.dropna(subset=["Team", "Week"])
+
+    group_columns = ["Team", "Week"]
+    if "TeamPoints" in rows.columns:
+        rows["TeamPoints"] = pd.to_numeric(rows["TeamPoints"], errors="coerce")
+        official = (
+            rows.dropna(subset=["TeamPoints"])
+            .groupby(group_columns, dropna=False)["TeamPoints"]
+            .first()
+        )
+    else:
+        official = pd.Series(dtype=float)
+
+    player_sums = rows.groupby(group_columns, dropna=False)["Points"].sum(min_count=1)
+    lookup = {}
+    for team_week, points in player_sums.items():
+        official_points = official.get(team_week, pd.NA)
+        final_points = official_points if not pd.isna(official_points) else points
+        if not pd.isna(final_points):
+            lookup[(match_key(team_week[0]), int(team_week[1]))] = float(final_points)
+    return lookup
+
+
 def boxscore_team_header(
     team: str,
     teams: dict[str, dict[str, str]],
@@ -2455,6 +2502,7 @@ def render_schedule_cards(
     scores_by_team_week = score_lookup(scores)
     full_schedule = schedule_context if schedule_context is not None else games
     safe_starters = starters if starters is not None else pd.DataFrame()
+    starter_scores_by_team_week = starter_score_lookup(safe_starters)
     games = games.copy()
     games["_team_b_sort"] = games["TeamB"].map(lambda value: clean_text(value).casefold())
     games["_team_a_sort"] = games["TeamA"].map(lambda value: clean_text(value).casefold())
@@ -2487,8 +2535,8 @@ def render_schedule_cards(
         team_b = clean_text(game.get("TeamB"))
         notes = clean_text(game.get("Notes"))
         is_conference = bool(game.get("Conference", False))
-        score_a = starter_points_for_team_week(safe_starters, team_a, week)
-        score_b = starter_points_for_team_week(safe_starters, team_b, week)
+        score_a = starter_scores_by_team_week.get((match_key(team_a), week))
+        score_b = starter_scores_by_team_week.get((match_key(team_b), week))
         if score_a is None:
             score_a = scores_by_team_week.get((match_key(team_a), week))
         if score_b is None:
@@ -2556,12 +2604,14 @@ def week_label(week: int) -> str:
     return f"Week {week}"
 
 
+@st.cache_data(show_spinner=False, max_entries=32)
 def filter_by_season(df: pd.DataFrame, season: int) -> pd.DataFrame:
     if df.empty or "Year" not in df.columns:
         return df.copy()
     return df.loc[pd.to_numeric(df["Year"], errors="coerce").eq(season)].copy()
 
 
+@st.cache_data(show_spinner=False, max_entries=16)
 def aggregate_scores_from_starters(starters: pd.DataFrame, fallback_scores: pd.DataFrame) -> pd.DataFrame:
     if starters.empty or not {"Team", "Week", "Points"}.issubset(starters.columns):
         return fallback_scores.copy()
@@ -2756,6 +2806,7 @@ def apply_game_result(row: dict[str, object], points: float, opponent_points: fl
         row[f"{prefix}_ties"] += 1
 
 
+@st.cache_data(show_spinner=False, max_entries=32)
 def build_standings(schedule: pd.DataFrame, scores: pd.DataFrame, schools: pd.DataFrame) -> pd.DataFrame:
     teams = team_lookup(schools)
     standings = {
@@ -3258,6 +3309,7 @@ def render_rules() -> None:
     )
 
 
+@st.cache_data(show_spinner=False, max_entries=32)
 def through_week(schedule: pd.DataFrame, scores: pd.DataFrame, week: int) -> tuple[pd.DataFrame, pd.DataFrame]:
     schedule_part = schedule.loc[schedule["Week"].le(week)].copy()
     scores_part = scores.loc[scores["Week"].le(week)].copy()
@@ -4038,6 +4090,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+render_data_controls()
 inject_css()
 selected_season = masthead()
 
@@ -4048,7 +4101,7 @@ rankings = filter_by_season(rankings, selected_season)
 drafts = filter_by_season(drafts, selected_season)
 starters = filter_by_season(starters, selected_season)
 scores = aggregate_scores_from_starters(starters, scores)
-all_rosters = load_all_rosters()
+all_rosters = load_all_rosters(schools)
 
 league_tab, conference_tab, team_tab = st.tabs(
     ["🏆 League", "🏟️ Conference", "🎓 Team"]
