@@ -94,6 +94,69 @@ def get_rosters(league_id: Any) -> list[dict[str, Any]]:
     return _get_json(f"/league/{league_id}/rosters")
 
 
+def get_future_draft_picks(
+    future_seasons: int = 3,
+    default_rounds: int = 5,
+) -> pd.DataFrame:
+    rows = []
+
+    for conference, league_id in LEAGUES.items():
+        try:
+            league = _get_json(f"/league/{league_id}")
+            rosters = get_rosters(league_id)
+            traded_picks = _get_json(f"/league/{league_id}/traded_picks") or []
+        except requests.RequestException:
+            continue
+
+        league_season = int(league.get("season") or 0)
+        settings = league.get("settings") or {}
+        rounds = int(settings.get("draft_rounds") or default_rounds)
+        roster_ids = sorted(
+            int(roster["roster_id"])
+            for roster in rosters
+            if roster.get("roster_id") is not None
+        )
+        traded_seasons = {
+            int(pick["season"])
+            for pick in traded_picks
+            if str(pick.get("season", "")).isdigit()
+            and int(pick["season"]) > league_season
+        }
+        seasons = sorted(
+            traded_seasons
+            | set(range(league_season + 1, league_season + future_seasons + 1))
+        )
+
+        ownership = {
+            (season, round_number, roster_id): roster_id
+            for season in seasons
+            for round_number in range(1, rounds + 1)
+            for roster_id in roster_ids
+        }
+        for pick in traded_picks:
+            season = int(pick.get("season") or 0)
+            round_number = int(pick.get("round") or 0)
+            original_roster_id = int(pick.get("roster_id") or 0)
+            owner_roster_id = int(pick.get("owner_id") or 0)
+            key = (season, round_number, original_roster_id)
+            if key in ownership and owner_roster_id:
+                ownership[key] = owner_roster_id
+
+        for (season, round_number, original_roster_id), owner_roster_id in ownership.items():
+            rows.append(
+                {
+                    "league_name": conference,
+                    "league_id": str(league_id),
+                    "season": season,
+                    "round": round_number,
+                    "original_roster_id": original_roster_id,
+                    "owner_roster_id": owner_roster_id,
+                }
+            )
+
+    return pd.DataFrame(rows)
+
+
 def get_roster(
     league_id: Any,
     players: Optional[pd.DataFrame] = None,
