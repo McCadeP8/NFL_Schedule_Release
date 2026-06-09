@@ -43,7 +43,7 @@ SCHEDULE_STATUS_COLORS = {
     "pending": "#8a96b0",
 }
 CACHE_TTL_SECONDS = 60 * 60 * 24
-DATA_CACHE_VERSION = "owners-v1"
+DATA_CACHE_VERSION = "owners-rosters-v2"
 
 
 def clean_text(value: object, fallback: str = "") -> str:
@@ -4106,7 +4106,11 @@ def current_roster_season() -> int:
 
 
 @st.cache_data(show_spinner=False, max_entries=8)
-def historical_roster_snapshot(starters: pd.DataFrame, schools: pd.DataFrame) -> pd.DataFrame:
+def historical_roster_snapshot(
+    starters: pd.DataFrame,
+    schools: pd.DataFrame,
+    season: int,
+) -> pd.DataFrame:
     empty_columns = [
         "team_name",
         "league_name",
@@ -4126,7 +4130,10 @@ def historical_roster_snapshot(starters: pd.DataFrame, schools: pd.DataFrame) ->
     if starters.empty:
         return pd.DataFrame(columns=empty_columns)
 
-    snapshot = starters.loc[pd.to_numeric(starters["Week"], errors="coerce").eq(18)].copy()
+    snapshot = starters.loc[
+        pd.to_numeric(starters["Year"], errors="coerce").eq(season)
+        & pd.to_numeric(starters["Week"], errors="coerce").eq(18)
+    ].copy()
     if snapshot.empty:
         return pd.DataFrame(columns=empty_columns)
 
@@ -4318,7 +4325,7 @@ is_current_roster_season = selected_season == current_roster_season()
 roster_snapshot = (
     all_rosters
     if is_current_roster_season
-    else historical_roster_snapshot(starters, schools)
+    else historical_roster_snapshot(starters, schools, selected_season)
 )
 
 league_tab, conference_tab, team_tab = st.tabs(
