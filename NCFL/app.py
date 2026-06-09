@@ -43,6 +43,7 @@ SCHEDULE_STATUS_COLORS = {
     "pending": "#8a96b0",
 }
 CACHE_TTL_SECONDS = 60 * 60 * 24
+DATA_CACHE_VERSION = "owners-v1"
 
 
 def clean_text(value: object, fallback: str = "") -> str:
@@ -1954,7 +1955,10 @@ def under_construction(label: str) -> None:
 
 
 @st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner="Loading team branding...")
-def load_branding_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def load_branding_data(
+    cache_version: str,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    del cache_version
     return fetch_branding_data()
 
 
@@ -2295,8 +2299,17 @@ def starter_score_lookup(starters: pd.DataFrame) -> dict[tuple[str, int], float]
 @st.cache_data(show_spinner=False, max_entries=8)
 def apply_season_owners(schools: pd.DataFrame, season: int) -> pd.DataFrame:
     schools = schools.copy()
-    owner_column = f"{season}Owner"
-    schools["Owner"] = schools[owner_column] if owner_column in schools.columns else ""
+    expected = f"{season}owner"
+    owner_column = next(
+        (
+            column
+            for column in schools.columns
+            if "".join(character for character in str(column).casefold() if character.isalnum())
+            == expected
+        ),
+        None,
+    )
+    schools["Owner"] = schools[owner_column].fillna("").astype(str).str.strip() if owner_column else ""
     return schools
 
 
@@ -4290,7 +4303,9 @@ render_data_controls()
 inject_css()
 selected_season = masthead()
 
-schools, conferences, schedule, scores, rankings, drafts, starters = load_branding_data()
+schools, conferences, schedule, scores, rankings, drafts, starters = load_branding_data(
+    DATA_CACHE_VERSION
+)
 schools = apply_season_owners(schools, selected_season)
 schedule = filter_by_season(schedule, selected_season)
 scores = filter_by_season(scores, selected_season)
