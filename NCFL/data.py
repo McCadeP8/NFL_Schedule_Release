@@ -182,7 +182,7 @@ def _empty_drafts() -> pd.DataFrame:
 
 
 def _empty_starters() -> pd.DataFrame:
-    return pd.DataFrame(columns=["Team", "Position", "Player", "Week", "Year", "Conference", "Points", "TeamPoints"])
+    return pd.DataFrame(columns=["Team", "Position", "Player", "RosterSpot", "Week", "Year", "Conference", "Points", "TeamPoints"])
 
 
 def _safe_read_csv_url(url: str, fallback: pd.DataFrame) -> pd.DataFrame:
@@ -316,7 +316,7 @@ def get_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, 
     scores = _ensure_columns(scores, ["Year", "Team", "Week", "Points"])
     rankings = _ensure_columns(rankings, ["Year", "Week", "Type", "Rank", "Team"])
     drafts = _ensure_columns(drafts, ["Year", "Conference", "Round", "Pick", "Team", "Player"])
-    starters = _ensure_columns(starters, ["Team", "Position", "Player", "Week", "Year", "Conference", "Points", "TeamPoints"])
+    starters = _ensure_columns(starters, ["Team", "Position", "Player", "RosterSpot", "Week", "Year", "Conference", "Points", "TeamPoints"])
 
     try:
         conferences = _read_csv_url(conferences_url)

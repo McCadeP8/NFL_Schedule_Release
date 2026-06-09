@@ -95,6 +95,9 @@ def _roster_lookup(league_id: str, conference: str, schools: pd.DataFrame) -> di
         lookup[roster_id] = {
             "Team": roster_to_school.get(roster_id) or sleeper_team_name or f"Roster {roster_id}",
             "SleeperTeamName": sleeper_team_name or "",
+            "Players": [str(player_id) for player_id in (roster.get("players") or [])],
+            "Reserve": {str(player_id) for player_id in (roster.get("reserve") or [])},
+            "Taxi": {str(player_id) for player_id in (roster.get("taxi") or [])},
         }
 
     return lookup
@@ -110,20 +113,24 @@ def _matchups_for_week(league_id: str, week: int) -> list[dict[str, Any]]:
     return matchups or []
 
 
-def _player_points(matchup: dict[str, Any], player_id: Any, starter_index: int) -> Any:
+def _player_points(
+    matchup: dict[str, Any],
+    player_id: Any,
+    starter_index: int | None = None,
+) -> Any:
     player_id = str(player_id)
     players_points = matchup.get("players_points") or {}
     if player_id in players_points:
         return players_points[player_id]
 
     starters_points = matchup.get("starters_points") or []
-    if starter_index < len(starters_points):
+    if starter_index is not None and starter_index < len(starters_points):
         return starters_points[starter_index]
 
     return pd.NA
 
 
-def _starter_rows_for_league(
+def _weekly_roster_rows_for_league(
     league_id: str,
     year: int,
     conference: str,
@@ -153,16 +160,45 @@ def _starter_rows_for_league(
             roster_id = matchup.get("roster_id")
             team_info = roster_lookup.get(
                 int(roster_id),
-                {"Team": f"Roster {roster_id}", "SleeperTeamName": ""},
+                {
+                    "Team": f"Roster {roster_id}",
+                    "SleeperTeamName": "",
+                    "Players": [],
+                    "Reserve": set(),
+                    "Taxi": set(),
+                },
             )
             team_name = team_info["Team"]
             starters = matchup.get("starters") or []
+            starter_indexes = {
+                str(player_id): index
+                for index, player_id in enumerate(starters)
+                if player_id and str(player_id) != "0"
+            }
+            matchup_players = matchup.get("players") or starters
+            if week == 18:
+                matchup_players = list(
+                    dict.fromkeys(
+                        [str(player_id) for player_id in matchup_players]
+                        + team_info.get("Players", [])
+                    )
+                )
 
-            for starter_index, player_id in enumerate(starters):
+            for player_id in matchup_players:
                 if not player_id or str(player_id) == "0":
                     continue
 
+                player_id = str(player_id)
                 player = player_lookup.get(str(player_id), {})
+                starter_index = starter_indexes.get(player_id)
+                if starter_index is not None:
+                    roster_spot = "Starter"
+                elif player_id in team_info.get("Reserve", set()):
+                    roster_spot = "Reserve"
+                elif player_id in team_info.get("Taxi", set()):
+                    roster_spot = "Taxi"
+                else:
+                    roster_spot = "Bench"
                 rows.append(
                     {
                         "Team": team_name,
@@ -172,6 +208,7 @@ def _starter_rows_for_league(
                         "Position": player.get("position"),
                         "Player": player.get("player_name") or str(player_id),
                         "PlayerID": str(player_id),
+                        "RosterSpot": roster_spot,
                         "Week": int(week),
                         "Year": int(year),
                         "Conference": conference,
@@ -187,7 +224,7 @@ def get_weekly_starters(
     league_ids_by_year: dict[int, dict[str, str]] | None = None,
     weeks: Iterable[int] = range(1, 19),
 ) -> pd.DataFrame:
-    """Load weekly Sleeper starters for every configured league/year."""
+    """Load every weekly Sleeper matchup player, marking starters and bench."""
     league_ids_by_year = league_ids_by_year or LEAGUE_IDS_BY_YEAR
     players = get_players()
     schools, *_ = load_branding_data()
@@ -196,7 +233,7 @@ def get_weekly_starters(
     for year, leagues in league_ids_by_year.items():
         for conference, league_id in leagues.items():
             rows.extend(
-                _starter_rows_for_league(
+                _weekly_roster_rows_for_league(
                     league_id=str(league_id),
                     year=year,
                     conference=conference,
@@ -214,6 +251,7 @@ def get_weekly_starters(
         "Position",
         "Player",
         "PlayerID",
+        "RosterSpot",
         "Week",
         "Year",
         "Conference",

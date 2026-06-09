@@ -2190,6 +2190,8 @@ def team_boxscore_from_starters(starters: pd.DataFrame, team: str, week: int) ->
         starters["Team"].astype(str).eq(team)
         & pd.to_numeric(starters["Week"], errors="coerce").eq(week)
     ].copy()
+    if "RosterSpot" in rows.columns and rows["RosterSpot"].notna().any():
+        rows = rows.loc[rows["RosterSpot"].astype(str).eq("Starter")].copy()
     if rows.empty:
         return groups
 
@@ -2251,6 +2253,9 @@ def starter_score_lookup(starters: pd.DataFrame) -> dict[tuple[str, int], float]
     rows["Week"] = pd.to_numeric(rows["Week"], errors="coerce")
     rows["Points"] = pd.to_numeric(rows["Points"], errors="coerce")
     rows = rows.dropna(subset=["Team", "Week"])
+    starter_rows = rows
+    if "RosterSpot" in rows.columns and rows["RosterSpot"].notna().any():
+        starter_rows = rows.loc[rows["RosterSpot"].astype(str).eq("Starter")].copy()
 
     group_columns = ["Team", "Week"]
     if "TeamPoints" in rows.columns:
@@ -2263,7 +2268,7 @@ def starter_score_lookup(starters: pd.DataFrame) -> dict[tuple[str, int], float]
     else:
         official = pd.Series(dtype=float)
 
-    player_sums = rows.groupby(group_columns, dropna=False)["Points"].sum(min_count=1)
+    player_sums = starter_rows.groupby(group_columns, dropna=False)["Points"].sum(min_count=1)
     lookup = {}
     for team_week, points in player_sums.items():
         official_points = official.get(team_week, pd.NA)
@@ -2378,13 +2383,15 @@ def boxscore_rows_html(
             else ""
         )
         left_points_html = (
-            f'{left_points:.2f}<br><span class="boxscore-proj">{left_projection:.1f}</span>'
-            if left_projection is not None
+            f'{left_points:.2f}'
+            f'{f"""<br><span class="boxscore-proj">{left_projection:.1f}</span>""" if left_projection is not None else ""}'
+            if left_player
             else ""
         )
         right_points_html = (
-            f'{right_points:.2f}<br><span class="boxscore-proj">{right_projection:.1f}</span>'
-            if right_projection is not None
+            f'{right_points:.2f}'
+            f'{f"""<br><span class="boxscore-proj">{right_projection:.1f}</span>""" if right_projection is not None else ""}'
+            if right_player
             else ""
         )
         rows.append(
@@ -2688,6 +2695,10 @@ def aggregate_scores_from_starters(starters: pd.DataFrame, fallback_scores: pd.D
             .rename(columns={"TeamPoints": "Points"})
         )
     else:
+        if "RosterSpot" in starter_scores.columns and starter_scores["RosterSpot"].notna().any():
+            starter_scores = starter_scores.loc[
+                starter_scores["RosterSpot"].astype(str).eq("Starter")
+            ].copy()
         scores = (
             starter_scores.groupby(group_columns, dropna=False)["Points"]
             .sum(min_count=1)
@@ -3899,12 +3910,21 @@ def render_roster_matrix(rosters: pd.DataFrame) -> None:
         )
 
 
-def render_league_roster_matrix(rosters: pd.DataFrame, conferences: pd.DataFrame) -> None:
+def render_league_roster_matrix(
+    rosters: pd.DataFrame,
+    conferences: pd.DataFrame,
+    preview_missing_conferences: bool = False,
+) -> None:
     active_conferences = set(rosters["league_name"])
-    conference_order = [
-        conference if conference in active_conferences else f"SEC Preview {index + 1}"
-        for index, conference in enumerate(LEAGUE_ROSTER_ORDER)
-    ]
+    if preview_missing_conferences:
+        conference_order = [
+            conference if conference in active_conferences else f"SEC Preview {index + 1}"
+            for index, conference in enumerate(LEAGUE_ROSTER_ORDER)
+        ]
+    else:
+        conference_order = [
+            conference for conference in LEAGUE_ROSTER_ORDER if conference in active_conferences
+        ]
     conference_sources = {
         display_conference: display_conference if display_conference in active_conferences else "SEC"
         for display_conference in conference_order
@@ -3919,7 +3939,8 @@ def render_league_roster_matrix(rosters: pd.DataFrame, conferences: pd.DataFrame
         if pos_rosters.empty:
             continue
         unique_players = pos_rosters["player_id"].nunique()
-        per_team = len(pos_rosters) / 144
+        team_count = rosters["team_name"].nunique()
+        per_team = len(pos_rosters) / team_count if team_count else 0
 
         rows = []
         for player_id, player_rows in pos_rosters.groupby("player_id"):
@@ -4095,7 +4116,10 @@ def historical_roster_snapshot(starters: pd.DataFrame, schools: pd.DataFrame) ->
     snapshot["player_name"] = snapshot["Player"]
     snapshot["player_id"] = snapshot.get("PlayerID", snapshot["Player"]).fillna(snapshot["Player"])
     snapshot["position"] = snapshot["Position"]
-    snapshot["roster_spot"] = "Starter"
+    snapshot["roster_spot"] = snapshot.get(
+        "RosterSpot",
+        pd.Series("Starter", index=snapshot.index),
+    ).fillna("Bench")
     snapshot["nfl_team"] = ""
     snapshot["injury_status"] = ""
     snapshot["team_logo"] = snapshot.get("team_logo", pd.Series(index=snapshot.index, dtype=object)).fillna("")
@@ -4317,7 +4341,11 @@ with league_tab:
         #     use_container_width=True,
         # )
         render_roster_snapshot_banner(selected_season, is_current_roster_season)
-        render_league_roster_matrix(roster_snapshot, conferences)
+        render_league_roster_matrix(
+            roster_snapshot,
+            conferences,
+            preview_missing_conferences=is_current_roster_season,
+        )
     with league_drafts_tab:
         under_construction("League Drafts")
     with league_rules_tab:
