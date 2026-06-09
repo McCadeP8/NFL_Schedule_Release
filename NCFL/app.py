@@ -9,6 +9,7 @@ import pandas as pd
 import streamlit as st
 
 from data import LEAGUES, POSITIONS, load_all_rosters as fetch_all_rosters
+from data import get_future_draft_picks as fetch_future_draft_picks
 from data import load_branding_data as fetch_branding_data
 
 
@@ -637,6 +638,67 @@ label[data-testid="stWidgetLabel"] * {
   font-weight: 800;
   color: #9aa5be;
   text-align: center;
+}
+.draft-capital {
+  margin-top: 24px;
+}
+.draft-capital-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.draft-pick-card {
+  background: #ffffff;
+  border: 1px solid #e2e6ef;
+  border-top: 5px solid var(--team-color);
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(15,23,42,0.07);
+  padding: 11px 12px;
+}
+.draft-pick-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.draft-pick-year {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 31px;
+  letter-spacing: 1.5px;
+  color: #111827;
+  line-height: 1;
+}
+.draft-pick-round {
+  border-radius: 999px;
+  background: #05070b;
+  color: #ffffff;
+  padding: 3px 8px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+.draft-pick-origin {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  min-width: 0;
+}
+.draft-pick-origin img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.draft-pick-origin-name {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #4a5a78;
+  line-height: 1.05;
 }
 .roster-snapshot-banner {
   display: flex;
@@ -1965,6 +2027,11 @@ def load_branding_data(
 @st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner="Loading NCAA/NFL Crossover rosters...")
 def load_all_rosters(schools: pd.DataFrame) -> pd.DataFrame:
     return fetch_all_rosters(schools)
+
+
+@st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner="Loading future draft picks...")
+def load_future_draft_picks() -> pd.DataFrame:
+    return fetch_future_draft_picks()
 
 
 @st.cache_data(show_spinner=False, max_entries=16)
@@ -4299,6 +4366,71 @@ def render_team_roster(rosters: pd.DataFrame, team_name: str) -> None:
     st.html(f'<div class="team-roster-board">{"".join(cards)}</div>')
 
 
+def render_team_draft_capital(
+    draft_picks: pd.DataFrame,
+    rosters: pd.DataFrame,
+    team_name: str,
+) -> None:
+    if draft_picks.empty or rosters.empty:
+        return
+
+    team = rosters.loc[rosters["team_name"].eq(team_name)].copy()
+    if team.empty:
+        return
+
+    league_name = first_value(team, "league_name")
+    roster_id = pd.to_numeric(team["roster_id"], errors="coerce").dropna()
+    if roster_id.empty:
+        return
+    roster_id = int(roster_id.iloc[0])
+
+    picks = draft_picks.loc[
+        draft_picks["league_name"].eq(league_name)
+        & draft_picks["owner_roster_id"].eq(roster_id)
+    ].sort_values(["season", "round", "original_roster_id"])
+    if picks.empty:
+        return
+
+    league_rosters = rosters.loc[rosters["league_name"].eq(league_name)].copy()
+    league_rosters["roster_id"] = pd.to_numeric(league_rosters["roster_id"], errors="coerce")
+    league_rosters = league_rosters.dropna(subset=["roster_id"])
+    league_rosters["roster_id"] = league_rosters["roster_id"].astype(int)
+    team_map = (
+        league_rosters.drop_duplicates("roster_id")
+        .set_index("roster_id")
+        .to_dict("index")
+    )
+    cards = []
+    for _, pick in picks.iterrows():
+        original = team_map.get(int(pick["original_roster_id"]), {})
+        origin_name = clean_text(original.get("team_name"), f"Roster {int(pick['original_roster_id'])}")
+        origin_logo = clean_text(original.get("team_logo"))
+        origin_color = clean_text(original.get("team_color"), "#1a2030")
+        cards.append(
+            f"""
+<div class="draft-pick-card" style="--team-color:{esc(origin_color)};">
+  <div class="draft-pick-top">
+    <div class="draft-pick-year">{int(pick["season"])}</div>
+    <div class="draft-pick-round">Round {int(pick["round"])}</div>
+  </div>
+  <div class="draft-pick-origin">
+    {f'<img src="{esc(origin_logo)}" alt="{esc(origin_name)}">' if origin_logo else ''}
+    <div class="draft-pick-origin-name">{esc(origin_name)} Pick</div>
+  </div>
+</div>
+"""
+        )
+
+    st.html(
+        f"""
+<section class="draft-capital">
+  <div class="position-label"><span>Future Draft Capital · {len(picks)} Picks</span><div></div></div>
+  <div class="draft-capital-grid">{''.join(cards)}</div>
+</section>
+"""
+    )
+
+
 st.set_page_config(
     page_title=LEAGUE_NAME,
     page_icon=LEAGUE_LOGO,
@@ -4321,6 +4453,7 @@ drafts = filter_by_season(drafts, selected_season)
 starters = filter_by_season(starters, selected_season)
 scores = aggregate_scores_from_starters(starters, scores)
 all_rosters = load_all_rosters(schools)
+future_draft_picks = load_future_draft_picks()
 is_current_roster_season = selected_season == current_roster_season()
 roster_snapshot = (
     all_rosters
@@ -4549,3 +4682,5 @@ with team_tab:
     with team_roster_tab:
         render_roster_snapshot_banner(selected_season, is_current_roster_season)
         render_team_roster(roster_snapshot, selected_team)
+        if is_current_roster_season:
+            render_team_draft_capital(future_draft_picks, all_rosters, selected_team)
