@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 import hashlib
+from datetime import datetime
 from typing import Optional
 
 import pandas as pd
@@ -622,6 +623,37 @@ label[data-testid="stWidgetLabel"] * {
   font-weight: 800;
   color: #9aa5be;
   text-align: center;
+}
+.roster-snapshot-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  background: #ffffff;
+  border: 1px solid #e2e6ef;
+  border-left: 7px solid var(--accent);
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(15,23,42,0.07);
+  padding: 10px 14px;
+  margin: 4px 0 16px;
+}
+.roster-snapshot-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: #111827;
+}
+.roster-snapshot-pill {
+  border-radius: 999px;
+  background: var(--accent);
+  color: #ffffff;
+  padding: 4px 10px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
 }
 .empty-state {
   min-height: 260px;
@@ -1503,6 +1535,9 @@ div[data-testid="stButton"] button {
   gap: 18px;
   align-items: start;
 }
+.rankings-layout.ap-only {
+  grid-template-columns: minmax(0, 1fr);
+}
 .poll-panel {
   background: #fff;
   border: 1px solid #e2e6ef;
@@ -2271,6 +2306,8 @@ def boxscore_rows_html(
     right_team: str,
     week: int,
     include_total: bool = True,
+    show_projections: bool = True,
+    show_stats: bool = True,
 ) -> str:
     row_count = max(len(left_rows), len(right_rows))
     rows = []
@@ -2300,10 +2337,18 @@ def boxscore_rows_html(
             if right_player and right_player != "TBD"
             else 0.0
         )
-        left_projection = boxscore_projection(left_team, week, left_player, slot) if left_player and left_player != "TBD" else None
-        right_projection = boxscore_projection(right_team, week, right_player, slot) if right_player and right_player != "TBD" else None
-        left_stats = player_stat_pills(left_team, week, left_player, slot)
-        right_stats = player_stat_pills(right_team, week, right_player, slot)
+        left_projection = (
+            boxscore_projection(left_team, week, left_player, slot)
+            if show_projections and left_player and left_player != "TBD"
+            else None
+        )
+        right_projection = (
+            boxscore_projection(right_team, week, right_player, slot)
+            if show_projections and right_player and right_player != "TBD"
+            else None
+        )
+        left_stats = player_stat_pills(left_team, week, left_player, slot) if show_stats else ""
+        right_stats = player_stat_pills(right_team, week, right_player, slot) if show_stats else ""
         left_total += left_points
         right_total += right_points
         left_player_html = (
@@ -2380,6 +2425,8 @@ def render_box_score_dialog(
     starters: pd.DataFrame,
 ) -> None:
     week = int(game["Week"]) if not pd.isna(game.get("Week")) else 0
+    year = int(game["Year"]) if not pd.isna(game.get("Year")) else 0
+    show_projections = year > 2025
     team_a = clean_text(game.get("TeamA"))
     team_b = clean_text(game.get("TeamB"))
     teams = team_lookup(schools)
@@ -2421,6 +2468,8 @@ def render_box_score_dialog(
             team_b,
             week,
             include_total=include_total,
+            show_projections=show_projections and section_name == "Starters",
+            show_stats=section_name == "Starters",
         )
         sections.append(
             f"""
@@ -2464,10 +2513,10 @@ def render_box_score_dialog(
     </div>
   </div>
 </div>
-<div class="win-prob" style="--left-color:{esc(team_a_color)}; --right-color:{esc(team_b_color)}; --left-pct:{win_probability * 100:.2f}%; --label-pct:{label_pct:.2f}%;">
+{f'''<div class="win-prob" style="--left-color:{esc(team_a_color)}; --right-color:{esc(team_b_color)}; --left-pct:{win_probability * 100:.2f}%; --label-pct:{label_pct:.2f}%;">
   <div class="win-prob-marker"></div>
   <div class="win-prob-label">{esc(favorite)} {favorite_probability * 100:.0f}% to win</div>
-</div>
+</div>''' if show_projections else ''}
 {''.join(sections)}
 """
     )
@@ -3593,10 +3642,37 @@ def render_rankings(
         include_last_game=False,
     )
     orv_text = ", ".join(ap_orv) if ap_orv else "None"
+    coaches_panel = ""
+    if not coaches_top.empty:
+        coaches_panel = f"""
+  <div class="poll-panel">
+    <div class="poll-header">
+      <div>
+        <div class="poll-title">Coaches Poll</div>
+        <div class="poll-subtitle">{esc(title_week)} Rankings</div>
+      </div>
+    </div>
+    <div class="poll-table-wrap">
+      <table class="poll-table coaches">
+        <thead>
+          <tr>
+            <th>Rk</th>
+            <th>Conf</th>
+            <th>Team</th>
+            <th>Total</th>
+            <th>Conf</th>
+            <th>PF</th>
+          </tr>
+        </thead>
+        <tbody>{coaches_rows}</tbody>
+      </table>
+    </div>
+  </div>
+"""
 
     st.html(
         f"""
-<div class="rankings-layout">
+<div class="rankings-layout {'ap-only' if coaches_top.empty else ''}">
   <div class="poll-panel">
     <div class="poll-header">
       <div>
@@ -3627,29 +3703,7 @@ def render_rankings(
       <div class="orv-text">{esc(orv_text)}</div>
     </div>
   </div>
-  <div class="poll-panel">
-    <div class="poll-header">
-      <div>
-        <div class="poll-title">Coaches Poll</div>
-        <div class="poll-subtitle">{esc(title_week)} Rankings</div>
-      </div>
-    </div>
-    <div class="poll-table-wrap">
-      <table class="poll-table coaches">
-        <thead>
-          <tr>
-            <th>Rk</th>
-            <th>Conf</th>
-            <th>Team</th>
-            <th>Total</th>
-            <th>Conf</th>
-            <th>PF</th>
-          </tr>
-        </thead>
-        <tbody>{coaches_rows}</tbody>
-      </table>
-    </div>
-  </div>
+  {coaches_panel}
 </div>
 """
     )
@@ -3777,6 +3831,7 @@ def render_roster_matrix(rosters: pd.DataFrame) -> None:
         pos_rosters = rosters.loc[rosters["position"].eq(position)].copy()
         if pos_rosters.empty:
             continue
+        per_team = len(pos_rosters) / len(teams) if teams else 0
 
         team_players: dict[str, list[str]] = {}
         max_players = 0
@@ -3832,7 +3887,7 @@ def render_roster_matrix(rosters: pd.DataFrame) -> None:
         st.html(
             f"""
 <div class="roster-section">
-  <div class="position-label"><span>{POSITION_LABELS.get(position, position)}</span><div></div></div>
+  <div class="position-label"><span>{POSITION_LABELS.get(position, position)} · {per_team:.1f} Per Team</span><div></div></div>
   <div class="roster-scroll">
     <table class="roster-table">
       <thead><tr>{''.join(headers)}</tr></thead>
@@ -3982,6 +4037,88 @@ def unique_player_download(rosters: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows).sort_values(["Position", "Player"]).reset_index(drop=True)
 
 
+def current_roster_season() -> int:
+    today = datetime.now()
+    return today.year if today.month >= 3 else today.year - 1
+
+
+@st.cache_data(show_spinner=False, max_entries=8)
+def historical_roster_snapshot(starters: pd.DataFrame, schools: pd.DataFrame) -> pd.DataFrame:
+    empty_columns = [
+        "team_name",
+        "league_name",
+        "player_name",
+        "player_id",
+        "position",
+        "roster_spot",
+        "nfl_team",
+        "injury_status",
+        "team_logo",
+        "team_wordmark",
+        "team_color",
+        "team_color2",
+        "roster_id",
+    ]
+    if starters.empty:
+        return pd.DataFrame(columns=empty_columns)
+
+    snapshot = starters.loc[pd.to_numeric(starters["Week"], errors="coerce").eq(18)].copy()
+    if snapshot.empty:
+        return pd.DataFrame(columns=empty_columns)
+
+    snapshot["Conference"] = snapshot["Conference"].replace({"6IX": "G6", "The 12": "F12"})
+    snapshot = snapshot.drop_duplicates(["Team", "Player"], keep="last")
+    school_branding = schools.copy()
+    school_branding["Conference"] = school_branding["Conference"].replace({"6IX": "G6", "The 12": "F12"})
+    school_branding = school_branding.rename(
+        columns={
+            "School": "Team",
+            "Logo": "team_logo",
+            "Wordmark": "team_wordmark",
+            "Color": "team_color",
+            "Color2": "team_color2",
+            "TeamID": "roster_id",
+        }
+    )
+    branding_columns = [
+        column
+        for column in ["Team", "team_logo", "team_wordmark", "team_color", "team_color2", "roster_id"]
+        if column in school_branding.columns
+    ]
+    snapshot = snapshot.merge(
+        school_branding[branding_columns].drop_duplicates("Team"),
+        on="Team",
+        how="left",
+    )
+    snapshot["team_name"] = snapshot["Team"]
+    snapshot["league_name"] = snapshot["Conference"]
+    snapshot["player_name"] = snapshot["Player"]
+    snapshot["player_id"] = snapshot.get("PlayerID", snapshot["Player"]).fillna(snapshot["Player"])
+    snapshot["position"] = snapshot["Position"]
+    snapshot["roster_spot"] = "Starter"
+    snapshot["nfl_team"] = ""
+    snapshot["injury_status"] = ""
+    snapshot["team_logo"] = snapshot.get("team_logo", pd.Series(index=snapshot.index, dtype=object)).fillna("")
+    snapshot["team_wordmark"] = snapshot.get("team_wordmark", pd.Series(index=snapshot.index, dtype=object)).fillna("")
+    snapshot["team_color"] = snapshot.get("team_color", pd.Series(index=snapshot.index, dtype=object)).fillna("#1a2030")
+    snapshot["team_color2"] = snapshot.get("team_color2", pd.Series(index=snapshot.index, dtype=object)).fillna("#c8102e")
+    return snapshot.reset_index(drop=True)
+
+
+def render_roster_snapshot_banner(season: int, is_current: bool) -> None:
+    title = f"{season} Current Roster" if is_current else f"{season} Final Roster Snapshot"
+    pill = "Current · Mar-Feb" if is_current else "Week 18"
+    accent = "#166534" if is_current else "#4a5a78"
+    st.html(
+        f"""
+<div class="roster-snapshot-banner" style="--accent:{accent};">
+  <div class="roster-snapshot-title">{esc(title)}</div>
+  <div class="roster-snapshot-pill">{esc(pill)}</div>
+</div>
+"""
+    )
+
+
 def render_team_hero(rosters: pd.DataFrame, team_name: str, record: str = "") -> None:
     team = rosters.loc[rosters["team_name"].eq(team_name)].copy()
     if team.empty:
@@ -4033,6 +4170,8 @@ def render_team_roster(rosters: pd.DataFrame, team_name: str) -> None:
             .dropna(subset=["player_name"])
             .sort_values(["position_sort", "player_name"])
         )
+        if group.empty:
+            continue
         rows = []
         for _, player in group.iterrows():
             injury = clean_text(player.get("injury_status"))
@@ -4102,6 +4241,12 @@ drafts = filter_by_season(drafts, selected_season)
 starters = filter_by_season(starters, selected_season)
 scores = aggregate_scores_from_starters(starters, scores)
 all_rosters = load_all_rosters(schools)
+is_current_roster_season = selected_season == current_roster_season()
+roster_snapshot = (
+    all_rosters
+    if is_current_roster_season
+    else historical_roster_snapshot(starters, schools)
+)
 
 league_tab, conference_tab, team_tab = st.tabs(
     ["🏆 League", "🏟️ Conference", "🎓 Team"]
@@ -4171,7 +4316,8 @@ with league_tab:
         #     mime="text/csv",
         #     use_container_width=True,
         # )
-        render_league_roster_matrix(all_rosters, conferences)
+        render_roster_snapshot_banner(selected_season, is_current_roster_season)
+        render_league_roster_matrix(roster_snapshot, conferences)
     with league_drafts_tab:
         under_construction("League Drafts")
     with league_rules_tab:
@@ -4183,8 +4329,8 @@ with conference_tab:
         conference_options = list(LEAGUES.keys())
 
     selected_conference = st.selectbox("Conference", conference_options)
-    conference_rosters = all_rosters.loc[
-        all_rosters["league_name"].eq(selected_conference)
+    conference_rosters = roster_snapshot.loc[
+        roster_snapshot["league_name"].eq(selected_conference)
     ].copy()
     conf_logo = conference_logo(conferences, selected_conference)
     conf_code = conference_code(conferences, selected_conference)
@@ -4271,6 +4417,7 @@ with conference_tab:
                 selected_conference,
             )
     with conf_rosters_tab:
+        render_roster_snapshot_banner(selected_season, is_current_roster_season)
         render_roster_matrix(conference_rosters)
     with conf_drafts_tab:
         render_draft_board(
@@ -4283,16 +4430,19 @@ with conference_tab:
 
 with team_tab:
     team_options = (
-        all_rosters["team_name"]
+        roster_snapshot["team_name"]
         .dropna()
         .astype(str)
         .sort_values()
         .drop_duplicates()
         .tolist()
     )
+    if not team_options:
+        st.warning(f"No Week 18 roster snapshot is available for {selected_season}.")
+        st.stop()
     selected_team = st.selectbox("Team", team_options)
     selected_team_record = team_record_text(schedule, scores, schools, selected_team, rankings)
-    render_team_hero(all_rosters, selected_team, selected_team_record)
+    render_team_hero(roster_snapshot, selected_team, selected_team_record)
     team_schedule_tab, team_roster_tab = st.tabs(["📅 Schedule", "👥 Rosters"])
     with team_schedule_tab:
         team_schedule = schedule.loc[
@@ -4313,4 +4463,5 @@ with team_tab:
             key_prefix=f"team_schedule_{match_key(selected_team)}",
         )
     with team_roster_tab:
-        render_team_roster(all_rosters, selected_team)
+        render_roster_snapshot_banner(selected_season, is_current_roster_season)
+        render_team_roster(roster_snapshot, selected_team)
