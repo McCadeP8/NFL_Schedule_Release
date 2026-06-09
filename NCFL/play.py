@@ -9,6 +9,11 @@ from data import SLEEPER_API_BASE_URL, get_players, load_branding_data
 
 
 LEAGUE_IDS_BY_YEAR: dict[int, dict[str, str]] = {
+    2022: {
+        "Big 12": "871796028209348608",
+        "B1G": "872263979001704448",
+        "SEC": "873261676571566080",
+    },
     2023: {
         "Big 12": "963848350720180224",
         "B1G": "963848512859389952",

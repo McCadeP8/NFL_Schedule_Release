@@ -352,6 +352,19 @@ label[data-testid="stWidgetLabel"] * {
   letter-spacing: 1px;
   color: rgba(255,255,255,0.92);
 }
+.team-hero-owner {
+  display: inline-flex;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.16);
+  border: 1px solid rgba(255,255,255,0.28);
+  color: #ffffff;
+  padding: 5px 11px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.8px;
+}
 .team-roster-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -1907,8 +1920,8 @@ def masthead() -> None:
         st.html('<div class="season-select-wrap">')
         selected_season = st.selectbox(
             "Season",
-            [2023, 2024, 2025, 2026],
-            index=2,
+            [2022, 2023, 2024, 2025, 2026],
+            index=3,
             key="global_season",
         )
         st.html("</div>")
@@ -1962,6 +1975,7 @@ def team_lookup(schools: pd.DataFrame) -> dict[str, dict[str, str]]:
             "wordmark": clean_text(row.get("Wordmark")),
             "conference": clean_text(row.get("Conference")),
             "nickname": clean_text(row.get("Nickname")),
+            "owner": clean_text(row.get("Owner")),
             "color": clean_text(row.get("Color"), "#1a2030"),
             "color2": clean_text(row.get("Color2"), "#c8102e"),
         }
@@ -2276,6 +2290,19 @@ def starter_score_lookup(starters: pd.DataFrame) -> dict[tuple[str, int], float]
         if not pd.isna(final_points):
             lookup[(match_key(team_week[0]), int(team_week[1]))] = float(final_points)
     return lookup
+
+
+@st.cache_data(show_spinner=False, max_entries=8)
+def apply_season_owners(schools: pd.DataFrame, season: int) -> pd.DataFrame:
+    schools = schools.copy()
+    owner_column = f"{season}Owner"
+    schools["Owner"] = schools[owner_column] if owner_column in schools.columns else ""
+    return schools
+
+
+def nickname_owner(nickname: object, owner: object) -> str:
+    values = [clean_text(nickname), clean_text(owner)]
+    return " · ".join(value for value in values if value)
 
 
 def boxscore_team_header(
@@ -2840,6 +2867,7 @@ def empty_standing(team: str, info: dict[str, str]) -> dict[str, object]:
         "team": team,
         "conference": clean_text(info.get("conference")),
         "nickname": clean_text(info.get("nickname")),
+        "owner": clean_text(info.get("owner")),
         "logo": clean_text(info.get("logo")),
         "color": clean_text(info.get("color"), "#1a2030"),
         "league_wins": 0,
@@ -3044,7 +3072,7 @@ def render_standings_section(
       {logo_html}
       <div>
         <div class="standings-team-name">{esc(display_name)}</div>
-        <div class="standings-team-sub">{esc(row.get("nickname"))}</div>
+        <div class="standings-team-sub">{esc(nickname_owner(row.get("nickname"), row.get("owner")))}</div>
       </div>
     </div>
   </td>
@@ -3544,6 +3572,7 @@ def poll_rows_html(
         conf_logo = conference_logo(conferences, conf)
         team_logo = clean_text(info.get("logo"))
         nickname = clean_text(info.get("nickname"))
+        owner = clean_text(info.get("owner"))
         stats = team_stats_for_week(standings, team)
         previous_rank = previous_ranks.get(team)
         last_rank = previous_rank if previous_rank is not None else "-"
@@ -3567,7 +3596,7 @@ def poll_rows_html(
       {f'<img class="poll-team-logo" src="{esc(team_logo)}" alt="{esc(team)}">' if team_logo else ''}
       <div>
         <div class="poll-team-name">{esc(team)}</div>
-        <div class="poll-team-sub">{esc(nickname)}</div>
+        <div class="poll-team-sub">{esc(nickname_owner(nickname, owner))}</div>
       </div>
     </div>
   </td>
@@ -4079,6 +4108,7 @@ def historical_roster_snapshot(starters: pd.DataFrame, schools: pd.DataFrame) ->
         "team_color",
         "team_color2",
         "roster_id",
+        "Owner",
     ]
     if starters.empty:
         return pd.DataFrame(columns=empty_columns)
@@ -4103,7 +4133,7 @@ def historical_roster_snapshot(starters: pd.DataFrame, schools: pd.DataFrame) ->
     )
     branding_columns = [
         column
-        for column in ["Team", "team_logo", "team_wordmark", "team_color", "team_color2", "roster_id"]
+        for column in ["Team", "team_logo", "team_wordmark", "team_color", "team_color2", "roster_id", "Owner"]
         if column in school_branding.columns
     ]
     snapshot = snapshot.merge(
@@ -4126,6 +4156,7 @@ def historical_roster_snapshot(starters: pd.DataFrame, schools: pd.DataFrame) ->
     snapshot["team_wordmark"] = snapshot.get("team_wordmark", pd.Series(index=snapshot.index, dtype=object)).fillna("")
     snapshot["team_color"] = snapshot.get("team_color", pd.Series(index=snapshot.index, dtype=object)).fillna("#1a2030")
     snapshot["team_color2"] = snapshot.get("team_color2", pd.Series(index=snapshot.index, dtype=object)).fillna("#c8102e")
+    snapshot["Owner"] = snapshot.get("Owner", pd.Series(index=snapshot.index, dtype=object)).fillna("")
     return snapshot.reset_index(drop=True)
 
 
@@ -4154,6 +4185,7 @@ def render_team_hero(rosters: pd.DataFrame, team_name: str, record: str = "") ->
     logo = first_value(team, "team_logo", LEAGUE_LOGO)
     wordmark = first_value(team, "team_wordmark", "")
     conference = first_value(team, "league_name", "")
+    owner = first_value(team, "Owner", "")
     hero_image = wordmark or logo
 
     st.html(
@@ -4163,6 +4195,7 @@ def render_team_hero(rosters: pd.DataFrame, team_name: str, record: str = "") ->
     <div class="team-hero-sub">{esc(conference)} Roster</div>
     <div class="team-hero-title">{esc(team_name)}</div>
     {f'<div class="team-hero-record">{esc(record)}</div>' if record else ''}
+    {f'<div class="team-hero-owner">Owner · {esc(owner)}</div>' if owner else ''}
   </div>
   <img class="team-hero-wordmark" src="{esc(hero_image)}" alt="{esc(team_name)}">
   <img class="team-hero-logo" src="{esc(logo)}" alt="{esc(team_name)}">
@@ -4258,6 +4291,7 @@ inject_css()
 selected_season = masthead()
 
 schools, conferences, schedule, scores, rankings, drafts, starters = load_branding_data()
+schools = apply_season_owners(schools, selected_season)
 schedule = filter_by_season(schedule, selected_season)
 scores = filter_by_season(scores, selected_season)
 rankings = filter_by_season(rankings, selected_season)
