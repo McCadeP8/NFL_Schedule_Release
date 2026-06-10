@@ -549,7 +549,7 @@ label[data-testid="stWidgetLabel"] * {
 }
 .team-roster-board {
   display: grid;
-  grid-template-columns: repeat(4, minmax(260px, 1fr));
+  grid-template-columns: repeat(var(--roster-card-count), minmax(0, 1fr));
   gap: 16px;
   align-items: start;
 }
@@ -4026,6 +4026,95 @@ def render_roster_matrix(rosters: pd.DataFrame) -> None:
         )
 
 
+def render_conference_draft_pick_matrix(
+    rosters: pd.DataFrame,
+    draft_picks: pd.DataFrame,
+) -> None:
+    if rosters.empty or draft_picks.empty:
+        return
+
+    league_name = first_value(rosters, "league_name")
+    league_picks = draft_picks.loc[draft_picks["league_name"].eq(league_name)].copy()
+    if league_picks.empty:
+        return
+
+    teams = (
+        rosters[
+            ["roster_id", "team_name", "team_logo", "team_color"]
+        ]
+        .drop_duplicates("roster_id")
+        .copy()
+    )
+    teams["roster_id"] = pd.to_numeric(teams["roster_id"], errors="coerce")
+    teams = teams.dropna(subset=["roster_id"]).sort_values("team_name")
+    teams["roster_id"] = teams["roster_id"].astype(int)
+    team_map = teams.set_index("roster_id").to_dict("index")
+
+    team_picks: dict[int, list[dict[str, object]]] = {}
+    max_picks = 0
+    for _, team in teams.iterrows():
+        roster_id = int(team["roster_id"])
+        owned = league_picks.loc[
+            league_picks["owner_roster_id"].eq(roster_id)
+        ].sort_values(["season", "round", "original_roster_id"])
+        team_picks[roster_id] = owned.to_dict("records")
+        max_picks = max(max_picks, len(owned))
+
+    headers = []
+    for _, team in teams.iterrows():
+        team_name = clean_text(team.get("team_name"))
+        logo = clean_text(team.get("team_logo"))
+        color = esc(team.get("team_color"), "#1a2030")
+        headers.append(
+            f"""
+<th class="team-head" style="--team-color:{color};">
+  {f'<img src="{esc(logo)}" alt="{esc(team_name)}">' if logo else ''}
+</th>
+"""
+        )
+
+    body_rows = []
+    for index in range(max_picks):
+        cells = []
+        for _, team in teams.iterrows():
+            picks = team_picks.get(int(team["roster_id"]), [])
+            if index >= len(picks):
+                cells.append("<td></td>")
+                continue
+            pick = picks[index]
+            original = team_map.get(int(pick["original_roster_id"]), {})
+            origin_name = clean_text(
+                original.get("team_name"),
+                f"Roster {int(pick['original_roster_id'])}",
+            )
+            origin_logo = clean_text(original.get("team_logo"))
+            cells.append(
+                f"""
+<td>
+  <div class="roster-player-cell">
+    {f'<img src="{esc(origin_logo)}" alt="{esc(origin_name)}">' if origin_logo else ''}
+    <span>{int(pick["season"])} R{int(pick["round"])}</span>
+  </div>
+</td>
+"""
+            )
+        body_rows.append(f"<tr>{''.join(cells)}</tr>")
+
+    st.html(
+        f"""
+<div class="roster-section">
+  <div class="position-label"><span>Draft Picks · {len(league_picks)} Total</span><div></div></div>
+  <div class="roster-scroll">
+    <table class="roster-table">
+      <thead><tr>{''.join(headers)}</tr></thead>
+      <tbody>{''.join(body_rows)}</tbody>
+    </table>
+  </div>
+</div>
+"""
+    )
+
+
 def render_league_roster_matrix(
     rosters: pd.DataFrame,
     conferences: pd.DataFrame,
@@ -4429,7 +4518,11 @@ def render_team_roster(
 """
             )
 
-    st.html(f'<div class="team-roster-board">{"".join(cards)}</div>')
+    card_count = max(len(cards), 1)
+    st.html(
+        f'<div class="team-roster-board" style="--roster-card-count:{card_count};">'
+        f'{"".join(cards)}</div>'
+    )
 
 
 def render_team_draft_capital(
@@ -4702,6 +4795,11 @@ with conference_tab:
     with conf_rosters_tab:
         render_roster_snapshot_banner(selected_season, is_current_roster_season)
         render_roster_matrix(conference_rosters)
+        if is_current_roster_season:
+            render_conference_draft_pick_matrix(
+                conference_rosters,
+                future_draft_picks,
+            )
     with conf_drafts_tab:
         render_draft_board(
             drafts,
