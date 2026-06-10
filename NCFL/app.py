@@ -2282,15 +2282,17 @@ def team_boxscore_from_starters(starters: pd.DataFrame, team: str, week: int) ->
         starters["Team"].astype(str).eq(team)
         & pd.to_numeric(starters["Week"], errors="coerce").eq(week)
     ].copy()
-    if "RosterSpot" in rows.columns and rows["RosterSpot"].notna().any():
-        rows = rows.loc[rows["RosterSpot"].astype(str).eq("Starter")].copy()
     if rows.empty:
         return groups
 
     position_order = {"QB": 0, "RB": 1, "WR": 2, "TE": 3}
     rows["position_sort"] = rows["Position"].map(position_order).fillna(9)
     rows = rows.sort_values(["position_sort", "Player"], na_position="last")
-    available = rows.to_dict("records")
+    if "RosterSpot" in rows.columns and rows["RosterSpot"].notna().any():
+        starter_rows = rows.loc[rows["RosterSpot"].astype(str).eq("Starter")].copy()
+    else:
+        starter_rows = rows.copy()
+    available = starter_rows.to_dict("records")
     used_indexes: set[int] = set()
 
     def take_player(slot: str, eligible_positions: list[str], color: str) -> dict[str, object]:
@@ -2310,6 +2312,25 @@ def team_boxscore_from_starters(starters: pd.DataFrame, team: str, week: int) ->
 
     for slot, eligible_positions, color in STARTER_SLOTS:
         groups["Starters"].append(take_player(slot, eligible_positions, color))
+
+    status_labels = {
+        "Bench": "Bench",
+        "Reserve": "Injured Reserve",
+        "Taxi": "Taxi",
+    }
+    if "RosterSpot" in rows.columns:
+        for roster_spot, label in status_labels.items():
+            group_rows = rows.loc[rows["RosterSpot"].astype(str).eq(roster_spot)]
+            for _, player in group_rows.iterrows():
+                groups[label].append(
+                    {
+                        "player": clean_text(player.get("Player"), "TBD"),
+                        "position": clean_text(player.get("Position")),
+                        "slot": clean_text(player.get("Position"), label[:2].upper()),
+                        "color": "#e5e7eb",
+                        "points": player.get("Points"),
+                    }
+                )
 
     return groups
 
@@ -4074,6 +4095,11 @@ def render_conference_draft_pick_matrix(
         )
 
     body_rows = []
+    round_labels = {
+        1: "1st Round",
+        2: "2nd Round",
+        3: "3rd Round",
+    }
     for index in range(max_picks):
         cells = []
         for _, team in teams.iterrows():
@@ -4088,12 +4114,14 @@ def render_conference_draft_pick_matrix(
                 f"Roster {int(pick['original_roster_id'])}",
             )
             origin_logo = clean_text(original.get("team_logo"))
+            round_number = int(pick["round"])
+            round_label = round_labels.get(round_number, f"{round_number}th Round")
             cells.append(
                 f"""
 <td>
   <div class="roster-player-cell">
     {f'<img src="{esc(origin_logo)}" alt="{esc(origin_name)}">' if origin_logo else ''}
-    <span>{int(pick["season"])} R{int(pick["round"])}</span>
+    <span>{int(pick["season"])} {esc(round_label)}</span>
   </div>
 </td>
 """
@@ -4103,7 +4131,7 @@ def render_conference_draft_pick_matrix(
     st.html(
         f"""
 <div class="roster-section">
-  <div class="position-label"><span>Draft Picks · {len(league_picks)} Total</span><div></div></div>
+  <div class="position-label"><span>Draft Picks</span><div></div></div>
   <div class="roster-scroll">
     <table class="roster-table">
       <thead><tr>{''.join(headers)}</tr></thead>
