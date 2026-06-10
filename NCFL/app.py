@@ -602,6 +602,13 @@ label[data-testid="stWidgetLabel"] * {
   background: #f8fafc;
   border: 2px solid #e2e8f0;
 }
+.team-roster-player img.draft-pick-roster-logo {
+  border-radius: 0;
+  object-fit: contain;
+  object-position: center;
+  border: 0;
+  background: transparent;
+}
 .team-roster-player-name {
   font-family: 'Barlow Condensed', sans-serif;
   font-size: 21px;
@@ -4291,7 +4298,11 @@ def render_team_hero(rosters: pd.DataFrame, team_name: str, record: str = "") ->
     )
 
 
-def render_team_roster(rosters: pd.DataFrame, team_name: str) -> None:
+def render_team_roster(
+    rosters: pd.DataFrame,
+    team_name: str,
+    draft_picks: Optional[pd.DataFrame] = None,
+) -> None:
     team = rosters.loc[rosters["team_name"].eq(team_name)].copy()
     if team.empty:
         st.warning("No roster rows found for this team.")
@@ -4362,6 +4373,61 @@ def render_team_roster(rosters: pd.DataFrame, team_name: str) -> None:
 </section>
 """
         )
+
+    if draft_picks is not None and not draft_picks.empty:
+        league_name = first_value(team, "league_name")
+        roster_ids = pd.to_numeric(team["roster_id"], errors="coerce").dropna()
+        if not roster_ids.empty:
+            roster_id = int(roster_ids.iloc[0])
+            owned_picks = draft_picks.loc[
+                draft_picks["league_name"].eq(league_name)
+                & draft_picks["owner_roster_id"].eq(roster_id)
+            ].sort_values(["season", "round", "original_roster_id"])
+
+            league_rosters = rosters.loc[rosters["league_name"].eq(league_name)].copy()
+            league_rosters["roster_id"] = pd.to_numeric(league_rosters["roster_id"], errors="coerce")
+            league_rosters = league_rosters.dropna(subset=["roster_id"])
+            league_rosters["roster_id"] = league_rosters["roster_id"].astype(int)
+            team_map = (
+                league_rosters.drop_duplicates("roster_id")
+                .set_index("roster_id")
+                .to_dict("index")
+            )
+
+            pick_rows = []
+            for _, pick in owned_picks.iterrows():
+                original = team_map.get(int(pick["original_roster_id"]), {})
+                origin_name = clean_text(
+                    original.get("team_name"),
+                    f"Roster {int(pick['original_roster_id'])}",
+                )
+                origin_logo = clean_text(original.get("team_logo"))
+                pick_rows.append(
+                    f"""
+<div class="team-roster-player">
+  {f'<img class="draft-pick-roster-logo" src="{esc(origin_logo)}" alt="{esc(origin_name)}">' if origin_logo else '<span></span>'}
+  <div>
+    <div class="team-roster-player-name">{int(pick["season"])} Round {int(pick["round"])}</div>
+    <div class="team-roster-player-meta">
+      <span class="nfl-chip">{esc(origin_name)} Pick</span>
+    </div>
+  </div>
+  <span class="nfl-chip">R{int(pick["round"])}</span>
+</div>
+"""
+                )
+
+            cards.append(
+                f"""
+<section class="team-roster-status" style="--team-color:{esc(color)};">
+  <div class="team-roster-status-title">
+    <span>Draft Picks</span>
+    <span>{len(owned_picks)}</span>
+  </div>
+  {''.join(pick_rows) if pick_rows else '<div class="team-roster-empty">No future picks</div>'}
+</section>
+"""
+            )
 
     st.html(f'<div class="team-roster-board">{"".join(cards)}</div>')
 
@@ -4681,6 +4747,8 @@ with team_tab:
         )
     with team_roster_tab:
         render_roster_snapshot_banner(selected_season, is_current_roster_season)
-        render_team_roster(roster_snapshot, selected_team)
-        if is_current_roster_season:
-            render_team_draft_capital(future_draft_picks, all_rosters, selected_team)
+        render_team_roster(
+            roster_snapshot,
+            selected_team,
+            future_draft_picks if is_current_roster_season else None,
+        )
