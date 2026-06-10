@@ -244,6 +244,10 @@ def _empty_drafts() -> pd.DataFrame:
     return pd.DataFrame(columns=["Year", "Conference", "Round", "Pick", "Team", "Player"])
 
 
+def _empty_bowls() -> pd.DataFrame:
+    return pd.DataFrame(columns=["Bowl", "Logo"])
+
+
 def _empty_starters() -> pd.DataFrame:
     return pd.DataFrame(columns=["Team", "Position", "Player", "RosterSpot", "Week", "Year", "Conference", "Points", "TeamPoints"])
 
@@ -354,13 +358,14 @@ def _fallback_conferences(schools: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def get_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def get_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     schools_url = "https://docs.google.com/spreadsheets/d/19bH4vYzaV7pbuQ2bcdz3HAaOWGb-BBJhQ9EgBp7YvoY/export?format=csv&gid=1436567589"
     conferences_url = "https://docs.google.com/spreadsheets/d/1qjPpIEGmhV8aF3CZ8hi-ijQlIP-_z6QYJzSArjJV9d8/export?format=csv&gid=1436567589"
     schedule_url = "https://docs.google.com/spreadsheets/d/19bH4vYzaV7pbuQ2bcdz3HAaOWGb-BBJhQ9EgBp7YvoY/export?format=csv&gid=1612692704"
     scores_url = "https://docs.google.com/spreadsheets/d/19bH4vYzaV7pbuQ2bcdz3HAaOWGb-BBJhQ9EgBp7YvoY/export?format=csv&gid=702965459"
     rankings_url = "https://docs.google.com/spreadsheets/d/19bH4vYzaV7pbuQ2bcdz3HAaOWGb-BBJhQ9EgBp7YvoY/export?format=csv&gid=1261881922"
     drafts_url = "https://docs.google.com/spreadsheets/d/19bH4vYzaV7pbuQ2bcdz3HAaOWGb-BBJhQ9EgBp7YvoY/export?format=csv&gid=1037681902"
+    bowls_url = "https://docs.google.com/spreadsheets/d/19bH4vYzaV7pbuQ2bcdz3HAaOWGb-BBJhQ9EgBp7YvoY/export?format=csv&gid=445477995445477995"
 
     schools = _read_csv_url(schools_url)
     if not _has_columns(schools, ["School", "TeamID"]):
@@ -369,16 +374,20 @@ def get_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, 
     scores = _safe_read_csv_url(scores_url, _empty_scores())
     rankings = _safe_read_csv_url(rankings_url, _empty_rankings())
     drafts = _safe_read_csv_url(drafts_url, _empty_drafts())
+    bowls = _safe_read_csv_url(bowls_url, _empty_bowls())
     starters_path = Path(__file__).with_name("weekly_starters.csv")
     starters = _normalize_sheet(pd.read_csv(starters_path)) if starters_path.exists() else _empty_starters()
     if rankings.empty:
         rankings = _safe_read_google_sheet(SCHOOLS_SHEET_ID, 1261881922, _empty_rankings())
     if drafts.empty:
         drafts = _safe_read_google_sheet(SCHOOLS_SHEET_ID, 1037681902, _empty_drafts())
+    if bowls.empty:
+        bowls = _safe_read_google_sheet(SCHOOLS_SHEET_ID, 445477995445477995, _empty_bowls())
     schedule = _ensure_columns(schedule, ["Year", "Week", "TeamA", "TeamB", "Conference", "Notes"])
     scores = _ensure_columns(scores, ["Year", "Team", "Week", "Points"])
     rankings = _ensure_columns(rankings, ["Year", "Week", "Type", "Rank", "Team"])
     drafts = _ensure_columns(drafts, ["Year", "Conference", "Round", "Pick", "Team", "Player"])
+    bowls = _ensure_columns(bowls, ["Bowl", "Logo"])
     starters = _ensure_columns(starters, ["Team", "Position", "Player", "RosterSpot", "Week", "Year", "Conference", "Points", "TeamPoints"])
 
     try:
@@ -458,7 +467,7 @@ def get_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, 
         starters["Conference"] = starters["Conference"].map(_normalize_conference)
     starters = _normalize_school_names(starters)
 
-    return schools, conferences, schedule, scores, rankings, drafts, starters
+    return schools, conferences, schedule, scores, rankings, drafts, starters, bowls
 
 
 def enrich_rosters(rosters: pd.DataFrame, schools: pd.DataFrame) -> pd.DataFrame:
@@ -498,7 +507,7 @@ def enrich_rosters(rosters: pd.DataFrame, schools: pd.DataFrame) -> pd.DataFrame
 def load_all_rosters(schools: Optional[pd.DataFrame] = None) -> pd.DataFrame:
     players = get_players()
     if schools is None:
-        schools, _, _, _, _, _, _ = get_data()
+        schools, _, _, _, _, _, _, _ = get_data()
     league_rosters = []
 
     for league_name, league_id in LEAGUES.items():
@@ -513,7 +522,7 @@ def load_all_rosters(schools: Optional[pd.DataFrame] = None) -> pd.DataFrame:
     return enrich_rosters(pd.concat(league_rosters, ignore_index=True), schools)
 
 
-def load_branding_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def load_branding_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     return get_data()
 
 

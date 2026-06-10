@@ -44,7 +44,7 @@ SCHEDULE_STATUS_COLORS = {
     "pending": "#8a96b0",
 }
 CACHE_TTL_SECONDS = 60 * 60 * 24
-DATA_CACHE_VERSION = "owners-rosters-v2"
+DATA_CACHE_VERSION = "bowl-games-v1"
 
 
 def clean_text(value: object, fallback: str = "") -> str:
@@ -791,6 +791,11 @@ label[data-testid="stWidgetLabel"] * {
   overflow: hidden;
   margin-bottom: 8px;
 }
+.schedule-card.bowl-game {
+  border: 1px solid #d7b65d;
+  border-top: 5px solid #d4a72c;
+  box-shadow: 0 7px 24px rgba(111, 78, 10, 0.20);
+}
 .schedule-card-top {
   display: flex;
   align-items: center;
@@ -798,6 +803,53 @@ label[data-testid="stWidgetLabel"] * {
   padding: 10px 14px;
   background: #f8fafc;
   border-bottom: 1px solid #e2e6ef;
+}
+.schedule-card.bowl-game .schedule-card-top {
+  background: #111827;
+  border-bottom-color: #2b3445;
+}
+.schedule-card.bowl-game .week-chip {
+  color: #f8e7aa;
+}
+.schedule-card.bowl-game .game-badge {
+  color: #17120a;
+  background: #f2cf68;
+}
+.bowl-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+  min-height: 78px;
+  padding: 10px 14px;
+  color: #ffffff;
+  background: #05070b;
+  border-bottom: 1px solid #303849;
+  text-align: left;
+}
+.bowl-banner img {
+  width: 72px;
+  height: 58px;
+  padding: 4px;
+  object-fit: contain;
+  border-radius: 6px;
+  background: #ffffff;
+}
+.bowl-kicker {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: #f2cf68;
+}
+.bowl-name {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 25px;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: 0;
+  text-transform: uppercase;
 }
 .week-chip {
   font-family: 'Barlow Condensed', sans-serif;
@@ -2026,7 +2078,7 @@ def under_construction(label: str) -> None:
 @st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner="Loading team branding...")
 def load_branding_data(
     cache_version: str,
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     del cache_version
     return fetch_branding_data()
 
@@ -2135,6 +2187,47 @@ def render_matchup_team(
     </div>
   </div>
   <div class="score-box {status if status in ('win', 'loss', 'tie') else ''}">{score_text}</div>
+</div>
+"""
+
+
+def bowl_for_notes(notes: object, bowls: Optional[pd.DataFrame]) -> dict[str, str]:
+    note_text = clean_text(notes)
+    if (
+        not note_text
+        or "bowl" not in note_text.casefold()
+        or bowls is None
+        or bowls.empty
+        or "Bowl" not in bowls.columns
+    ):
+        return {}
+
+    note_key = match_key(note_text)
+    matches = []
+    for _, row in bowls.iterrows():
+        bowl_name = clean_text(row.get("Bowl"))
+        if bowl_name and match_key(bowl_name) in note_key:
+            matches.append(
+                {
+                    "name": bowl_name,
+                    "logo": clean_text(row.get("Logo")),
+                }
+            )
+    return max(matches, key=lambda bowl: len(bowl["name"]), default={})
+
+
+def render_bowl_banner(bowl: dict[str, str]) -> str:
+    if not bowl:
+        return ""
+    logo = clean_text(bowl.get("logo"))
+    logo_html = f'<img src="{esc(logo)}" alt="{esc(bowl.get("name"))}">' if logo else ""
+    return f"""
+<div class="bowl-banner">
+  {logo_html}
+  <div>
+    <div class="bowl-kicker">Postseason Bowl</div>
+    <div class="bowl-name">{esc(bowl.get("name"))}</div>
+  </div>
 </div>
 """
 
@@ -2265,7 +2358,7 @@ def team_boxscore_players(rosters: pd.DataFrame, team: str) -> dict[str, list[di
                 {
                     "player": clean_text(row.get("player_name"), "TBD"),
                     "position": clean_text(row.get("position")),
-                    "slot": clean_text(row.get("position"), label[:2].upper()),
+                    "slot": "",
                     "color": "#e5e7eb",
                 }
             )
@@ -2326,7 +2419,7 @@ def team_boxscore_from_starters(starters: pd.DataFrame, team: str, week: int) ->
                     {
                         "player": clean_text(player.get("Player"), "TBD"),
                         "position": clean_text(player.get("Position")),
-                        "slot": clean_text(player.get("Position"), label[:2].upper()),
+                        "slot": "",
                         "color": "#e5e7eb",
                         "points": player.get("Points"),
                     }
@@ -2671,6 +2764,7 @@ def render_schedule_cards(
     rankings: Optional[pd.DataFrame] = None,
     rosters: Optional[pd.DataFrame] = None,
     starters: Optional[pd.DataFrame] = None,
+    bowls: Optional[pd.DataFrame] = None,
     schedule_context: Optional[pd.DataFrame] = None,
     empty_label: str = "No games found",
     stacked: bool = False,
@@ -2725,6 +2819,7 @@ def render_schedule_cards(
         team_a = clean_text(game.get("TeamA"))
         team_b = clean_text(game.get("TeamB"))
         notes = clean_text(game.get("Notes"))
+        bowl = bowl_for_notes(notes, bowls)
         is_conference = bool(game.get("Conference", False))
         score_a = starter_scores_by_team_week.get((match_key(team_a), week))
         score_b = starter_scores_by_team_week.get((match_key(team_b), week))
@@ -2732,7 +2827,7 @@ def render_schedule_cards(
             score_a = scores_by_team_week.get((match_key(team_a), week))
         if score_b is None:
             score_b = scores_by_team_week.get((match_key(team_b), week))
-        badge = "Conference" if is_conference else "Non-Conf"
+        badge = "Bowl Game" if bowl else ("Conference" if is_conference else "Non-Conf")
         game_ranks = schedule_ap_top25(rankings, week)
         record_week = max(week - 1, 0)
         team_a_record = team_record_through_week(full_schedule, scores, schools, team_a, record_week)
@@ -2741,14 +2836,15 @@ def render_schedule_cards(
         with slot_container:
             st.html(
                 f"""
-<div class="schedule-card">
+<div class="schedule-card{' bowl-game' if bowl else ''}">
   <div class="schedule-card-top">
     <div class="week-chip">Week {week}</div>
     <div class="game-badge">{badge}</div>
   </div>
+  {render_bowl_banner(bowl)}
   {render_matchup_team(team_a, week, score_a, score_b, teams, game_ranks, team_a_record)}
   {render_matchup_team(team_b, week, score_b, score_a, teams, game_ranks, team_b_record)}
-  {f'<div class="schedule-notes">{esc(notes)}</div>' if notes else ''}
+  {f'<div class="schedule-notes">{esc(notes)}</div>' if notes and match_key(notes) != match_key(bowl.get("name")) else ''}
 </div>
 """
             )
@@ -4629,7 +4725,7 @@ render_data_controls()
 inject_css()
 selected_season = masthead()
 
-schools, conferences, schedule, scores, rankings, drafts, starters = load_branding_data(
+schools, conferences, schedule, scores, rankings, drafts, starters, bowls = load_branding_data(
     DATA_CACHE_VERSION
 )
 schools = apply_season_owners(schools, selected_season)
@@ -4689,6 +4785,7 @@ with league_tab:
                 rankings=rankings,
                 rosters=all_rosters,
                 starters=starters,
+                bowls=bowls,
                 schedule_context=schedule,
                 empty_label=f"No Week {selected_week} games",
                 key_prefix="league_schedule",
@@ -4701,6 +4798,7 @@ with league_tab:
                 rankings=rankings,
                 rosters=all_rosters,
                 starters=starters,
+                bowls=bowls,
                 schedule_context=schedule,
                 empty_label="No schedule loaded",
                 key_prefix="league_schedule_empty",
@@ -4792,6 +4890,7 @@ with conference_tab:
                 rankings=rankings,
                 rosters=all_rosters,
                 starters=starters,
+                bowls=bowls,
                 schedule_context=schedule,
                 empty_label=f"No Week {selected_week} {selected_conference} games",
                 key_prefix=f"conference_schedule_{match_key(selected_conference)}",
@@ -4810,6 +4909,7 @@ with conference_tab:
                 rankings=rankings,
                 rosters=all_rosters,
                 starters=starters,
+                bowls=bowls,
                 schedule_context=schedule,
                 empty_label=f"No {selected_conference} games",
                 key_prefix=f"conference_schedule_empty_{match_key(selected_conference)}",
@@ -4865,6 +4965,7 @@ with team_tab:
             rankings=rankings,
             rosters=all_rosters,
             starters=starters,
+            bowls=bowls,
             schedule_context=schedule,
             empty_label=f"No {selected_team} games",
             stacked=True,
