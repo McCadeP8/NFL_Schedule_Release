@@ -1576,24 +1576,19 @@ div[data-testid="stButton"] button {
   margin-top: 2px;
 }
 .metric-main {
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 21px;
-  font-weight: 800;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 28px;
+  font-weight: 400;
+  letter-spacing: 1px;
   color: #1a2030;
   line-height: 1;
 }
 .metric-rank {
-  display: inline-block;
-  margin-top: 4px;
+  margin-top: 2px;
   font-family: 'Rajdhani', sans-serif;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
-  color: #64748b;
-  background: #eef2f7;
-  border-radius: 4px;
-  padding: 2px 6px;
+  color: #8a96b0;
 }
 .rules-hero {
   background: #ffffff;
@@ -2048,13 +2043,16 @@ div[data-testid="stButton"] button {
   padding-bottom: 4px;
 }
 .draft-card {
+  display: grid;
+  grid-template-rows: auto auto 76px;
+  align-items: start;
   background: #ffffff;
   border: 1px solid #e2e6ef;
   border-left: 7px solid var(--team-color);
   border-radius: 10px;
   box-shadow: 0 2px 10px rgba(15,23,42,0.07);
   padding: 10px 9px 12px;
-  min-height: 178px;
+  min-height: 214px;
 }
 .draft-card-top {
   display: flex;
@@ -2094,12 +2092,21 @@ div[data-testid="stButton"] button {
   margin: 2px auto 10px;
 }
 .draft-player {
+  display: -webkit-box;
+  align-items: center;
+  justify-content: center;
+  height: 76px;
   font-family: 'Bebas Neue', sans-serif;
   font-size: 24px;
   letter-spacing: 1px;
   color: #111827;
-  line-height: 1;
-  overflow-wrap: anywhere;
+  line-height: 1.05;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: auto;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
   text-align: center;
 }
 .draft-empty-player {
@@ -2170,6 +2177,7 @@ div[data-testid="stButton"] button {
   --pick-slot-size: 31px;
   --pick-slot-font: 11px;
   --pick-player-font: 14px;
+  --pick-row-height: 82px;
   display: grid;
   grid-template-columns: repeat(var(--conference-count), minmax(0, 1fr));
   gap: 10px;
@@ -2185,6 +2193,7 @@ div[data-testid="stButton"] button {
   --pick-slot-size: 42px;
   --pick-slot-font: 14px;
   --pick-player-font: 19px;
+  --pick-row-height: 112px;
   gap: 14px;
 }
 .league-draft-board.roomy {
@@ -2196,6 +2205,7 @@ div[data-testid="stButton"] button {
   --pick-slot-size: 54px;
   --pick-slot-font: 17px;
   --pick-player-font: 26px;
+  --pick-row-height: 146px;
   gap: 18px;
 }
 .league-draft-column {
@@ -2244,6 +2254,8 @@ div[data-testid="stButton"] button {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  height: var(--pick-row-height);
+  box-sizing: border-box;
   padding: 6px 5px;
   background: #ffffff;
   border-bottom: 1px solid #e6eaf1;
@@ -2286,6 +2298,8 @@ div[data-testid="stButton"] button {
   background: #f8fafc;
 }
 .league-draft-player {
+  display: -webkit-box;
+  min-height: 2.1em;
   min-width: 0;
   font-family: 'Barlow Condensed', sans-serif;
   font-size: var(--pick-player-font);
@@ -2293,7 +2307,12 @@ div[data-testid="stButton"] button {
   line-height: 1.05;
   color: #111827;
   text-transform: uppercase;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: auto;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 .league-draft-empty {
   padding: 18px 10px;
@@ -2429,6 +2448,39 @@ div[data-testid="stButton"] button {
   color: #334155;
 }
 .history-table td:first-child { text-align: left; }
+.history-table .record-main {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.05;
+}
+.history-table .record-sub {
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #9aa5be;
+}
+.champion-star {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 900;
+}
+.champion-star.national {
+  background: #f2cf68;
+  box-shadow: inset 0 0 0 1px #d7ad31;
+}
+.champion-star.conference {
+  background: #e2e8f0;
+  box-shadow: inset 0 0 0 1px #94a3b8;
+}
 .history-team {
   display: flex;
   align-items: center;
@@ -3803,6 +3855,7 @@ def render_standings_section(
     ap_ranks: Optional[dict[str, int]] = None,
     sort_prefix: str = "league",
     show_championship_cut: bool = False,
+    show_conference_title: bool = True,
 ) -> None:
     section = standings.loc[standings["conference"].eq(conference)].copy()
     if section.empty:
@@ -3862,11 +3915,11 @@ def render_standings_section(
     st.html(
         f"""
 <div class="standings-wrap">
-  <div class="standings-title">
+  {f'''<div class="standings-title">
     {'<img src="' + esc(conf_logo) + '" alt="' + esc(conference) + '">' if conf_logo else ''}
     <span>{esc(conference)}</span>
     <div></div>
-  </div>
+  </div>''' if show_conference_title else ''}
   <div class="standings-scroll">
     <table class="standings-table">
       <thead>
@@ -3947,6 +4000,7 @@ def render_conference_standings(
         ap_ranks=ap_ranks,
         sort_prefix="conf",
         show_championship_cut=True,
+        show_conference_title=False,
     )
 
 
@@ -4301,6 +4355,7 @@ def history_champions(
     for title, group, show_conference in groups:
         if group.empty:
             continue
+        star_class = "conference" if title == "Conference Championships" else "national"
         rows = []
         for year, year_games in group.sort_values(["Year", "Week"], ascending=[False, False]).groupby("Year", sort=False):
             column_count = 5 if show_conference else 4
@@ -4313,7 +4368,7 @@ def history_champions(
                 event = bowl_for_notes(game["Notes"], bowls)
                 event_logo = clean_text(event.get("logo"))
                 rows.append(
-                    f"""<tr><td>{f'<img src="{esc(event_logo)}" alt="{esc(game["Notes"])}" title="{esc(game["Notes"])}" style="width:44px;height:36px;object-fit:contain;">' if event_logo else esc(game["Notes"])}</td>{f'<td>{esc(game["Conference"])}</td>' if show_conference else ''}<td><div class="history-team" style="justify-content:flex-end;"><span title="Winner" style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#f2cf68;color:#111827;font-size:14px;font-weight:900;">★</span>{f'<div class="history-team-name">{esc(team)}</div><img src="{esc(team_logo)}" alt="{esc(team)}">' if team_logo else f'<div class="history-team-name">{esc(team)}</div>'}</div></td><td>{float(game["Points"]):,.2f}-{float(game["OpponentPoints"]):,.2f}</td><td><div class="history-team">{f'<img src="{esc(opponent_logo)}" alt="{esc(opponent)}">' if opponent_logo else ''}<div class="history-team-name">{esc(opponent)}</div></div></td></tr>"""
+                    f"""<tr><td>{f'<img src="{esc(event_logo)}" alt="{esc(game["Notes"])}" title="{esc(game["Notes"])}" style="width:44px;height:36px;object-fit:contain;">' if event_logo else esc(game["Notes"])}</td>{f'<td>{esc(game["Conference"])}</td>' if show_conference else ''}<td><div class="history-team" style="justify-content:flex-end;"><span class="champion-star {star_class}" title="Winner">&#9733;</span>{f'<div class="history-team-name">{esc(team)}</div><img src="{esc(team_logo)}" alt="{esc(team)}">' if team_logo else f'<div class="history-team-name">{esc(team)}</div>'}</div></td><td>{float(game["Points"]):,.2f}-{float(game["OpponentPoints"]):,.2f}</td><td><div class="history-team">{f'<img src="{esc(opponent_logo)}" alt="{esc(opponent)}">' if opponent_logo else ''}<div class="history-team-name">{esc(opponent)}</div></div></td></tr>"""
                 )
         conference_header = "<th>Conference</th>" if show_conference else ""
         winner_header = "Champion" if title == "Conference Championships" else "Winner"
@@ -6048,7 +6103,6 @@ with league_tab:
         #     mime="text/csv",
         #     use_container_width=True,
         # )
-        render_roster_snapshot_banner(selected_season, is_current_roster_season)
         render_league_roster_matrix(
             roster_snapshot,
             conferences,
@@ -6164,7 +6218,6 @@ with conference_tab:
                 selected_conference,
             )
     with conf_rosters_tab:
-        render_roster_snapshot_banner(selected_season, is_current_roster_season)
         render_roster_matrix(conference_rosters)
         if is_current_roster_season:
             render_conference_draft_pick_matrix(
@@ -6218,7 +6271,6 @@ with team_tab:
             key_prefix=f"team_schedule_{match_key(selected_team)}",
         )
     with team_roster_tab:
-        render_roster_snapshot_banner(selected_season, is_current_roster_season)
         render_team_roster(
             roster_snapshot,
             selected_team,

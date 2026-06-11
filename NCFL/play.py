@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from typing import Any, Iterable
 
 import pandas as pd
@@ -269,8 +270,165 @@ def get_weekly_starters(
     ).reset_index(drop=True)
 
 
+def _draft_label(draft: dict[str, Any]) -> str:
+    metadata = draft.get("metadata") or {}
+    searchable = " ".join(
+        str(value) for value in [draft.get("type"), *metadata.values()] if value
+    ).lower()
+    if "startup" in searchable or "start-up" in searchable or "start up" in searchable:
+        return "Start-Up"
+    return "Rookie"
+
+
+def _draft_player_name(
+    pick: dict[str, Any],
+    player_lookup: dict[str, dict[str, Any]],
+) -> str:
+    metadata = pick.get("metadata") or {}
+    full_name = metadata.get("full_name")
+    if full_name:
+        return str(full_name).strip()
+
+    first_name = str(metadata.get("first_name") or "").strip()
+    last_name = str(metadata.get("last_name") or "").strip()
+    metadata_name = f"{first_name} {last_name}".strip()
+    if metadata_name:
+        return metadata_name
+
+    player_id = str(pick.get("player_id") or "")
+    return str(player_lookup.get(player_id, {}).get("player_name") or player_id)
+
+
+def get_draft_results(
+    league_ids_by_year: dict[int, dict[str, str]] | None = None,
+) -> pd.DataFrame:
+    """Load every available Sleeper draft pick into a sheet-ready dataframe."""
+    league_ids_by_year = league_ids_by_year or LEAGUE_IDS_BY_YEAR
+    players = get_players()
+    player_lookup = players.set_index("player_id").to_dict("index")
+    schools, *_ = load_branding_data()
+    rows: list[dict[str, Any]] = []
+
+    for year, leagues in league_ids_by_year.items():
+        for conference, league_id in leagues.items():
+            try:
+                drafts = _get_json(f"/league/{league_id}/drafts") or []
+                roster_lookup = _roster_lookup(league_id, conference, schools)
+            except requests.HTTPError as exc:
+                if exc.response is not None and exc.response.status_code == 404:
+                    print(f"Skipping {year} {conference}: league was not found.")
+                    continue
+                raise
+
+            for draft in drafts:
+                draft_id = str(draft.get("draft_id") or "")
+                if not draft_id:
+                    continue
+
+                try:
+                    picks = _get_json(f"/draft/{draft_id}/picks") or []
+                except requests.HTTPError as exc:
+                    if exc.response is not None and exc.response.status_code == 404:
+                        print(f"Skipping unavailable draft {draft_id}.")
+                        continue
+                    raise
+
+                metadata = draft.get("metadata") or {}
+                draft_name = metadata.get("name") or metadata.get("description") or ""
+                draft_type = _draft_label(draft)
+
+                for pick in picks:
+                    roster_id = pick.get("roster_id")
+                    roster_id_int = int(roster_id) if roster_id is not None else None
+                    team_info = roster_lookup.get(roster_id_int, {})
+                    pick_metadata = pick.get("metadata") or {}
+                    player_id = str(pick.get("player_id") or "")
+                    player = player_lookup.get(player_id, {})
+
+                    rows.append(
+                        {
+                            "Year": int(year),
+                            "Conference": _clean_conference(conference),
+                            "Type": draft_type,
+                            "Round": pick.get("round"),
+                            "Pick": pick.get("draft_slot"),
+                            "Team": team_info.get("Team") or f"Roster {roster_id}",
+                            "Player": _draft_player_name(pick, player_lookup),
+                            "PlayerID": player_id,
+                            "Position": pick_metadata.get("position") or player.get("position"),
+                            "NFLTeam": pick_metadata.get("team") or player.get("nfl_team"),
+                            "OverallPick": pick.get("pick_no"),
+                            "RosterID": roster_id,
+                            "PickedBy": pick.get("picked_by"),
+                            "DraftID": draft_id,
+                            "LeagueID": str(league_id),
+                            "DraftName": draft_name,
+                            "SleeperDraftType": draft.get("type"),
+                        }
+                    )
+
+    columns = [
+        "Year",
+        "Conference",
+        "Type",
+        "Round",
+        "Pick",
+        "Team",
+        "Player",
+        "PlayerID",
+        "Position",
+        "NFLTeam",
+        "OverallPick",
+        "RosterID",
+        "PickedBy",
+        "DraftID",
+        "LeagueID",
+        "DraftName",
+        "SleeperDraftType",
+    ]
+    if not rows:
+        return pd.DataFrame(columns=columns)
+
+    results = pd.DataFrame(rows, columns=columns)
+    conference_order = [
+        _clean_conference(conference)
+        for leagues in league_ids_by_year.values()
+        for conference in leagues
+    ]
+    conference_order = list(dict.fromkeys(conference_order))
+    results["_ConferenceOrder"] = pd.Categorical(
+        results["Conference"], categories=conference_order, ordered=True
+    )
+    results["_TypeOrder"] = results["Type"].map({"Rookie": 0, "Start-Up": 1}).fillna(2)
+    return (
+        results.sort_values(
+            ["Year", "_ConferenceOrder", "_TypeOrder", "Round", "Pick", "OverallPick"],
+            na_position="last",
+        )
+        .drop(columns=["_ConferenceOrder", "_TypeOrder"])
+        .reset_index(drop=True)
+    )
+
+
+def run_export(export: str = "drafts") -> None:
+    """Write a historical export CSV; defaults to draft results."""
+    if export == "starters":
+        starters = get_weekly_starters()
+        starters.to_csv("weekly_starters.csv", index=False)
+        print(starters.head())
+        print(f"Wrote {len(starters):,} rows to weekly_starters.csv")
+    elif export == "drafts":
+        draft_results = get_draft_results()
+        draft_results.to_csv("draft_results.csv", index=False)
+        print(draft_results.head())
+        print(f"Wrote {len(draft_results):,} rows to draft_results.csv")
+    else:
+        raise ValueError("export must be either 'drafts' or 'starters'")
+
+
 if __name__ == "__main__":
-    starters = get_weekly_starters()
-    starters.to_csv("weekly_starters.csv", index=False)
-    print(starters.head())
-    print(f"Wrote {len(starters):,} rows to weekly_starters.csv")
+    requested_export = next(
+        (argument for argument in sys.argv[1:] if argument in {"drafts", "starters"}),
+        "drafts",
+    )
+    run_export(requested_export)
