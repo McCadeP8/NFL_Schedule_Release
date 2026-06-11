@@ -4352,6 +4352,12 @@ def history_record_book(ledger: pd.DataFrame, schools: pd.DataFrame, title: str 
     rows = []
     teams = team_lookup(schools)
     team_specific = ledger["Team"].nunique() == 1
+    if not team_specific:
+        candidates = [
+            candidate
+            for candidate in candidates
+            if candidate[0] not in {"Largest Defeat", "Closest Defeat"}
+        ]
     sections = [("All-Time", ledger)]
     sections.extend(
         (f"{year} Season", ledger.loc[ledger["Year"].eq(year)])
@@ -4370,8 +4376,13 @@ def history_record_book(ledger: pd.DataFrame, schools: pd.DataFrame, title: str 
             opponent = clean_text(game["Opponent"])
             opponent_logo = clean_text(teams.get(opponent, {}).get("logo"))
             score_html = record_book_score_html(game, label)
+            game_period = (
+                f'{int(game["Year"])} · Week {int(game["Week"])}'
+                if section_label == "All-Time"
+                else f'Week {int(game["Week"])}'
+            )
             rows.append(
-                f"""<tr><td>{esc(label)}</td>{f'<td><div class="history-team" style="justify-content:flex-end;">{f"""<div class="history-team-name">{esc(team)}</div><img src="{esc(logo)}" alt="{esc(team)}">""" if logo else f"""<div class="history-team-name">{esc(team)}</div>"""}</div></td>' if not team_specific else ''}<td>{score_html}</td><td><div class="history-team">{f'<img src="{esc(opponent_logo)}" alt="{esc(opponent)}">' if opponent_logo else ''}<div class="history-team-name">{esc(opponent)}</div></div></td><td>Week {int(game["Week"])}</td></tr>"""
+                f"""<tr><td>{esc(label)}</td>{f'<td><div class="history-team" style="justify-content:flex-end;">{f"""<div class="history-team-name">{esc(team)}</div><img src="{esc(logo)}" alt="{esc(team)}">""" if logo else f"""<div class="history-team-name">{esc(team)}</div>"""}</div></td>' if not team_specific else ''}<td>{score_html}</td><td><div class="history-team">{f'<img src="{esc(opponent_logo)}" alt="{esc(opponent)}">' if opponent_logo else ''}<div class="history-team-name">{esc(opponent)}</div></div></td><td>{esc(game_period)}</td></tr>"""
             )
     team_header = "" if team_specific else "<th>Team</th>"
     st.html(f'<div class="history-section-title"><span>{esc(title)}</span><div></div></div><div class="history-table-wrap"><table class="history-table"><thead><tr><th>Record</th>{team_header}<th>Score</th><th>Opponent</th><th>Week</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div>')
