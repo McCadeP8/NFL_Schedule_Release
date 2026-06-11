@@ -5946,9 +5946,17 @@ render_data_controls()
 inject_css()
 selected_season = masthead()
 
-schools, conferences, schedule, scores, rankings, drafts, starters, bowls = load_branding_data(
-    DATA_CACHE_VERSION
-)
+branding_data = load_branding_data(DATA_CACHE_VERSION)
+if len(branding_data) == 8:
+    schools, conferences, schedule, scores, rankings, drafts, starters, bowls = branding_data
+elif len(branding_data) == 7:
+    schools, conferences, schedule, scores, rankings, drafts, starters = branding_data
+    bowls = pd.DataFrame(columns=["Bowl", "Logo"])
+else:
+    raise ValueError(
+        f"Expected 7 or 8 branding datasets, received {len(branding_data)}. "
+        "Confirm the published app.py and data.py are from the same version."
+    )
 full_schedule = schedule.copy()
 full_rankings = rankings.copy()
 full_starters = starters.copy()
