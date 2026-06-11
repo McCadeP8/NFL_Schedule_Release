@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import html
 import hashlib
+import re
+import unicodedata
 from datetime import datetime
 from typing import Optional
 
@@ -17,17 +19,17 @@ LEAGUE_NAME = "NCAA/NFL Crossover"
 LEAGUE_LOGO = "https://upload.wikimedia.org/wikipedia/en/c/cf/NCAA_football_icon_logo.svg"
 PLACEHOLDER_PLAYER_HEADSHOT = "https://www.pro-football-reference.com/req/20230307/images/headshots/HerbJu00_2025.jpg"
 LEAGUE_ROSTER_ORDER = [
-    "ACC",
-    "B1G",
     "Big 12",
+    "B1G",
     "SEC",
     "Pac-12",
+    "ACC",
     "G6",
     "MW",
-    "AAC",
     "MAC",
     "C-USA",
     "SBC",
+    "AAC",
     "F12",
 ]
 ROSTER_STATUS_ORDER = {"Starter": 0, "Bench": 1, "Taxi": 2, "Reserve": 3}
@@ -44,13 +46,15 @@ SCHEDULE_STATUS_COLORS = {
     "pending": "#8a96b0",
 }
 CACHE_TTL_SECONDS = 60 * 60 * 24
-DATA_CACHE_VERSION = "bowl-games-v1"
+DATA_CACHE_VERSION = "history-archive-v4"
 
 
 def clean_text(value: object, fallback: str = "") -> str:
     if pd.isna(value):
         return fallback
-    text = str(value).strip()
+    text = unicodedata.normalize("NFKC", str(value))
+    text = text.replace("\u00a0", " ").replace("\u200b", "").strip()
+    text = re.sub(r"\s+", " ", text)
     if text.lower() in {"", "nan", "none"}:
         return fallback
     return text
@@ -70,6 +74,33 @@ def first_value(frame: pd.DataFrame, column: str, fallback: str = "") -> str:
 
 def match_key(value: object) -> str:
     return clean_text(value).casefold()
+
+
+def canonical_team_key(value: object) -> str:
+    return re.sub(r"[^a-z0-9]+", "", clean_text(value).casefold())
+
+
+def official_team_resolver(schools: pd.DataFrame) -> dict[str, str]:
+    resolver = {
+        canonical_team_key(team): team
+        for team in schools["School"].dropna().map(clean_text)
+        if team
+    }
+    resolver.update(
+        {
+            "oregonst": "Oregon State",
+            "oregonstate": "Oregon State",
+            "fsu": "Florida State",
+            "miami": "Miami (FL)",
+            "smu": "Southern Methodist",
+        }
+    )
+    return resolver
+
+
+def official_team_name(value: object, resolver: dict[str, str]) -> str:
+    text = clean_text(value)
+    return resolver.get(canonical_team_key(text), text)
 
 
 def inject_css() -> None:
@@ -964,6 +995,63 @@ div[data-testid="stButton"] button {
   box-shadow: 0 8px 30px rgba(15,23,42,0.13);
   overflow: hidden;
   margin-bottom: 18px;
+}
+.boxscore-bowl-masthead {
+  position: relative;
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr) 132px;
+  align-items: center;
+  min-height: 142px;
+  margin: 2px 0 18px;
+  padding: 18px 28px;
+  overflow: hidden;
+  color: #ffffff;
+  background: #05070b;
+  border: 1px solid #d7b65d;
+  border-top: 7px solid #f2cf68;
+  border-bottom: 7px solid #f2cf68;
+  border-radius: 12px;
+  box-shadow: 0 9px 32px rgba(111, 78, 10, 0.28);
+}
+.boxscore-bowl-logo {
+  width: 116px;
+  height: 94px;
+  padding: 8px;
+  object-fit: contain;
+  justify-self: center;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.28);
+}
+.boxscore-bowl-copy {
+  min-width: 0;
+  text-align: center;
+}
+.boxscore-bowl-kicker {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: #f2cf68;
+}
+.boxscore-bowl-title {
+  margin-top: 3px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 58px;
+  line-height: 0.95;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #ffffff;
+}
+.boxscore-bowl-meta {
+  margin-top: 8px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: #cbd5e1;
 }
 .boxscore-matchup-top {
   display: grid;
@@ -2017,6 +2105,434 @@ div[data-testid="stButton"] button {
 .draft-empty-player {
   color: #b0baca;
 }
+.draft-type-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 22px 0 12px;
+}
+.draft-type-heading span:first-child {
+  border-radius: 5px;
+  padding: 6px 11px;
+  color: #ffffff;
+  background: #05070b;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+}
+.draft-type-heading span:last-child {
+  flex: 1;
+  height: 2px;
+  background: #111827;
+}
+.league-draft-wrap {
+  overflow-x: visible;
+  padding: 2px 0 18px;
+}
+.league-draft-phase-headings {
+  display: grid;
+  grid-template-columns: repeat(var(--conference-count), minmax(0, 1fr));
+  gap: 10px;
+  margin: 16px 0 12px;
+}
+.league-draft-phase-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 4px 10px 4px 12px;
+  border-left: 7px solid var(--phase-color);
+}
+.league-draft-phase-title.phase-start {
+  padding-left: 12px;
+}
+.league-draft-phase-title span:first-child {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 42px;
+  line-height: 1;
+  letter-spacing: 2px;
+  color: #111827;
+  white-space: nowrap;
+}
+.league-draft-phase-title span:last-child {
+  flex: 1;
+  height: 2px;
+  background: var(--phase-color);
+}
+.league-draft-board {
+  --conf-header-height: 82px;
+  --conf-logo-size: 38px;
+  --conf-font-size: 22px;
+  --pick-icon-size: 30px;
+  --pick-photo-size: 31px;
+  --pick-slot-size: 31px;
+  --pick-slot-font: 11px;
+  --pick-player-font: 14px;
+  display: grid;
+  grid-template-columns: repeat(var(--conference-count), minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+  align-items: start;
+}
+.league-draft-board.medium {
+  --conf-header-height: 98px;
+  --conf-logo-size: 50px;
+  --conf-font-size: 29px;
+  --pick-icon-size: 42px;
+  --pick-photo-size: 44px;
+  --pick-slot-size: 42px;
+  --pick-slot-font: 14px;
+  --pick-player-font: 19px;
+  gap: 14px;
+}
+.league-draft-board.roomy {
+  --conf-header-height: 124px;
+  --conf-logo-size: 70px;
+  --conf-font-size: 40px;
+  --pick-icon-size: 58px;
+  --pick-photo-size: 60px;
+  --pick-slot-size: 54px;
+  --pick-slot-font: 17px;
+  --pick-player-font: 26px;
+  gap: 18px;
+}
+.league-draft-column {
+  min-width: 0;
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #dfe4ed;
+  border-radius: 9px;
+  box-shadow: 0 2px 10px rgba(15,23,42,0.07);
+}
+.league-draft-column.phase-start {
+  margin-left: 4px;
+  border-left: 5px solid #111827;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  box-shadow: -7px 0 0 #ffffff, -9px 0 0 #111827, 0 2px 10px rgba(15,23,42,0.07);
+}
+.league-draft-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: var(--conf-header-height);
+  padding: 9px 6px;
+  color: #111827;
+  background: #f8fafc;
+  border-bottom: 5px solid #c8102e;
+}
+.league-draft-header img {
+  width: var(--conf-logo-size);
+  height: var(--conf-logo-size);
+  object-fit: contain;
+}
+.league-draft-header span {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: var(--conf-font-size);
+  line-height: 1;
+  letter-spacing: 1px;
+  text-align: center;
+}
+.league-draft-pick {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 6px 5px;
+  background: #ffffff;
+  border-bottom: 1px solid #e6eaf1;
+  border-left: 5px solid var(--team-color);
+  text-align: center;
+}
+.league-draft-pick-top {
+  display: grid;
+  grid-template-columns: repeat(3, var(--pick-icon-size));
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.league-draft-pick-number {
+  width: var(--pick-slot-size);
+  height: var(--pick-slot-size);
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #111827;
+  background: #eef2f7;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: var(--pick-slot-font);
+  font-weight: 900;
+}
+.league-draft-pick img {
+  width: var(--pick-icon-size);
+  height: var(--pick-icon-size);
+  object-fit: contain;
+}
+.league-draft-pick img.league-draft-player-photo {
+  width: var(--pick-photo-size);
+  height: var(--pick-photo-size);
+  border: 2px solid #e2e8f0;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: top center;
+  background: #f8fafc;
+}
+.league-draft-player {
+  min-width: 0;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: var(--pick-player-font);
+  font-weight: 900;
+  line-height: 1.05;
+  color: #111827;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+.league-draft-empty {
+  padding: 18px 10px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  color: #9aa5be;
+  text-align: center;
+  text-transform: uppercase;
+}
+.history-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 24px;
+  margin: 10px 0 18px;
+  padding: 26px 28px;
+  color: #ffffff;
+  background: #05070b;
+  border-top: 7px solid var(--accent);
+  border-radius: 10px;
+  box-shadow: 0 7px 24px rgba(15,23,42,0.18);
+}
+.history-kicker {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.history-title {
+  margin-top: 3px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 64px;
+  line-height: 0.95;
+  letter-spacing: 3px;
+}
+.history-sub {
+  max-width: 760px;
+  margin-top: 8px;
+  font-family: 'Barlow', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: #b8c2d2;
+}
+.history-hero-logo {
+  width: 108px;
+  height: 108px;
+  object-fit: contain;
+}
+.history-metrics {
+  display: grid;
+  grid-template-columns: repeat(var(--metric-count), minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 0 24px;
+}
+.history-metric {
+  padding: 13px 15px;
+  background: #ffffff;
+  border: 1px solid #e2e6ef;
+  border-top: 4px solid var(--accent);
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(15,23,42,0.07);
+}
+.history-metric-value {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 38px;
+  line-height: 1;
+  letter-spacing: 1px;
+  color: #111827;
+}
+.history-metric-label {
+  margin-top: 3px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #8a96b0;
+}
+.history-section-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 22px 0 10px;
+}
+.history-section-title span {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 42px;
+  line-height: 1;
+  letter-spacing: 2px;
+  color: #111827;
+}
+.history-section-title div {
+  flex: 1;
+  height: 2px;
+  background: #dce2ec;
+}
+.history-table-wrap {
+  overflow-x: auto;
+  background: #ffffff;
+  border: 1px solid #e2e6ef;
+  border-radius: 9px;
+  box-shadow: 0 2px 12px rgba(15,23,42,0.08);
+}
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.history-table th {
+  padding: 9px 11px;
+  background: #f8fafc;
+  border-bottom: 2px solid #e2e6ef;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 1.7px;
+  text-align: center;
+  text-transform: uppercase;
+  color: #8a96b0;
+  white-space: nowrap;
+}
+.history-table th:first-child { text-align: left; }
+.history-table td {
+  padding: 9px 11px;
+  border-bottom: 1px solid #edf0f7;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  text-align: center;
+  color: #334155;
+}
+.history-table td:first-child { text-align: left; }
+.history-team {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 210px;
+}
+.history-team img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+.history-team-name {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+  color: #111827;
+}
+.history-team-sub {
+  margin-top: 2px;
+  font-size: 10px;
+  color: #9aa5be;
+}
+.history-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 11px;
+}
+.history-card {
+  padding: 14px 15px;
+  background: #ffffff;
+  border: 1px solid #e2e6ef;
+  border-left: 6px solid var(--accent);
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(15,23,42,0.07);
+}
+.history-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.history-card-eyebrow {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #8a96b0;
+}
+.history-card-score {
+  margin-top: 5px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 31px;
+  line-height: 1;
+  letter-spacing: 1px;
+  color: #111827;
+}
+.history-card-detail {
+  margin-top: 4px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #64748b;
+}
+.history-card img {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+}
+.history-yearbook {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 11px;
+}
+.history-year {
+  padding: 15px;
+  background: #ffffff;
+  border: 1px solid #e2e6ef;
+  border-top: 5px solid var(--accent);
+  border-radius: 8px;
+}
+.history-year-label {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 34px;
+  line-height: 1;
+  color: #111827;
+}
+.history-year-record {
+  margin-top: 7px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 21px;
+  font-weight: 900;
+  color: #334155;
+}
+.history-year-meta {
+  margin-top: 4px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  color: #8a96b0;
+}
 </style>
 """
     )
@@ -2137,16 +2653,40 @@ def conference_code(conferences: pd.DataFrame, conference: str) -> str:
     return first_value(match, "Code", conference)
 
 
-def taken_color(count: int) -> str:
-    if count >= 10:
+def taken_color(count: int, max_count: int = 12) -> str:
+    ratio = count / max(max_count, 1)
+    if ratio >= 0.83:
         return "#166534"
-    if count >= 7:
+    if ratio >= 0.58:
         return "#3f8f29"
-    if count >= 5:
+    if ratio >= 0.42:
         return "#d97706"
-    if count >= 3:
+    if ratio >= 0.25:
         return "#dc2626"
     return "#7f1d1d"
+
+
+def latest_result_week(scores: pd.DataFrame) -> Optional[int]:
+    if scores.empty or not {"Week", "Points"}.issubset(scores.columns):
+        return None
+    completed = scores.loc[
+        pd.to_numeric(scores["Week"], errors="coerce").gt(0)
+        & pd.to_numeric(scores["Points"], errors="coerce").notna()
+    ]
+    weeks = pd.to_numeric(completed["Week"], errors="coerce").dropna()
+    return int(weeks.max()) if not weeks.empty else None
+
+
+def latest_completed_week_index(
+    weeks: list[int],
+    scores: pd.DataFrame,
+) -> int:
+    if not weeks:
+        return 0
+    result_week = latest_result_week(scores)
+    eligible = [week for week in weeks if result_week is not None and week <= result_week]
+    default_week = max(eligible) if eligible else max(weeks)
+    return weeks.index(default_week)
 
 
 def score_class(points: Optional[float], opponent_points: Optional[float]) -> str:
@@ -2193,27 +2733,26 @@ def render_matchup_team(
 
 def bowl_for_notes(notes: object, bowls: Optional[pd.DataFrame]) -> dict[str, str]:
     note_text = clean_text(notes)
-    if (
-        not note_text
-        or "bowl" not in note_text.casefold()
-        or bowls is None
-        or bowls.empty
-        or "Bowl" not in bowls.columns
-    ):
+    if not note_text or "bowl" not in note_text.casefold():
         return {}
+
+    fallback = {"name": note_text, "logo": ""}
+    if bowls is None or bowls.empty or "Bowl" not in bowls.columns:
+        return fallback
 
     note_key = match_key(note_text)
     matches = []
     for _, row in bowls.iterrows():
         bowl_name = clean_text(row.get("Bowl"))
-        if bowl_name and match_key(bowl_name) in note_key:
+        bowl_key = match_key(bowl_name)
+        if bowl_name and (bowl_key in note_key or note_key in bowl_key):
             matches.append(
                 {
                     "name": bowl_name,
                     "logo": clean_text(row.get("Logo")),
                 }
             )
-    return max(matches, key=lambda bowl: len(bowl["name"]), default={})
+    return max(matches, key=lambda bowl: len(bowl["name"]), default=fallback)
 
 
 def render_bowl_banner(bowl: dict[str, str]) -> str:
@@ -2228,6 +2767,32 @@ def render_bowl_banner(bowl: dict[str, str]) -> str:
     <div class="bowl-kicker">Postseason Bowl</div>
     <div class="bowl-name">{esc(bowl.get("name"))}</div>
   </div>
+</div>
+"""
+
+
+def render_boxscore_bowl_masthead(
+    bowl: dict[str, str],
+    year: int,
+    week: int,
+) -> str:
+    if not bowl:
+        return ""
+    logo = clean_text(bowl.get("logo"))
+    logo_html = (
+        f'<img class="boxscore-bowl-logo" src="{esc(logo)}" alt="{esc(bowl.get("name"))}">'
+        if logo
+        else '<div></div>'
+    )
+    return f"""
+<div class="boxscore-bowl-masthead">
+  {logo_html}
+  <div class="boxscore-bowl-copy">
+    <div class="boxscore-bowl-kicker">NCAA/NFL Crossover Postseason</div>
+    <div class="boxscore-bowl-title">{esc(bowl.get("name"))}</div>
+    <div class="boxscore-bowl-meta">{year} Bowl Season &nbsp; | &nbsp; Week {week} Box Score</div>
+  </div>
+  <div></div>
 </div>
 """
 
@@ -2658,12 +3223,14 @@ def render_box_score_dialog(
     rankings: Optional[pd.DataFrame],
     rosters: pd.DataFrame,
     starters: pd.DataFrame,
+    bowls: Optional[pd.DataFrame] = None,
 ) -> None:
     week = int(game["Week"]) if not pd.isna(game.get("Week")) else 0
     year = int(game["Year"]) if not pd.isna(game.get("Year")) else 0
     show_projections = year > 2025
     team_a = clean_text(game.get("TeamA"))
     team_b = clean_text(game.get("TeamB"))
+    bowl = bowl_for_notes(game.get("Notes"), bowls)
     teams = team_lookup(schools)
     ranks = schedule_ap_top25(rankings, week)
     team_a_color = clean_text(teams.get(team_a, {}).get("color"), "#1a2030")
@@ -2726,6 +3293,7 @@ def render_box_score_dialog(
 
     st.html(
         f"""
+{render_boxscore_bowl_masthead(bowl, year, week)}
 <div class="boxscore-matchup-card">
   <div class="boxscore-matchup-top">
     {boxscore_team_header(team_a, teams, ranks, team_a_record, "left")}
@@ -2863,6 +3431,7 @@ def render_schedule_cards(
                         rankings,
                         safe_rosters,
                         safe_starters,
+                        bowls,
                     )
             st.html('<div class="schedule-card-divider"></div>')
 
@@ -3434,6 +4003,511 @@ def team_record_through_week(
     return f"{overall} ({conference})"
 
 
+@st.cache_data(show_spinner=False, max_entries=8)
+def build_history_ledger(
+    schedule: pd.DataFrame,
+    scores: pd.DataFrame,
+    schools: pd.DataFrame,
+    rankings: pd.DataFrame,
+) -> pd.DataFrame:
+    columns = [
+        "Year", "Week", "Team", "Opponent", "Conference", "OpponentConference",
+        "Points", "OpponentPoints", "Margin", "Result", "ConferenceGame",
+        "OpponentRank", "Notes",
+    ]
+    if schedule.empty or scores.empty:
+        return pd.DataFrame(columns=columns)
+
+    teams = team_lookup(schools)
+    resolver = official_team_resolver(schools)
+    score_map = {}
+    for _, row in scores.iterrows():
+        year = pd.to_numeric(row.get("Year"), errors="coerce")
+        week = pd.to_numeric(row.get("Week"), errors="coerce")
+        points = pd.to_numeric(row.get("Points"), errors="coerce")
+        team = official_team_name(row.get("Team"), resolver)
+        if team and not pd.isna(year) and not pd.isna(week) and not pd.isna(points):
+            score_map[(int(year), int(week), match_key(team))] = float(points)
+
+    rank_map_by_week = {}
+    if not rankings.empty:
+        ap = rankings.loc[rankings["Type"].astype(str).eq("AP Poll")].copy()
+        for _, row in ap.iterrows():
+            year = pd.to_numeric(row.get("Year"), errors="coerce")
+            week = pd.to_numeric(row.get("Week"), errors="coerce")
+            rank = pd.to_numeric(row.get("Rank"), errors="coerce")
+            team = official_team_name(row.get("Team"), resolver)
+            if team and not pd.isna(year) and not pd.isna(week) and not pd.isna(rank):
+                rank_map_by_week[(int(year), int(week), match_key(team))] = int(rank)
+
+    rows = []
+    for _, game in schedule.iterrows():
+        year = pd.to_numeric(game.get("Year"), errors="coerce")
+        week = pd.to_numeric(game.get("Week"), errors="coerce")
+        team_a = official_team_name(game.get("TeamA"), resolver)
+        team_b = official_team_name(game.get("TeamB"), resolver)
+        if pd.isna(year) or pd.isna(week) or not team_a or not team_b:
+            continue
+        year, week = int(year), int(week)
+        score_a = score_map.get((year, week, match_key(team_a)))
+        score_b = score_map.get((year, week, match_key(team_b)))
+        if score_a is None or score_b is None:
+            continue
+        for team, opponent, points, opponent_points in [
+            (team_a, team_b, score_a, score_b),
+            (team_b, team_a, score_b, score_a),
+        ]:
+            opponent_rank = rank_map_by_week.get(
+                (year, max(week - 1, 0), match_key(opponent))
+            )
+            if opponent_rank is None:
+                opponent_rank = rank_map_by_week.get((year, week, match_key(opponent)))
+            rows.append(
+                {
+                    "Year": year,
+                    "Week": week,
+                    "Team": team,
+                    "Opponent": opponent,
+                    "Conference": clean_text(teams.get(team, {}).get("conference")),
+                    "OpponentConference": clean_text(teams.get(opponent, {}).get("conference")),
+                    "Points": points,
+                    "OpponentPoints": opponent_points,
+                    "Margin": points - opponent_points,
+                    "Result": "W" if points > opponent_points else "L" if points < opponent_points else "T",
+                    "ConferenceGame": bool(game.get("Conference", False)),
+                    "OpponentRank": opponent_rank,
+                    "Notes": clean_text(game.get("Notes")),
+                }
+            )
+    return pd.DataFrame(rows, columns=columns)
+
+
+def history_aggregate(ledger: pd.DataFrame, schools: Optional[pd.DataFrame] = None) -> pd.DataFrame:
+    rows = []
+    team_names = set(ledger["Team"]) if not ledger.empty else set()
+    if schools is not None and not schools.empty:
+        team_names.update(schools["School"].dropna().map(clean_text))
+    teams = team_lookup(schools) if schools is not None else {}
+    for team in sorted(name for name in team_names if name):
+        games = ledger.loc[ledger["Team"].eq(team)].copy()
+        wins = int(games["Result"].eq("W").sum())
+        losses = int(games["Result"].eq("L").sum())
+        ties = int(games["Result"].eq("T").sum())
+        ranked = games.loc[games["OpponentRank"].between(1, 25, inclusive="both")]
+        conf = games.loc[games["ConferenceGame"]]
+        bowls = games.loc[
+            games["Notes"].str.contains("bowl", case=False, na=False)
+            & ~games["Notes"].str.contains("conference", case=False, na=False)
+        ]
+        rows.append(
+            {
+                "Team": team,
+                "Conference": first_value(games, "Conference", clean_text(teams.get(team, {}).get("conference"))),
+                "Seasons": games["Year"].nunique(),
+                "Wins": wins,
+                "Losses": losses,
+                "Ties": ties,
+                "ConfWins": int(conf["Result"].eq("W").sum()),
+                "ConfLosses": int(conf["Result"].eq("L").sum()),
+                "ConfTies": int(conf["Result"].eq("T").sum()),
+                "WinPct": pct(wins, losses, ties),
+                "ConfWinPct": pct(
+                    int(conf["Result"].eq("W").sum()),
+                    int(conf["Result"].eq("L").sum()),
+                    int(conf["Result"].eq("T").sum()),
+                ),
+                "PF": games["Points"].sum(),
+                "PA": games["OpponentPoints"].sum(),
+                "RankedWins": int(ranked["Result"].eq("W").sum()),
+                "RankedGames": len(ranked),
+                "BowlWins": int(bowls["Result"].eq("W").sum()),
+                "BowlLosses": int(bowls["Result"].eq("L").sum()),
+                "BowlTies": int(bowls["Result"].eq("T").sum()),
+            }
+        )
+    return pd.DataFrame(rows).sort_values(
+        ["Wins", "WinPct", "PF", "Team"], ascending=[False, False, False, True]
+    ).reset_index(drop=True)
+
+
+def history_hero(title: str, subtitle: str, logo: str = "", accent: str = "#f2cf68") -> None:
+    st.html(
+        f"""
+<div class="history-hero" style="--accent:{esc(accent)};">
+  <div>
+    <div class="history-kicker">Historical Archive</div>
+    <div class="history-title">{esc(title)}</div>
+    <div class="history-sub">{esc(subtitle)}</div>
+  </div>
+  {f'<img class="history-hero-logo" src="{esc(logo)}" alt="{esc(title)}">' if logo else ''}
+</div>
+"""
+    )
+
+
+def history_metrics(items: list[tuple[str, str]], accent: str = "#c8102e") -> None:
+    cards = "".join(
+        f'<div class="history-metric" style="--accent:{esc(accent)};"><div class="history-metric-value">{esc(value)}</div><div class="history-metric-label">{esc(label)}</div></div>'
+        for value, label in items
+    )
+    st.html(f'<div class="history-metrics" style="--metric-count:{len(items)};">{cards}</div>')
+
+
+def history_program_table(aggregate: pd.DataFrame, schools: pd.DataFrame, limit: Optional[int] = None) -> None:
+    if aggregate.empty:
+        return
+    teams = team_lookup(schools)
+    rows = []
+    for index, row in aggregate.head(limit).iterrows():
+        info = teams.get(clean_text(row["Team"]), {})
+        logo = clean_text(info.get("logo"))
+        nickname = clean_text(info.get("nickname"))
+        ranked_record = f'{int(row["RankedWins"])}-{int(row["RankedGames"] - row["RankedWins"])}'
+        bowl_record = record_text(int(row["BowlWins"]), int(row["BowlLosses"]), int(row["BowlTies"]))
+        rows.append(
+            f"""
+<tr>
+  <td><div class="standings-team"><span class="standings-rank">{index + 1}</span>{f'<img src="{esc(logo)}" alt="{esc(row["Team"])}">' if logo else ''}<div><div class="standings-team-name">{esc(row["Team"])}</div><div class="standings-team-sub">{esc(nickname)}</div></div></div></td>
+  <td>{int(row["Seasons"])}</td>
+  <td>{record_html(int(row["Wins"]), int(row["Losses"]), int(row["Ties"]), float(row["WinPct"]))}</td>
+  <td>{record_html(int(row["ConfWins"]), int(row["ConfLosses"]), int(row["ConfTies"]), float(row["ConfWinPct"]))}</td>
+  <td>{float(row["PF"]):,.2f}</td><td>{float(row["PA"]):,.2f}</td><td>{ranked_record}</td><td>{bowl_record}</td>
+</tr>
+"""
+        )
+    st.html(
+        f"""
+<div class="history-section-title"><span>All-Time Programs</span><div></div></div>
+<div class="history-table-wrap"><table class="history-table">
+<thead><tr><th>Program</th><th>Seasons</th><th>Record</th><th>Conf Record</th><th>Points For</th><th>Points Against</th><th>vs Top 25</th><th>Bowl Record</th></tr></thead>
+<tbody>{''.join(rows)}</tbody></table></div>
+"""
+    )
+
+
+def history_signature_wins(ledger: pd.DataFrame, schools: pd.DataFrame, title: str = "Signature Wins") -> None:
+    wins = ledger.loc[
+        ledger["Result"].eq("W") & ledger["OpponentRank"].between(1, 25, inclusive="both")
+    ].sort_values(["OpponentRank", "Margin", "Year"], ascending=[True, False, False]).head(12)
+    if wins.empty:
+        return
+    teams = team_lookup(schools)
+    cards = []
+    for _, game in wins.iterrows():
+        team = clean_text(game["Team"])
+        info = teams.get(team, {})
+        logo = clean_text(info.get("logo"))
+        cards.append(
+            f"""
+<div class="history-card" style="--accent:{esc(info.get("color"), "#1a2030")};">
+  <div class="history-card-top"><div class="history-card-eyebrow">{int(game["Year"])} · Week {int(game["Week"])} · Beat No. {int(game["OpponentRank"])}</div>{f'<img src="{esc(logo)}" alt="{esc(team)}">' if logo else ''}</div>
+  <div class="history-card-score">{esc(team)}</div>
+  <div class="history-card-detail">{float(game["Points"]):.2f}-{float(game["OpponentPoints"]):.2f} over {esc(game["Opponent"])}</div>
+</div>
+"""
+        )
+    st.html(
+        f'<div class="history-section-title"><span>{esc(title)}</span><div></div></div><div class="history-card-grid">{"".join(cards)}</div>'
+    )
+
+
+def historical_owner(schools: pd.DataFrame, team: str, year: int) -> str:
+    row = schools.loc[schools["School"].astype(str).eq(team)]
+    if row.empty:
+        return ""
+    target = f"{year}owner"
+    column = next(
+        (column for column in schools.columns if "".join(char for char in str(column).casefold() if char.isalnum()) == target),
+        None,
+    )
+    return clean_text(row.iloc[0].get(column)) if column else ""
+
+
+def history_record_book(ledger: pd.DataFrame, schools: pd.DataFrame, title: str = "Record Book") -> None:
+    if ledger.empty:
+        return
+    winners = ledger.loc[ledger["Result"].eq("W")]
+    losses = ledger.loc[ledger["Result"].eq("L")]
+    candidates = [
+        ("Highest Score", lambda games: games.sort_values("Points", ascending=False).head(1)),
+        ("Lowest Score", lambda games: games.sort_values("Points").head(1)),
+        ("Highest Score in Loss", lambda games: games.loc[games["Result"].eq("L")].sort_values("Points", ascending=False).head(1)),
+        ("Lowest Score in Win", lambda games: games.loc[games["Result"].eq("W")].sort_values("Points").head(1)),
+        ("Largest Victory", lambda games: games.loc[games["Result"].eq("W")].sort_values("Margin", ascending=False).head(1)),
+        ("Closest Victory", lambda games: games.loc[games["Result"].eq("W")].sort_values("Margin").head(1)),
+        ("Most Combined Points", lambda games: games.assign(Combined=games["Points"] + games["OpponentPoints"]).sort_values("Combined", ascending=False).head(1)),
+        ("Least Combined Points", lambda games: games.assign(Combined=games["Points"] + games["OpponentPoints"]).sort_values("Combined").head(1)),
+        ("Largest Defeat", lambda games: games.loc[games["Result"].eq("L")].sort_values("Margin").head(1)),
+        ("Closest Defeat", lambda games: games.loc[games["Result"].eq("L")].sort_values("Margin", ascending=False).head(1)),
+    ]
+    rows = []
+    teams = team_lookup(schools)
+    team_specific = ledger["Team"].nunique() == 1
+    sections = [("All-Time", ledger)]
+    sections.extend(
+        (f"{year} Season", ledger.loc[ledger["Year"].eq(year)])
+        for year in sorted(ledger["Year"].dropna().astype(int).unique(), reverse=True)
+    )
+    for section_label, year_games in sections:
+        column_count = 4 if team_specific else 5
+        rows.append(f'<tr><th colspan="{column_count}" style="text-align:left;font-size:18px;color:#111827;background:#eef2f7;">{esc(section_label)}</th></tr>')
+        for label, selector in candidates:
+            frame = selector(year_games)
+            if frame.empty:
+                continue
+            game = frame.iloc[0]
+            team = clean_text(game["Team"])
+            logo = clean_text(teams.get(team, {}).get("logo"))
+            opponent = clean_text(game["Opponent"])
+            opponent_logo = clean_text(teams.get(opponent, {}).get("logo"))
+            rows.append(
+                f"""<tr><td>{esc(label)}</td>{f'<td><div class="history-team" style="justify-content:flex-end;">{f"""<div class="history-team-name">{esc(team)}</div><img src="{esc(logo)}" alt="{esc(team)}">""" if logo else f"""<div class="history-team-name">{esc(team)}</div>"""}</div></td>' if not team_specific else ''}<td>{float(game["Points"]):,.2f}-{float(game["OpponentPoints"]):,.2f}</td><td><div class="history-team">{f'<img src="{esc(opponent_logo)}" alt="{esc(opponent)}">' if opponent_logo else ''}<div class="history-team-name">{esc(opponent)}</div></div></td><td>Week {int(game["Week"])}</td></tr>"""
+            )
+    team_header = "" if team_specific else "<th>Team</th>"
+    st.html(f'<div class="history-section-title"><span>{esc(title)}</span><div></div></div><div class="history-table-wrap"><table class="history-table"><thead><tr><th>Record</th>{team_header}<th>Score</th><th>Opponent</th><th>Week</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div>')
+
+
+def history_champions(
+    ledger: pd.DataFrame,
+    schools: pd.DataFrame,
+    bowls: pd.DataFrame,
+    conference: str = "",
+) -> None:
+    winners = ledger.loc[ledger["Result"].eq("W")].copy()
+    if conference:
+        winners = winners.loc[winners["Conference"].eq(conference)]
+    winners = winners.drop_duplicates(["Year", "Week", "Team", "Opponent"])
+    if winners.empty:
+        return
+    teams = team_lookup(schools)
+    sections = []
+    note_keys = winners["Notes"].map(match_key)
+    groups = [
+        (
+            "Conference Championships",
+            winners.loc[
+                note_keys.str.contains(r"\bconf(?:erence)?\s+champ(?:ionship)?\s+bowl\b", regex=True, na=False)
+            ],
+            not conference,
+        ),
+        (
+            "National Championship",
+            winners.loc[
+                note_keys.str.contains(r"\bnational\s+(?:semifinal|championship)\s+bowl\b", regex=True, na=False)
+            ],
+            False,
+        ),
+    ]
+    for title, group, show_conference in groups:
+        if group.empty:
+            continue
+        rows = []
+        for year, year_games in group.sort_values(["Year", "Week"], ascending=[False, False]).groupby("Year", sort=False):
+            column_count = 5 if show_conference else 4
+            rows.append(f'<tr><th colspan="{column_count}" style="text-align:left;font-size:18px;color:#111827;background:#eef2f7;">{int(year)} Season</th></tr>')
+            for _, game in year_games.iterrows():
+                team = clean_text(game["Team"])
+                opponent = clean_text(game["Opponent"])
+                team_logo = clean_text(teams.get(team, {}).get("logo"))
+                opponent_logo = clean_text(teams.get(opponent, {}).get("logo"))
+                event = bowl_for_notes(game["Notes"], bowls)
+                event_logo = clean_text(event.get("logo"))
+                rows.append(
+                    f"""<tr><td>{f'<img src="{esc(event_logo)}" alt="{esc(game["Notes"])}" title="{esc(game["Notes"])}" style="width:44px;height:36px;object-fit:contain;">' if event_logo else esc(game["Notes"])}</td>{f'<td>{esc(game["Conference"])}</td>' if show_conference else ''}<td><div class="history-team" style="justify-content:flex-end;"><span title="Winner" style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#f2cf68;color:#111827;font-size:14px;font-weight:900;">★</span>{f'<div class="history-team-name">{esc(team)}</div><img src="{esc(team_logo)}" alt="{esc(team)}">' if team_logo else f'<div class="history-team-name">{esc(team)}</div>'}</div></td><td>{float(game["Points"]):,.2f}-{float(game["OpponentPoints"]):,.2f}</td><td><div class="history-team">{f'<img src="{esc(opponent_logo)}" alt="{esc(opponent)}">' if opponent_logo else ''}<div class="history-team-name">{esc(opponent)}</div></div></td></tr>"""
+                )
+        conference_header = "<th>Conference</th>" if show_conference else ""
+        winner_header = "Champion" if title == "Conference Championships" else "Winner"
+        sections.append(f'<div class="history-section-title"><span>{esc(title)}</span><div></div></div><div class="history-table-wrap"><table class="history-table"><thead><tr><th>Event</th>{conference_header}<th>{winner_header}</th><th>Score</th><th>Opponent</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div>')
+    st.html("".join(sections))
+
+
+def conference_history_matrix(ledger: pd.DataFrame, schools: pd.DataFrame, conference: str) -> None:
+    games = ledger.loc[ledger["Conference"].eq(conference) & ledger["OpponentConference"].eq(conference)]
+    teams = sorted(set(games["Team"]))
+    if not teams:
+        return
+    lookup = team_lookup(schools)
+    headers = "".join(
+        f'<th>{f"""<img src="{esc(lookup.get(team, {}).get("logo"))}" alt="{esc(team)}" title="{esc(team)}" style="width:38px;height:38px;object-fit:contain;">""" if clean_text(lookup.get(team, {}).get("logo")) else esc(team)}</th>'
+        for team in teams
+    )
+    rows = []
+    for team in teams:
+        cells = []
+        for opponent in teams:
+            if team == opponent:
+                cells.append('<td style="background:#111827;color:#fff;text-align:center;">-</td>')
+                continue
+            series = games.loc[games["Team"].eq(team) & games["Opponent"].eq(opponent)]
+            wins = int(series["Result"].eq("W").sum())
+            losses = int(series["Result"].eq("L").sum())
+            points = series["Points"].sum()
+            opponent_points = series["OpponentPoints"].sum()
+            cells.append(f'<td style="text-align:center;"><strong style="font-size:16px;">{wins}-{losses}</strong><br><span style="font-size:13px;color:#64748b;">{points:,.1f}-{opponent_points:,.1f}</span></td>')
+        team_logo = clean_text(lookup.get(team, {}).get("logo"))
+        rows.append(f'<tr><th style="text-align:center;">{f"""<img src="{esc(team_logo)}" alt="{esc(team)}" title="{esc(team)}" style="width:38px;height:38px;object-fit:contain;">""" if team_logo else esc(team)}</th>{"".join(cells)}</tr>')
+    st.html(f'<div class="history-section-title"><span>All-Time Conference Matchups</span><div></div></div><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:800;color:#64748b;margin:-4px 0 9px;">Each cell is the row team’s record and points scored against the column opponent.</div><div class="history-table-wrap"><table class="history-table"><thead><tr><th>Row Team</th>{headers}</tr></thead><tbody>{"".join(rows)}</tbody></table></div>')
+
+
+def team_history_yearbook(full_ledger: pd.DataFrame, schools: pd.DataFrame, team: str) -> None:
+    games = full_ledger.loc[full_ledger["Team"].eq(team)]
+    rows = []
+    history_years = set(pd.to_numeric(games["Year"], errors="coerce").dropna().astype(int))
+    history_years.add(current_roster_season())
+    for year in sorted(history_years, reverse=True):
+        season = games.loc[games["Year"].eq(year)].copy()
+        conf = season.loc[season["ConferenceGame"]]
+        bowl = season.loc[season["Notes"].str.contains("bowl", case=False, na=False)]
+        bowl_text = ""
+        if not bowl.empty:
+            bowl_text = "<br>".join(
+                f'{esc(game["Notes"])}: {game["Result"]} vs {esc(game["Opponent"])}, {game["Points"]:.2f}-{game["OpponentPoints"]:.2f}'
+                for _, game in bowl.sort_values("Week").iterrows()
+            )
+        year_totals = full_ledger.loc[full_ledger["Year"].eq(year)].groupby("Team", as_index=False).agg(
+            PF=("Points", "sum"),
+            PA=("OpponentPoints", "sum"),
+        )
+        pf_rank = pa_rank = None
+        if not year_totals.empty and team in set(year_totals["Team"]):
+            year_totals["PFRank"] = year_totals["PF"].rank(ascending=False, method="min")
+            year_totals["PARank"] = year_totals["PA"].rank(ascending=True, method="min")
+            team_ranks = year_totals.loc[year_totals["Team"].eq(team)].iloc[0]
+            pf_rank = int(team_ranks["PFRank"])
+            pa_rank = int(team_ranks["PARank"])
+        overall_w, overall_l, overall_t = int(season["Result"].eq("W").sum()), int(season["Result"].eq("L").sum()), int(season["Result"].eq("T").sum())
+        conf_w, conf_l, conf_t = int(conf["Result"].eq("W").sum()), int(conf["Result"].eq("L").sum()), int(conf["Result"].eq("T").sum())
+        rows.append(
+            f"""<tr><td>{int(year)}</td><td>{esc(historical_owner(schools, team, int(year)), "-")}</td><td>{record_html(overall_w, overall_l, overall_t, pct(overall_w, overall_l, overall_t))}</td><td>{record_html(conf_w, conf_l, conf_t, pct(conf_w, conf_l, conf_t))}</td><td>{season["Points"].sum():,.2f}{f' ({pf_rank})' if pf_rank is not None else ''}</td><td>{season["OpponentPoints"].sum():,.2f}{f' ({pa_rank})' if pa_rank is not None else ''}</td><td>{int((season["OpponentRank"].between(1,25) & season["Result"].eq("W")).sum())}</td><td style="text-align:left;">{bowl_text}</td></tr>"""
+        )
+    st.html(f'<div class="history-section-title"><span>Program Yearbook</span><div></div></div><div class="history-table-wrap"><table class="history-table"><thead><tr><th>Season</th><th>Owner</th><th>Record</th><th>Conf Record</th><th>PF</th><th>PA</th><th>Top-25 Wins</th><th>Bowl Result</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div>')
+
+
+def team_opponent_series(ledger: pd.DataFrame, schools: pd.DataFrame, team: str) -> None:
+    games = ledger.loc[ledger["Team"].eq(team)]
+    lookup = team_lookup(schools)
+    rows = []
+    for opponent, series in games.groupby("Opponent"):
+        last = series.sort_values(["Year", "Week"]).iloc[-1]
+        logo = clean_text(lookup.get(opponent, {}).get("logo"))
+        rows.append((len(series), f"""<tr><td><div class="history-team">{f'<img src="{esc(logo)}" alt="{esc(opponent)}">' if logo else ''}<div class="history-team-name">{esc(opponent)}</div></div></td><td>{len(series)}</td><td>{record_text(int(series["Result"].eq("W").sum()), int(series["Result"].eq("L").sum()), int(series["Result"].eq("T").sum()))}</td><td>{series["Points"].sum():,.2f}</td><td>{series["OpponentPoints"].sum():,.2f}</td><td>{int(last["Year"])}, W{int(last["Week"])} · {last["Result"]} {last["Points"]:.2f}-{last["OpponentPoints"]:.2f}</td></tr>"""))
+    rows = [html for _, html in sorted(rows, key=lambda item: -item[0])]
+    st.html(f'<div class="history-section-title"><span>Opponent Series</span><div></div></div><div class="history-table-wrap"><table class="history-table"><thead><tr><th>Opponent</th><th>Games</th><th>Record</th><th>PF</th><th>PA</th><th>Last Matchup</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div>')
+
+
+def team_starter_history(starters: pd.DataFrame, ledger: pd.DataFrame, team: str) -> None:
+    if starters.empty:
+        return
+    resolver = official_team_resolver(pd.DataFrame({"School": [team]}))
+    team_rows = starters.copy()
+    team_rows["_official_team"] = team_rows["Team"].map(lambda value: official_team_name(value, resolver))
+    team_rows = team_rows.loc[team_rows["_official_team"].eq(team)].copy()
+    team_rows["Year"] = pd.to_numeric(team_rows["Year"], errors="coerce")
+    team_rows["Week"] = pd.to_numeric(team_rows["Week"], errors="coerce")
+    team_rows["Points"] = pd.to_numeric(team_rows["Points"], errors="coerce")
+    completed_pairs = set(
+        ledger.loc[ledger["Team"].eq(team), ["Year", "Week"]]
+        .drop_duplicates()
+        .itertuples(index=False, name=None)
+    )
+    occurred = team_rows.loc[
+        team_rows.apply(lambda row: (row["Year"], row["Week"]) in completed_pairs, axis=1)
+    ].drop_duplicates(["Year", "Week", "Player"], keep="last")
+    started = occurred.loc[
+        occurred["RosterSpot"].astype(str).eq("Starter")
+    ].dropna(subset=["Player", "Points"]).drop_duplicates(["Year", "Week", "Player"], keep="last")
+    if started.empty:
+        return
+    summary = started.groupby("Player").agg(Starts=("Player", "size"), Points=("Points", "sum"), Average=("Points", "mean"), Best=("Points", "max"), Position=("Position", "first")).reset_index()
+    appearances = occurred.groupby("Player").size().rename("RosterGames").reset_index()
+    summary = summary.merge(appearances, on="Player", how="left")
+    summary["StartPct"] = summary["Starts"] / summary["RosterGames"].clip(lower=1)
+    summary = summary.sort_values(["Points", "Starts"], ascending=[False, False])
+    position_colors = {"QB": "#ef4444", "RB": "#f97316", "WR": "#eab308", "TE": "#22c55e"}
+    body = "".join(f'<tr><td><span class="standings-rank">{index + 1}</span></td><td><div class="history-team"><img src="{PLACEHOLDER_PLAYER_HEADSHOT}" alt="{esc(row["Player"])}" style="border-radius:50%;object-fit:cover;object-position:center 12%;"><div style="display:flex;align-items:center;gap:7px;"><div class="history-team-name">{esc(row["Player"])}</div><span class="position-chip" style="background:{position_colors.get(clean_text(row["Position"]), "#e5e7eb")};">{esc(row["Position"])}</span></div></div></td><td>{int(row["Starts"])}</td><td>{row["StartPct"]:.1%}</td><td>{row["Points"]:,.2f}</td><td>{row["Average"]:,.2f}</td><td>{row["Best"]:,.2f}</td></tr>' for index, (_, row) in enumerate(summary.head(50).iterrows()))
+    st.html(f'<div class="history-section-title"><span>All-Time Starter Production</span><div></div></div><div class="history-table-wrap"><table class="history-table"><thead><tr><th>Rank</th><th>Player</th><th>Starts</th><th>Start %</th><th>Points While Starting</th><th>Avg Start</th><th>Best Start</th></tr></thead><tbody>{body}</tbody></table></div>')
+
+
+def render_league_history(ledger: pd.DataFrame, schools: pd.DataFrame, bowls: pd.DataFrame) -> None:
+    history_hero(
+        "League History",
+        "The programs, performances, and ranked wins that have shaped the NCAA/NFL Crossover.",
+        LEAGUE_LOGO,
+    )
+    aggregate = history_aggregate(ledger, schools)
+    history_metrics(
+        [
+            (f'{ledger["Year"].nunique()}', "Seasons"),
+            (f'{len(ledger) // 2:,}', "Completed Games"),
+            (f'{len(aggregate)}', "Programs"),
+            (f'{ledger["Points"].sum() / 2:,.2f}', "Points Scored"),
+            (f'{int((ledger["OpponentRank"].between(1, 25) & ledger["Result"].eq("W")).sum())}', "Top-25 Wins"),
+        ]
+    )
+    history_program_table(aggregate, schools)
+    history_champions(ledger, schools, bowls)
+    history_record_book(ledger, schools)
+
+
+def render_conference_history(
+    ledger: pd.DataFrame,
+    schools: pd.DataFrame,
+    conferences: pd.DataFrame,
+    bowls: pd.DataFrame,
+    conference: str,
+) -> None:
+    conf_ledger = ledger.loc[ledger["Conference"].eq(conference)].copy()
+    history_hero(
+        f"{conference} History",
+        "An all-time view of the conference's strongest programs and most meaningful victories.",
+        conference_logo(conferences, conference),
+        "#7dd3fc",
+    )
+    aggregate = history_aggregate(conf_ledger, schools)
+    aggregate = aggregate.loc[aggregate["Conference"].eq(conference)].reset_index(drop=True)
+    history_metrics(
+        [
+            (f'{conf_ledger["Year"].nunique()}', "Seasons"),
+            (f'{len(aggregate)}', "Programs"),
+            (f'{int(conf_ledger["Result"].eq("W").sum())}', "Wins"),
+            (f'{int((conf_ledger["OpponentRank"].between(1, 25) & conf_ledger["Result"].eq("W")).sum())}', "Top-25 Wins"),
+        ],
+        "#7dd3fc",
+    )
+    history_program_table(aggregate, schools)
+    history_champions(conf_ledger, schools, bowls, conference)
+    history_record_book(conf_ledger, schools, "Conference Record Book")
+    conference_history_matrix(ledger, schools, conference)
+
+
+def render_team_history(
+    ledger: pd.DataFrame,
+    schools: pd.DataFrame,
+    starters: pd.DataFrame,
+    team: str,
+) -> None:
+    games = ledger.loc[ledger["Team"].eq(team)].copy()
+    info = team_lookup(schools).get(team, {})
+    wins = int(games["Result"].eq("W").sum())
+    losses = int(games["Result"].eq("L").sum())
+    ties = int(games["Result"].eq("T").sum())
+    ranked_wins = int((games["OpponentRank"].between(1, 25) & games["Result"].eq("W")).sum())
+    history_metrics(
+        [
+            (record_text(wins, losses, ties), "All-Time Record"),
+            (f'{games["Points"].sum():,.2f}', "Points Scored"),
+            (f"{ranked_wins}", "Top-25 Wins"),
+            (f'{games["Margin"].max():,.2f}' if not games.empty else "-", "Largest Win"),
+        ],
+        clean_text(info.get("color"), "#c8102e"),
+    )
+
+    team_history_yearbook(ledger, schools, team)
+    team_opponent_series(games, schools, team)
+    history_record_book(games, schools, "Team Record Book")
+    team_starter_history(starters, ledger, team)
+
+
 def render_rules() -> None:
     st.html(
         """
@@ -3833,6 +4907,7 @@ def render_rankings(
     selected_week = st.selectbox(
         "Week",
         weeks,
+        index=latest_completed_week_index(weeks, scores),
         key="rankings_week",
         format_func=lambda week: "Preseason" if week == 0 else week_label(week),
     )
@@ -3975,11 +5050,15 @@ def render_draft_board(
     board["Round"] = pd.to_numeric(board["Round"], errors="coerce")
     board["Pick"] = pd.to_numeric(board["Pick"], errors="coerce")
     board["Conference"] = board["Conference"].astype(str)
+    board["Type"] = board["Type"].map(clean_text).replace("", "Draft")
+    board["_type_order"] = board["Type"].map(
+        {"Rookie": 0, "Start-Up": 1, "Startup": 1}
+    ).fillna(2)
     board["_conference_order"] = board["Conference"].map(
         {name: index for index, name in enumerate(LEAGUE_ROSTER_ORDER)}
     ).fillna(999)
     board = board.sort_values(
-        ["_conference_order", "Conference", "Round", "Pick", "Team", "Player"],
+        ["_conference_order", "Conference", "_type_order", "Type", "Round", "Pick", "Team", "Player"],
         na_position="last",
     )
 
@@ -3988,6 +5067,7 @@ def render_draft_board(
     rounds = int(board["Round"].nunique())
     picks = int(len(board))
     drafted = int(board["Player"].map(clean_text).ne("").sum())
+    draft_types = board["Type"].drop_duplicates().tolist()
     board_title = f"{conference} Draft Board" if conference else "League Draft Board"
     board_kicker = f"{season} Conference Draft" if conference else f"{season} League Draft"
 
@@ -4005,6 +5085,7 @@ def render_draft_board(
     <span class="draft-chip">{rounds} Rounds</span>
     <span class="draft-chip">{picks} Picks</span>
     <span class="draft-chip">{drafted} Drafted</span>
+    {''.join(f'<span class="draft-chip">{esc(draft_type)}</span>' for draft_type in draft_types)}
   </div>
 </div>
 """
@@ -4024,20 +5105,23 @@ def render_draft_board(
 <div class="draft-round-title"><img class="conf-logo" src="{esc(group_logo)}" alt="{esc(group_conference)}"><span>{esc(group_conference)}</span><span></span></div>
 """
             )
-        for round_number, round_rows in group_board.groupby("Round", dropna=False):
-            round_label = "Round -" if pd.isna(round_number) else f"Round {int(round_number)}"
-            cards = []
-            for _, row in round_rows.iterrows():
-                team = clean_text(row.get("Team"))
-                player = clean_text(row.get("Player"))
-                pick = row.get("Pick")
-                pick_label = "-" if pd.isna(pick) else str(int(pick))
-                info = teams.get(team, {})
-                logo = clean_text(info.get("logo"))
-                nickname = clean_text(info.get("nickname"))
-                color = esc(info.get("color"), "#1a2030")
-                cards.append(
-                    f"""
+        for draft_type, type_board in group_board.groupby("Type", sort=False):
+            sections.append(
+                f'<div class="draft-type-heading"><span>{esc(draft_type)} Draft</span><span></span></div>'
+            )
+            for round_number, round_rows in type_board.groupby("Round", dropna=False):
+                round_label = "Round -" if pd.isna(round_number) else f"Round {int(round_number)}"
+                cards = []
+                for _, row in round_rows.iterrows():
+                    team = clean_text(row.get("Team"))
+                    player = clean_text(row.get("Player"))
+                    pick = row.get("Pick")
+                    pick_label = "-" if pd.isna(pick) else str(int(pick))
+                    info = teams.get(team, {})
+                    logo = clean_text(info.get("logo"))
+                    color = esc(info.get("color"), "#1a2030")
+                    cards.append(
+                        f"""
 <div class="draft-card" style="--team-color:{color};">
   <div class="draft-card-top">
     <span class="draft-pick">{esc(pick_label)}</span>
@@ -4047,18 +5131,155 @@ def render_draft_board(
   <div class="draft-player {'draft-empty-player' if not player else ''}">{esc(player, 'TBD')}</div>
 </div>
 """
-                )
+                    )
 
-            sections.append(
-                f"""
+                sections.append(
+                    f"""
 <section class="draft-round">
   <div class="draft-round-title"><span>{esc(round_label)}</span><span></span></div>
   <div class="draft-grid">{''.join(cards)}</div>
 </section>
 """
-            )
+                )
 
     st.html("".join(sections))
+
+
+def render_league_draft_board(
+    drafts: pd.DataFrame,
+    schools: pd.DataFrame,
+    conferences: pd.DataFrame,
+    season: int,
+) -> None:
+    if drafts.empty:
+        under_construction(f"{season} League Draft Board")
+        return
+
+    board = drafts.loc[pd.to_numeric(drafts["Year"], errors="coerce").eq(season)].copy()
+    if board.empty:
+        under_construction(f"{season} League Draft Board")
+        return
+
+    board["Round"] = pd.to_numeric(board["Round"], errors="coerce")
+    board["Pick"] = pd.to_numeric(board["Pick"], errors="coerce")
+    board["Conference"] = board["Conference"].map(clean_text)
+    board["Type"] = board["Type"].map(clean_text).replace("", "Draft")
+    board["_type_order"] = board["Type"].map(
+        {"Rookie": 0, "Start-Up": 1, "Startup": 1}
+    ).fillna(2)
+    board = board.sort_values(
+        ["_type_order", "Type", "Round", "Pick", "Team", "Player"],
+        na_position="last",
+    )
+
+    teams = team_lookup(schools)
+
+    st.html(
+        f"""
+<div class="draft-hero" style="--accent:#c8102e;">
+  <div class="draft-hero-main">
+    <img src="{LEAGUE_LOGO}" alt="{esc(LEAGUE_NAME)}">
+    <div>
+      <div class="draft-kicker">{season} League Draft</div>
+      <div class="draft-title">League Draft Board</div>
+    </div>
+  </div>
+</div>
+"""
+    )
+
+    phase_groups = []
+    for draft_type, draft_type_board in board.groupby("Type", sort=False):
+        phase_color = "#7dd3fc" if match_key(draft_type) in {"start-up", "startup"} else "#f2cf68"
+        phase_active_conferences = set(draft_type_board["Conference"])
+        phase_conference_order = [
+            conference
+            for conference in LEAGUE_ROSTER_ORDER
+            if conference in phase_active_conferences
+        ]
+        phase_conference_order.extend(
+            sorted(phase_active_conferences.difference(phase_conference_order))
+        )
+        phase_groups.append(
+            {
+                "type": draft_type,
+                "color": phase_color,
+                "conferences": phase_conference_order,
+                "board": draft_type_board,
+            }
+        )
+
+    conference_count = max(
+        sum(len(group["conferences"]) for group in phase_groups),
+        1,
+    )
+    board_size_class = (
+        "roomy"
+        if conference_count <= 3
+        else "medium"
+        if conference_count <= 6
+        else "compact"
+    )
+    phase_headers = []
+    columns = []
+    for phase_index, group in enumerate(phase_groups):
+        phase_class = "phase-start" if phase_index > 0 else ""
+        phase_headers.append(
+            f"""
+<div class="league-draft-phase-title {phase_class}" style="--phase-color:{group['color']}; grid-column: span {len(group['conferences'])};">
+  <span>{esc(group['type'])} Draft</span><span></span>
+</div>
+"""
+        )
+        for conference_index, conference in enumerate(group["conferences"]):
+            conference_board = group["board"].loc[group["board"]["Conference"].eq(conference)]
+            logo = conference_logo(conferences, conference)
+            pick_rows = []
+            for _, row in conference_board.iterrows():
+                team = clean_text(row.get("Team"))
+                player = clean_text(row.get("Player"), "TBD")
+                info = teams.get(team, {})
+                team_logo = clean_text(info.get("logo"))
+                color = esc(info.get("color"), "#1a2030")
+                round_number = row.get("Round")
+                pick_number = row.get("Pick")
+                round_label = "-" if pd.isna(round_number) else str(int(round_number))
+                pick_label = "-" if pd.isna(pick_number) else str(int(pick_number))
+                draft_slot = f"{round_label}.{pick_label}"
+                pick_rows.append(
+                    f"""
+<div class="league-draft-pick" style="--team-color:{color};">
+  <div class="league-draft-pick-top">
+    <span class="league-draft-pick-number">{esc(draft_slot)}</span>
+    {f'<img src="{esc(team_logo)}" alt="{esc(team)}" title="{esc(team)}">' if team_logo else '<span></span>'}
+    <img class="league-draft-player-photo" src="{PLACEHOLDER_PLAYER_HEADSHOT}" alt="{esc(player)}">
+  </div>
+  <div class="league-draft-player">{esc(player)}</div>
+</div>
+"""
+                )
+
+            column_class = "phase-start" if phase_index > 0 and conference_index == 0 else ""
+            columns.append(
+                f"""
+<section class="league-draft-column {column_class}">
+  <div class="league-draft-header">
+    {f'<img src="{esc(logo)}" alt="{esc(conference)}">' if logo else ''}
+    <span>{esc(conference)}</span>
+  </div>
+  {''.join(pick_rows)}
+</section>
+"""
+            )
+
+    st.html(
+        f"""
+<div class="league-draft-wrap">
+  <div class="league-draft-phase-headings" style="--conference-count:{conference_count};">{''.join(phase_headers)}</div>
+  <div class="league-draft-board {board_size_class}" style="--conference-count:{conference_count};">{''.join(columns)}</div>
+</div>
+"""
+    )
 
 
 def render_roster_matrix(rosters: pd.DataFrame) -> None:
@@ -4330,7 +5551,7 @@ def render_league_roster_matrix(
                     cells.append('<td class="team-logo-cell"></td>')
             taken_count = int(row["taken_count"])
             cells.append(
-                f'<td class="taken-col"><span class="taken-pill" style="background:{taken_color(taken_count)};">{taken_count}</span></td>'
+                f'<td class="taken-col"><span class="taken-pill" style="background:{taken_color(taken_count, len(conference_order))};">{taken_count}</span></td>'
             )
             body_rows.append(f"<tr>{''.join(cells)}</tr>")
 
@@ -4728,6 +5949,10 @@ selected_season = masthead()
 schools, conferences, schedule, scores, rankings, drafts, starters, bowls = load_branding_data(
     DATA_CACHE_VERSION
 )
+full_schedule = schedule.copy()
+full_rankings = rankings.copy()
+full_starters = starters.copy()
+full_scores = aggregate_scores_from_starters(starters, scores)
 schools = apply_season_owners(schools, selected_season)
 schedule = filter_by_season(schedule, selected_season)
 scores = filter_by_season(scores, selected_season)
@@ -4743,9 +5968,10 @@ roster_snapshot = (
     if is_current_roster_season
     else historical_roster_snapshot(starters, schools, selected_season)
 )
+history_ledger = build_history_ledger(full_schedule, full_scores, schools, full_rankings)
 
-league_tab, conference_tab, team_tab = st.tabs(
-    ["🏆 League", "🏟️ Conference", "🎓 Team"]
+league_tab, conference_tab, team_tab, rules_tab = st.tabs(
+    ["🏆 League", "🏟️ Conference", "🎓 Team", "📘 Rules"]
 )
 
 with league_tab:
@@ -4755,7 +5981,7 @@ with league_tab:
         league_rankings_tab,
         league_rosters_tab,
         league_drafts_tab,
-        league_rules_tab,
+        league_history_tab,
     ) = st.tabs(
         [
             "📊 Standings",
@@ -4763,8 +5989,7 @@ with league_tab:
             "⭐ Rankings",
             "👥 Rosters",
             "🧾 Drafts",
-            "📘 Rules",
-        ]
+        ] + ["🕰️ History"]
     )
     with league_standings_tab:
         render_league_standings(schedule, scores, schools, conferences, rankings)
@@ -4774,6 +5999,7 @@ with league_tab:
             selected_week = st.selectbox(
                 "Week",
                 weeks,
+                index=latest_completed_week_index(weeks, scores),
                 key="league_schedule_week",
                 format_func=week_label,
             )
@@ -4821,9 +6047,14 @@ with league_tab:
             preview_missing_conferences=is_current_roster_season,
         )
     with league_drafts_tab:
-        under_construction("League Drafts")
-    with league_rules_tab:
-        render_rules()
+        render_league_draft_board(
+            drafts,
+            schools,
+            conferences,
+            selected_season,
+        )
+    with league_history_tab:
+        render_league_history(history_ledger, schools, bowls)
 
 with conference_tab:
     conference_options = [name for name in LEAGUES.keys() if name in set(conferences["Conference"].astype(str))]
@@ -4856,7 +6087,10 @@ with conference_tab:
         conf_schedule_tab,
         conf_rosters_tab,
         conf_drafts_tab,
-    ) = st.tabs(["📊 Standings", "📅 Schedule", "👥 Rosters", "🧾 Drafts"])
+        conf_history_tab,
+    ) = st.tabs(["📊 Standings", "📅 Schedule", "👥 Rosters", "🧾 Drafts", "🕰️ History"])
+    with conf_history_tab:
+        render_conference_history(history_ledger, schools, conferences, bowls, selected_conference)
     with conf_standings_tab:
         render_conference_standings(
             schedule,
@@ -4877,6 +6111,7 @@ with conference_tab:
             selected_week = st.selectbox(
                 "Week",
                 weeks,
+                index=latest_completed_week_index(weeks, scores),
                 key=f"conference_schedule_week_{selected_conference}",
                 format_func=week_label,
             )
@@ -4952,7 +6187,9 @@ with team_tab:
     selected_team = st.selectbox("Team", team_options)
     selected_team_record = team_record_text(schedule, scores, schools, selected_team, rankings)
     render_team_hero(roster_snapshot, selected_team, selected_team_record)
-    team_schedule_tab, team_roster_tab = st.tabs(["📅 Schedule", "👥 Rosters"])
+    team_schedule_tab, team_roster_tab, team_history_tab = st.tabs(
+        ["📅 Schedule", "👥 Rosters", "🕰️ History"]
+    )
     with team_schedule_tab:
         team_schedule = schedule.loc[
             schedule["TeamA"].eq(selected_team)
@@ -4979,3 +6216,8 @@ with team_tab:
             selected_team,
             future_draft_picks if is_current_roster_season else None,
         )
+    with team_history_tab:
+        render_team_history(history_ledger, schools, full_starters, selected_team)
+
+with rules_tab:
+    render_rules()

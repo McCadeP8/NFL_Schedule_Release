@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from io import StringIO
 from pathlib import Path
+import re
 from typing import Any, Optional, Tuple
+import unicodedata
 
 import pandas as pd
 from pandas.errors import EmptyDataError
@@ -43,6 +45,12 @@ CONFERENCE_LOGOS = {
 
 CONFERENCE_ALIASES = {
     "FCS": "F12",
+    "6IX": "G6",
+    "The 6ix": "G6",
+    "The 12": "F12",
+    "Big XII": "Big 12",
+    "Big Ten": "B1G",
+    "PAC": "Pac-12",
 }
 
 POSITIONS = ["QB", "RB", "WR", "TE"]
@@ -51,6 +59,8 @@ SCHOOL_ALIASES = {
     "FSU": "Florida State",
     "Miami": "Miami (FL)",
     "SMU": "Southern Methodist",
+    "Oregon St": "Oregon State",
+    "Oregon St.": "Oregon State",
 }
 
 COLUMN_ALIASES = {
@@ -241,7 +251,7 @@ def _empty_rankings() -> pd.DataFrame:
 
 
 def _empty_drafts() -> pd.DataFrame:
-    return pd.DataFrame(columns=["Year", "Conference", "Round", "Pick", "Team", "Player"])
+    return pd.DataFrame(columns=["Year", "Conference", "Type", "Round", "Pick", "Team", "Player"])
 
 
 def _empty_bowls() -> pd.DataFrame:
@@ -285,8 +295,15 @@ def _has_columns(df: pd.DataFrame, columns: list[str]) -> bool:
 def _normalize_school(value: object) -> object:
     if pd.isna(value):
         return value
-    text = str(value).strip()
-    return SCHOOL_ALIASES.get(text, text)
+    text = unicodedata.normalize("NFKC", str(value))
+    text = text.replace("\u00a0", " ").replace("\u200b", "").strip()
+    text = re.sub(r"\s+", " ", text)
+    match_text = re.sub(r"[^a-z0-9]+", " ", text.casefold()).strip()
+    aliases = {
+        re.sub(r"[^a-z0-9]+", " ", str(key).casefold()).strip(): normalized
+        for key, normalized in SCHOOL_ALIASES.items()
+    }
+    return aliases.get(match_text, text)
 
 
 def _normalize_school_names(df: pd.DataFrame) -> pd.DataFrame:
@@ -313,7 +330,8 @@ def _normalize_sheet(df: pd.DataFrame) -> pd.DataFrame:
 
 def _normalize_conference(value: object) -> str:
     conference = str(value).strip()
-    return CONFERENCE_ALIASES.get(conference, conference)
+    aliases = {str(key).casefold(): normalized for key, normalized in CONFERENCE_ALIASES.items()}
+    return aliases.get(conference.casefold(), conference)
 
 
 def _is_image_url(value: object) -> bool:
@@ -365,7 +383,7 @@ def get_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, 
     scores_url = "https://docs.google.com/spreadsheets/d/19bH4vYzaV7pbuQ2bcdz3HAaOWGb-BBJhQ9EgBp7YvoY/export?format=csv&gid=702965459"
     rankings_url = "https://docs.google.com/spreadsheets/d/19bH4vYzaV7pbuQ2bcdz3HAaOWGb-BBJhQ9EgBp7YvoY/export?format=csv&gid=1261881922"
     drafts_url = "https://docs.google.com/spreadsheets/d/19bH4vYzaV7pbuQ2bcdz3HAaOWGb-BBJhQ9EgBp7YvoY/export?format=csv&gid=1037681902"
-    bowls_url = "https://docs.google.com/spreadsheets/d/19bH4vYzaV7pbuQ2bcdz3HAaOWGb-BBJhQ9EgBp7YvoY/export?format=csv&gid=445477995445477995"
+    bowls_url = "https://docs.google.com/spreadsheets/d/19bH4vYzaV7pbuQ2bcdz3HAaOWGb-BBJhQ9EgBp7YvoY/export?format=csv&gid=445477995"
 
     schools = _read_csv_url(schools_url)
     if not _has_columns(schools, ["School", "TeamID"]):
@@ -382,11 +400,11 @@ def get_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, 
     if drafts.empty:
         drafts = _safe_read_google_sheet(SCHOOLS_SHEET_ID, 1037681902, _empty_drafts())
     if bowls.empty:
-        bowls = _safe_read_google_sheet(SCHOOLS_SHEET_ID, 445477995445477995, _empty_bowls())
+        bowls = _safe_read_google_sheet(SCHOOLS_SHEET_ID, 445477995, _empty_bowls())
     schedule = _ensure_columns(schedule, ["Year", "Week", "TeamA", "TeamB", "Conference", "Notes"])
     scores = _ensure_columns(scores, ["Year", "Team", "Week", "Points"])
     rankings = _ensure_columns(rankings, ["Year", "Week", "Type", "Rank", "Team"])
-    drafts = _ensure_columns(drafts, ["Year", "Conference", "Round", "Pick", "Team", "Player"])
+    drafts = _ensure_columns(drafts, ["Year", "Conference", "Type", "Round", "Pick", "Team", "Player"])
     bowls = _ensure_columns(bowls, ["Bowl", "Logo"])
     starters = _ensure_columns(starters, ["Team", "Position", "Player", "RosterSpot", "Week", "Year", "Conference", "Points", "TeamPoints"])
 
