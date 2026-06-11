@@ -2559,7 +2559,7 @@ def masthead() -> None:
         selected_season = st.selectbox(
             "Season",
             [2022, 2023, 2024, 2025, 2026],
-            index=3,
+            index=4,
             key="global_season",
         )
         st.html("</div>")
