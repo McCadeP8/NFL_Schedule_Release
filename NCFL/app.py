@@ -4136,6 +4136,30 @@ def build_history_ledger(
     return pd.DataFrame(rows, columns=columns)
 
 
+def conference_championship_mask(ledger: pd.DataFrame) -> pd.Series:
+    return ledger["Notes"].map(match_key).str.contains(
+        r"\bconf(?:erence)?\s+champ(?:ionship)?\s+bowl\b",
+        regex=True,
+        na=False,
+    )
+
+
+def national_championship_mask(ledger: pd.DataFrame) -> pd.Series:
+    return ledger["Notes"].map(match_key).str.contains(
+        r"\bnational\s+championship\s+bowl\b",
+        regex=True,
+        na=False,
+    )
+
+
+def national_postseason_mask(ledger: pd.DataFrame) -> pd.Series:
+    return ledger["Notes"].map(match_key).str.contains(
+        r"\bnational\s+(?:semifinal|championship)\s+bowl\b",
+        regex=True,
+        na=False,
+    )
+
+
 def history_aggregate(ledger: pd.DataFrame, schools: Optional[pd.DataFrame] = None) -> pd.DataFrame:
     rows = []
     team_names = set(ledger["Team"]) if not ledger.empty else set()
@@ -4149,9 +4173,15 @@ def history_aggregate(ledger: pd.DataFrame, schools: Optional[pd.DataFrame] = No
         ties = int(games["Result"].eq("T").sum())
         ranked = games.loc[games["OpponentRank"].between(1, 25, inclusive="both")]
         conf = games.loc[games["ConferenceGame"]]
+        conference_titles = games.loc[
+            conference_championship_mask(games) & games["Result"].eq("W")
+        ]
+        national_titles = games.loc[
+            national_championship_mask(games) & games["Result"].eq("W")
+        ]
         bowls = games.loc[
             games["Notes"].str.contains("bowl", case=False, na=False)
-            & ~games["Notes"].str.contains("conference", case=False, na=False)
+            & ~conference_championship_mask(games)
         ]
         rows.append(
             {
@@ -4177,6 +4207,13 @@ def history_aggregate(ledger: pd.DataFrame, schools: Optional[pd.DataFrame] = No
                 "BowlWins": int(bowls["Result"].eq("W").sum()),
                 "BowlLosses": int(bowls["Result"].eq("L").sum()),
                 "BowlTies": int(bowls["Result"].eq("T").sum()),
+                "ConferenceChampionships": len(conference_titles),
+                "NationalChampionshipYears": ", ".join(
+                    str(year)
+                    for year in sorted(
+                        national_titles["Year"].dropna().astype(int).unique()
+                    )
+                ),
             }
         )
     return pd.DataFrame(rows).sort_values(
@@ -4222,10 +4259,10 @@ def history_program_table(aggregate: pd.DataFrame, schools: pd.DataFrame, limit:
             f"""
 <tr>
   <td><div class="standings-team"><span class="standings-rank">{index + 1}</span>{f'<img src="{esc(logo)}" alt="{esc(row["Team"])}">' if logo else ''}<div><div class="standings-team-name">{esc(row["Team"])}</div><div class="standings-team-sub">{esc(nickname)}</div></div></div></td>
-  <td>{int(row["Seasons"])}</td>
   <td>{record_html(int(row["Wins"]), int(row["Losses"]), int(row["Ties"]), float(row["WinPct"]))}</td>
   <td>{record_html(int(row["ConfWins"]), int(row["ConfLosses"]), int(row["ConfTies"]), float(row["ConfWinPct"]))}</td>
   <td>{float(row["PF"]):,.2f}</td><td>{float(row["PA"]):,.2f}</td><td>{ranked_record}</td><td>{bowl_record}</td>
+  <td>{int(row["ConferenceChampionships"])}</td><td>{esc(row["NationalChampionshipYears"], "-")}</td>
 </tr>
 """
         )
@@ -4233,7 +4270,7 @@ def history_program_table(aggregate: pd.DataFrame, schools: pd.DataFrame, limit:
         f"""
 <div class="history-section-title"><span>All-Time Programs</span><div></div></div>
 <div class="history-table-wrap"><table class="history-table">
-<thead><tr><th>Program</th><th>Seasons</th><th>Record</th><th>Conf Record</th><th>Points For</th><th>Points Against</th><th>vs Top 25</th><th>Bowl Record</th></tr></thead>
+<thead><tr><th>Program</th><th>Record</th><th>Conf Record</th><th>Points For</th><th>Points Against</th><th>vs Top 25</th><th>Bowl Record</th><th>Conf Championships</th><th>National Championships</th></tr></thead>
 <tbody>{''.join(rows)}</tbody></table></div>
 """
     )
@@ -4277,6 +4314,24 @@ def historical_owner(schools: pd.DataFrame, team: str, year: int) -> str:
     return clean_text(row.iloc[0].get(column)) if column else ""
 
 
+def record_book_score_html(game: pd.Series, label: str) -> str:
+    points = float(game["Points"])
+    opponent_points = float(game["OpponentPoints"])
+    if "Combined Points" in label:
+        detail = points + opponent_points
+    elif "Victory" in label or "Defeat" in label:
+        detail = abs(points - opponent_points)
+    else:
+        detail = None
+
+    subtext = (
+        f'<div class="record-sub">{detail:,.2f}</div>'
+        if detail is not None
+        else ""
+    )
+    return f'<div class="record-book-score">{points:,.2f}-{opponent_points:,.2f}{subtext}</div>'
+
+
 def history_record_book(ledger: pd.DataFrame, schools: pd.DataFrame, title: str = "Record Book") -> None:
     if ledger.empty:
         return
@@ -4314,8 +4369,9 @@ def history_record_book(ledger: pd.DataFrame, schools: pd.DataFrame, title: str 
             logo = clean_text(teams.get(team, {}).get("logo"))
             opponent = clean_text(game["Opponent"])
             opponent_logo = clean_text(teams.get(opponent, {}).get("logo"))
+            score_html = record_book_score_html(game, label)
             rows.append(
-                f"""<tr><td>{esc(label)}</td>{f'<td><div class="history-team" style="justify-content:flex-end;">{f"""<div class="history-team-name">{esc(team)}</div><img src="{esc(logo)}" alt="{esc(team)}">""" if logo else f"""<div class="history-team-name">{esc(team)}</div>"""}</div></td>' if not team_specific else ''}<td>{float(game["Points"]):,.2f}-{float(game["OpponentPoints"]):,.2f}</td><td><div class="history-team">{f'<img src="{esc(opponent_logo)}" alt="{esc(opponent)}">' if opponent_logo else ''}<div class="history-team-name">{esc(opponent)}</div></div></td><td>Week {int(game["Week"])}</td></tr>"""
+                f"""<tr><td>{esc(label)}</td>{f'<td><div class="history-team" style="justify-content:flex-end;">{f"""<div class="history-team-name">{esc(team)}</div><img src="{esc(logo)}" alt="{esc(team)}">""" if logo else f"""<div class="history-team-name">{esc(team)}</div>"""}</div></td>' if not team_specific else ''}<td>{score_html}</td><td><div class="history-team">{f'<img src="{esc(opponent_logo)}" alt="{esc(opponent)}">' if opponent_logo else ''}<div class="history-team-name">{esc(opponent)}</div></div></td><td>Week {int(game["Week"])}</td></tr>"""
             )
     team_header = "" if team_specific else "<th>Team</th>"
     st.html(f'<div class="history-section-title"><span>{esc(title)}</span><div></div></div><div class="history-table-wrap"><table class="history-table"><thead><tr><th>Record</th>{team_header}<th>Score</th><th>Opponent</th><th>Week</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div>')
@@ -4327,28 +4383,29 @@ def history_champions(
     bowls: pd.DataFrame,
     conference: str = "",
 ) -> None:
-    winners = ledger.loc[ledger["Result"].eq("W")].copy()
+    source = ledger.copy()
     if conference:
-        winners = winners.loc[winners["Conference"].eq(conference)]
-    winners = winners.drop_duplicates(["Year", "Week", "Team", "Opponent"])
-    if winners.empty:
+        source = source.loc[source["Conference"].eq(conference)]
+    source = source.drop_duplicates(["Year", "Week", "Team", "Opponent"])
+    if source.empty:
         return
     teams = team_lookup(schools)
     sections = []
-    note_keys = winners["Notes"].map(match_key)
+    conference_champions = source.loc[
+        conference_championship_mask(source) & source["Result"].eq("W")
+    ]
+    national_games = source.loc[national_postseason_mask(source)]
+    if not conference:
+        national_games = national_games.loc[national_games["Result"].eq("W")]
     groups = [
         (
             "Conference Championships",
-            winners.loc[
-                note_keys.str.contains(r"\bconf(?:erence)?\s+champ(?:ionship)?\s+bowl\b", regex=True, na=False)
-            ],
+            conference_champions,
             not conference,
         ),
         (
             "National Championship",
-            winners.loc[
-                note_keys.str.contains(r"\bnational\s+(?:semifinal|championship)\s+bowl\b", regex=True, na=False)
-            ],
+            national_games,
             False,
         ),
     ]
@@ -4367,8 +4424,13 @@ def history_champions(
                 opponent_logo = clean_text(teams.get(opponent, {}).get("logo"))
                 event = bowl_for_notes(game["Notes"], bowls)
                 event_logo = clean_text(event.get("logo"))
+                winner_star = (
+                    f'<span class="champion-star {star_class}" title="Winner">&#9733;</span>'
+                    if game["Result"] == "W"
+                    else '<span style="width:24px;flex-shrink:0;"></span>'
+                )
                 rows.append(
-                    f"""<tr><td>{f'<img src="{esc(event_logo)}" alt="{esc(game["Notes"])}" title="{esc(game["Notes"])}" style="width:44px;height:36px;object-fit:contain;">' if event_logo else esc(game["Notes"])}</td>{f'<td>{esc(game["Conference"])}</td>' if show_conference else ''}<td><div class="history-team" style="justify-content:flex-end;"><span class="champion-star {star_class}" title="Winner">&#9733;</span>{f'<div class="history-team-name">{esc(team)}</div><img src="{esc(team_logo)}" alt="{esc(team)}">' if team_logo else f'<div class="history-team-name">{esc(team)}</div>'}</div></td><td>{float(game["Points"]):,.2f}-{float(game["OpponentPoints"]):,.2f}</td><td><div class="history-team">{f'<img src="{esc(opponent_logo)}" alt="{esc(opponent)}">' if opponent_logo else ''}<div class="history-team-name">{esc(opponent)}</div></div></td></tr>"""
+                    f"""<tr><td>{f'<img src="{esc(event_logo)}" alt="{esc(game["Notes"])}" title="{esc(game["Notes"])}" style="width:44px;height:36px;object-fit:contain;">' if event_logo else esc(game["Notes"])}</td>{f'<td>{esc(game["Conference"])}</td>' if show_conference else ''}<td><div class="history-team" style="justify-content:flex-end;">{winner_star}{f'<div class="history-team-name">{esc(team)}</div><img src="{esc(team_logo)}" alt="{esc(team)}">' if team_logo else f'<div class="history-team-name">{esc(team)}</div>'}</div></td><td>{float(game["Points"]):,.2f}-{float(game["OpponentPoints"]):,.2f}</td><td><div class="history-team">{f'<img src="{esc(opponent_logo)}" alt="{esc(opponent)}">' if opponent_logo else ''}<div class="history-team-name">{esc(opponent)}</div></div></td></tr>"""
                 )
         conference_header = "<th>Conference</th>" if show_conference else ""
         winner_header = "Champion" if title == "Conference Championships" else "Winner"
@@ -4412,7 +4474,10 @@ def team_history_yearbook(full_ledger: pd.DataFrame, schools: pd.DataFrame, team
     for year in sorted(history_years, reverse=True):
         season = games.loc[games["Year"].eq(year)].copy()
         conf = season.loc[season["ConferenceGame"]]
-        bowl = season.loc[season["Notes"].str.contains("bowl", case=False, na=False)]
+        bowl = season.loc[
+            season["Notes"].str.contains("bowl", case=False, na=False)
+            & ~conference_championship_mask(season)
+        ]
         bowl_text = ""
         if not bowl.empty:
             bowl_text = "<br>".join(
@@ -4523,7 +4588,10 @@ def render_conference_history(
     history_metrics(
         [
             (f'{conf_ledger["Year"].nunique()}', "Seasons"),
-            (f'{len(aggregate)}', "Programs"),
+            (
+                f'{int((national_championship_mask(conf_ledger) & conf_ledger["Result"].eq("W")).sum())}',
+                "League Championships",
+            ),
             (f'{int(conf_ledger["Result"].eq("W").sum())}', "Wins"),
             (f'{int((conf_ledger["OpponentRank"].between(1, 25) & conf_ledger["Result"].eq("W")).sum())}', "Top-25 Wins"),
         ],
@@ -4547,12 +4615,19 @@ def render_team_history(
     losses = int(games["Result"].eq("L").sum())
     ties = int(games["Result"].eq("T").sum())
     ranked_wins = int((games["OpponentRank"].between(1, 25) & games["Result"].eq("W")).sum())
+    conference_titles = int(
+        (conference_championship_mask(games) & games["Result"].eq("W")).sum()
+    )
+    national_titles = int(
+        (national_championship_mask(games) & games["Result"].eq("W")).sum()
+    )
     history_metrics(
         [
             (record_text(wins, losses, ties), "All-Time Record"),
             (f'{games["Points"].sum():,.2f}', "Points Scored"),
             (f"{ranked_wins}", "Top-25 Wins"),
-            (f'{games["Margin"].max():,.2f}' if not games.empty else "-", "Largest Win"),
+            (f"{conference_titles}", "Conference Championships"),
+            (f"{national_titles}", "National Championships"),
         ],
         clean_text(info.get("color"), "#c8102e"),
     )
