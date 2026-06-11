@@ -4207,7 +4207,12 @@ def history_aggregate(ledger: pd.DataFrame, schools: Optional[pd.DataFrame] = No
                 "BowlWins": int(bowls["Result"].eq("W").sum()),
                 "BowlLosses": int(bowls["Result"].eq("L").sum()),
                 "BowlTies": int(bowls["Result"].eq("T").sum()),
-                "ConferenceChampionships": len(conference_titles),
+                "ConferenceChampionshipYears": ", ".join(
+                    str(year)
+                    for year in sorted(
+                        conference_titles["Year"].dropna().astype(int).unique()
+                    )
+                ),
                 "NationalChampionshipYears": ", ".join(
                     str(year)
                     for year in sorted(
@@ -4262,7 +4267,7 @@ def history_program_table(aggregate: pd.DataFrame, schools: pd.DataFrame, limit:
   <td>{record_html(int(row["Wins"]), int(row["Losses"]), int(row["Ties"]), float(row["WinPct"]))}</td>
   <td>{record_html(int(row["ConfWins"]), int(row["ConfLosses"]), int(row["ConfTies"]), float(row["ConfWinPct"]))}</td>
   <td>{float(row["PF"]):,.2f}</td><td>{float(row["PA"]):,.2f}</td><td>{ranked_record}</td><td>{bowl_record}</td>
-  <td>{int(row["ConferenceChampionships"])}</td><td>{esc(row["NationalChampionshipYears"], "-")}</td>
+  <td>{esc(row["ConferenceChampionshipYears"], "-")}</td><td>{esc(row["NationalChampionshipYears"], "-")}</td>
 </tr>
 """
         )
