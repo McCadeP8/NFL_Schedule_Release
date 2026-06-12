@@ -89,22 +89,25 @@ header[data-testid="stHeader"] {
   background:rgba(49,213,208,.18)!important;
 }
 
-[data-testid="stSidebar"] { background:linear-gradient(180deg,#19364c 0%,#234b64 100%); border-right:1px solid rgba(49,213,208,.28); }
-[data-testid="stSidebar"] * { color:#fff; }
-[data-testid="stSidebarContent"] { padding:0 1rem; }
-[data-testid="stSidebar"] .stRadio label { padding:.5rem .45rem; }
-[data-testid="stSidebar"] div[data-testid="stWidgetLabel"] p {
-  font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:800; letter-spacing:2px; text-transform:uppercase;
-}
-[data-testid="stToolbar"],[data-testid="stToolbar"]>div,[data-testid="stSidebarCollapseButton"],
-[data-testid="stSidebarCollapseButton"] button,[data-testid="stExpandSidebarButton"] { opacity:1!important; visibility:visible!important; }
-[data-testid="stSidebarCollapseButton"] button,[data-testid="stExpandSidebarButton"] {
-  background:var(--aqua)!important; border:2px solid #fff!important; border-radius:999px!important;
-  box-shadow:0 5px 16px rgba(23,44,61,.25)!important; color:var(--navy)!important;
-  height:2.4rem!important; width:2.4rem!important;
-}
-[data-testid="stSidebarCollapseButton"] { right:.8rem; top:.8rem; }
-[data-testid="stExpandSidebarButton"] { left:1rem!important; top:.9rem!important; }
+[data-testid="stSidebar"] { display:none!important; }
+[data-testid="stSidebarCollapseButton"],[data-testid="stExpandSidebarButton"] { display:none!important; }
+[data-testid="stToolbar"],[data-testid="stToolbar"]>div { opacity:1!important; visibility:visible!important; }
+
+.top-brand { display:flex; align-items:center; gap:20px; padding:28px 0 17px; border-bottom:1px solid var(--line); }
+.top-brand img { width:min(380px,45vw); height:auto; object-fit:contain; }
+.top-brand-copy { border-left:1px solid var(--line); color:#8294a0; font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:800; letter-spacing:3px; padding-left:20px; text-transform:uppercase; }
+.st-key-top_control_deck { background:#fff; border:1px solid var(--line); border-radius:8px; box-shadow:0 2px 10px rgba(23,44,61,.06); margin:14px 0 8px; padding:11px 14px 4px; }
+.st-key-top_control_deck div[data-testid="stWidgetLabel"] p { color:var(--navy)!important; font-family:'Barlow Condensed',sans-serif!important; font-size:12px!important; font-weight:800!important; letter-spacing:1.5px!important; text-transform:uppercase!important; }
+.st-key-top_control_deck div[data-baseweb="select"]>div { background:#f7fafb!important; border-color:var(--line)!important; color:var(--navy)!important; }
+.st-key-top_control_deck div[data-baseweb="select"] * { color:var(--navy)!important; }
+
+.st-key-navigation_tabs div[data-testid="stWidgetLabel"] { display:none!important; }
+.st-key-navigation_tabs [data-baseweb="button-group"] { background:transparent!important; border-bottom:2px solid var(--line); border-radius:0!important; gap:0!important; width:100%; }
+.st-key-navigation_tabs button { background:transparent!important; border:0!important; border-bottom:3px solid transparent!important; border-radius:0!important; color:#91a1ab!important; font-family:'Barlow Condensed',sans-serif!important; font-size:16px!important; font-weight:800!important; letter-spacing:1.7px!important; padding:13px 24px!important; text-transform:uppercase!important; }
+.st-key-navigation_tabs button:hover { color:var(--navy)!important; background:#edf8f8!important; }
+.st-key-navigation_tabs button[aria-pressed="true"] { color:var(--navy)!important; border-bottom-color:var(--aqua)!important; background:transparent!important; }
+.st-key-top_control_deck [data-baseweb="button-group"] button { color:var(--navy)!important; font-family:'Barlow Condensed',sans-serif!important; font-size:12px!important; font-weight:800!important; }
+.st-key-top_control_deck [data-baseweb="button-group"] button[aria-pressed="true"] { background:var(--navy)!important; color:#fff!important; }
 
 .masthead { display:flex; justify-content:space-between; align-items:flex-end; gap:24px; padding:30px 0 22px; border-bottom:2px solid var(--line); margin-bottom:20px; }
 .mast-kicker { font-family:'Barlow Condensed',sans-serif; color:#168f8c; font-weight:800; font-size:13px; letter-spacing:4px; text-transform:uppercase; }
@@ -178,27 +181,15 @@ header[data-testid="stHeader"] {
 .condition-rank-value { color:var(--ink); font-family:'Rajdhani',sans-serif; font-size:22px; font-weight:800; line-height:1; }
 .condition-rank-share { color:#8b9ba6; font-size:10px; font-weight:700; margin-top:3px; text-transform:uppercase; }
 
-.st-key-severity_toggle_group div[data-testid="stWidgetLabel"] { display:none!important; }
-.st-key-severity_toggle_group div[data-testid="stCheckbox"] label {
-  display:flex!important; align-items:center!important; min-height:48px!important;
-  background:#fff!important; border:1px solid var(--line)!important; border-top:5px solid var(--severity-color)!important;
-  border-radius:7px!important; box-shadow:0 2px 8px rgba(23,44,61,.06)!important;
-  padding:8px 11px!important; transition:transform .15s ease,box-shadow .15s ease,background .15s ease!important;
-}
-.st-key-severity_toggle_group div[data-testid="stCheckbox"] label:hover {
-  transform:translateY(-1px); box-shadow:0 5px 14px rgba(23,44,61,.11)!important;
-}
-.st-key-severity_toggle_group div[data-testid="stCheckbox"] label:has(input:checked) {
-  background:color-mix(in srgb,var(--severity-color) 13%,white)!important;
-  border-color:var(--severity-color)!important;
-}
-.st-key-severity_toggle_group div[data-testid="stCheckbox"] label p {
+.st-key-severity_toggle_group { background:#fff; border:1px solid var(--line); border-radius:8px; box-shadow:0 2px 10px rgba(23,44,61,.06); padding:12px 15px 7px; }
+.st-key-severity_toggle_group div[data-testid="stWidgetLabel"] p {
   color:var(--navy)!important; font-family:'Barlow Condensed',sans-serif!important;
-  font-size:12px!important; font-weight:800!important; letter-spacing:.7px!important; text-transform:uppercase!important;
+  font-size:12px!important; font-weight:800!important; letter-spacing:.4px!important; line-height:1.15!important;
+  text-transform:uppercase!important;
 }
-.st-key-severity_toggle_group div[data-testid="stCheckbox"] [data-testid="stCheckboxIcon"] {
-  color:var(--severity-color)!important; fill:var(--severity-color)!important;
-}
+.st-key-severity_toggle_group div[data-testid="stToggle"] label { gap:8px!important; }
+.st-key-severity_toggle_group div[data-testid="stToggle"] [role="switch"] { background:#dbe5e9!important; }
+.st-key-severity_toggle_group div[data-testid="stToggle"] [role="switch"][aria-checked="true"] { background:var(--severity-color)!important; }
 .st-key-severity_fatal { --severity-color:#b4232d; }
 .st-key-severity_serious { --severity-color:#e68723; }
 .st-key-severity_minor { --severity-color:#31d5d0; }
@@ -399,30 +390,46 @@ county_analytics = load_county_analytics()
 utah_crashes = load_utah_crashes()
 utah_county_analytics = load_utah_county_analytics()
 
-with st.sidebar:
-    st.image("https://elysiumwealthmanagement.com/wp-content/uploads/2025/02/elysium-800x166.png", width="stretch")
-    st.caption("TRAFFIC ACCIDENT INTELLIGENCE")
-    st.divider()
-    page = st.radio(
-        "Navigation",
-        ("Executive Overview", "Accident Trends", "Risk Factors", "Geographic Analysis"),
-        label_visibility="collapsed",
-    )
-    st.divider()
-    st.caption("OFFICIAL DATA FILTERS")
-    states = sorted(fars["state"].dropna().unique()) if not fars.empty else ["Utah"]
-    selected_state = st.selectbox("State", states, index=states.index("Utah") if "Utah" in states else 0)
-    utah_all_crash_available = (
-        not utah_crashes.empty and "year" in utah_crashes.columns
-    )
-    crash_scope = "Fatal Crashes Only"
-    if selected_state == "Utah" and utah_all_crash_available:
-        crash_scope = st.radio(
-            "Crash scope",
-            ("All Reported Crashes", "Fatal Crashes Only"),
+st.html(
+    """
+    <div class="top-brand">
+      <img src="https://elysiumwealthmanagement.com/wp-content/uploads/2025/02/elysium-800x166.png" alt="Elysium Wealth Management">
+      <div class="top-brand-copy">Traffic Accident Intelligence</div>
+    </div>
+    """
+)
+
+page = st.segmented_control(
+    "Navigation",
+    ("Executive Overview", "Accident Trends", "Risk Factors", "Geographic Analysis"),
+    default="Executive Overview",
+    label_visibility="collapsed",
+    width="stretch",
+    key="navigation_tabs",
+)
+
+states = sorted(fars["state"].dropna().unique()) if not fars.empty else ["Utah"]
+utah_all_crash_available = not utah_crashes.empty and "year" in utah_crashes.columns
+with st.container(key="top_control_deck"):
+    state_column, scope_column, years_column = st.columns((1, 1.45, 2.7), gap="medium")
+    with state_column:
+        selected_state = st.selectbox(
+            "State",
+            states,
+            index=states.index("Utah") if "Utah" in states else 0,
         )
-    elif selected_state == "Utah":
-        st.caption("All-crash UDOT data is not installed in this deployment.")
+    with scope_column:
+        if selected_state == "Utah" and utah_all_crash_available:
+            crash_scope = st.segmented_control(
+                "Crash Scope",
+                ("All Reported Crashes", "Fatal Crashes Only"),
+                default="All Reported Crashes",
+                width="stretch",
+                key="crash_scope_tabs",
+            )
+        else:
+            crash_scope = "Fatal Crashes Only"
+            st.text_input("Crash Scope", value=crash_scope, disabled=True)
     use_utah_all_crashes = (
         selected_state == "Utah"
         and crash_scope == "All Reported Crashes"
@@ -434,9 +441,12 @@ with st.sidebar:
         if "year" in year_source.columns
         else []
     )
-    selected_years = st.multiselect("Crash years", available_years, default=available_years)
-    st.divider()
-    st.caption("NHTSA FARS · CENSUS CBP · CENSUS POPULATION ESTIMATES")
+    with years_column:
+        selected_years = st.multiselect(
+            "Crash Years",
+            available_years,
+            default=available_years,
+        )
 
 if fars.empty or not selected_years:
     st.info("Select at least one year or run `python ingest.py` to load official data.")
@@ -627,7 +637,7 @@ else:
             toggle_columns = st.columns(5, gap="small")
             for column, (label, key) in zip(toggle_columns, severity_options):
                 with column:
-                    enabled = st.checkbox(label, value=True, key=key)
+                    enabled = st.toggle(label, value=True, key=key)
                     if enabled:
                         selected_severities.append(
                             "No Injury/PDO" if label == "No Injury / PDO" else label
