@@ -18,10 +18,10 @@ from data import load_branding_data as fetch_branding_data
 LEAGUE_NAME = "NCAA/NFL Crossover"
 LEAGUE_LOGO = "https://upload.wikimedia.org/wikipedia/en/c/cf/NCAA_football_icon_logo.svg"
 SILHOUETTE_PLAYER_HEADSHOT = (
-    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E"
-    "%3Crect width='200' height='200' fill='%23eef2f7'/%3E"
-    "%3Ccircle cx='100' cy='72' r='42' fill='%2305070b'/%3E"
-    "%3Cpath d='M30 200c4-55 30-82 70-82s66 27 70 82z' fill='%2305070b'/%3E%3C/svg%3E"
+    "data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 200 200%27%3E"
+    "%3Crect width=%27200%27 height=%27200%27 fill=%27%23eef2f7%27/%3E"
+    "%3Ccircle cx=%27100%27 cy=%2772%27 r=%2742%27 fill=%27%2305070b%27/%3E"
+    "%3Cpath d=%27M30 200c4-55 30-82 70-82s66 27 70 82z%27 fill=%27%2305070b%27/%3E%3C/svg%3E"
 )
 PLAYER_PICTURE_LOOKUP: dict[str, str] = {}
 LEAGUE_ROSTER_ORDER = [
@@ -91,6 +91,10 @@ def player_picture(player: object) -> str:
         player_picture_key(player),
         SILHOUETTE_PLAYER_HEADSHOT,
     )
+
+
+def player_picture_fallback() -> str:
+    return f"this.onerror=null;this.src='{SILHOUETTE_PLAYER_HEADSHOT}';"
 
 
 def canonical_team_key(value: object) -> str:
@@ -3221,7 +3225,7 @@ def boxscore_rows_html(
         left_player_html = (
             f"""
     <div class="boxscore-player-wrap">
-      <img class="boxscore-headshot" src="{esc(player_picture(left_player))}" alt="{esc(left_player)}">
+      <img class="boxscore-headshot" src="{esc(player_picture(left_player))}" alt="{esc(left_player)}" onerror="{player_picture_fallback()}">
       <div>
         <div class="boxscore-player-name">{esc(left_player)}</div>
         {left_stats}
@@ -3238,7 +3242,7 @@ def boxscore_rows_html(
         <div class="boxscore-player-name">{esc(right_player)}</div>
         {right_stats}
       </div>
-      <img class="boxscore-headshot" src="{esc(player_picture(right_player))}" alt="{esc(right_player)}">
+      <img class="boxscore-headshot" src="{esc(player_picture(right_player))}" alt="{esc(right_player)}" onerror="{player_picture_fallback()}">
     </div>
 """
             if right_player
@@ -4577,7 +4581,7 @@ def team_starter_history(starters: pd.DataFrame, ledger: pd.DataFrame, team: str
     summary["StartPct"] = summary["Starts"] / summary["RosterGames"].clip(lower=1)
     summary = summary.sort_values(["Points", "Starts"], ascending=[False, False])
     position_colors = {"QB": "#ef4444", "RB": "#f97316", "WR": "#eab308", "TE": "#22c55e"}
-    body = "".join(f'<tr><td><span class="standings-rank">{index + 1}</span></td><td><div class="history-team"><img src="{esc(player_picture(row["Player"]))}" alt="{esc(row["Player"])}" style="border-radius:50%;object-fit:cover;object-position:center 12%;"><div style="display:flex;align-items:center;gap:7px;"><div class="history-team-name">{esc(row["Player"])}</div><span class="position-chip" style="background:{position_colors.get(clean_text(row["Position"]), "#e5e7eb")};">{esc(row["Position"])}</span></div></div></td><td>{int(row["Starts"])}</td><td>{row["StartPct"]:.1%}</td><td>{row["Points"]:,.2f}</td><td>{row["Average"]:,.2f}</td><td>{row["Best"]:,.2f}</td></tr>' for index, (_, row) in enumerate(summary.head(50).iterrows()))
+    body = "".join(f'<tr><td><span class="standings-rank">{index + 1}</span></td><td><div class="history-team"><img src="{esc(player_picture(row["Player"]))}" alt="{esc(row["Player"])}" onerror="{player_picture_fallback()}" style="border-radius:50%;object-fit:cover;object-position:center 12%;"><div style="display:flex;align-items:center;gap:7px;"><div class="history-team-name">{esc(row["Player"])}</div><span class="position-chip" style="background:{position_colors.get(clean_text(row["Position"]), "#e5e7eb")};">{esc(row["Position"])}</span></div></div></td><td>{int(row["Starts"])}</td><td>{row["StartPct"]:.1%}</td><td>{row["Points"]:,.2f}</td><td>{row["Average"]:,.2f}</td><td>{row["Best"]:,.2f}</td></tr>' for index, (_, row) in enumerate(summary.head(50).iterrows()))
     st.html(f'<div class="history-section-title"><span>All-Time Starter Production</span><div></div></div><div class="history-table-wrap"><table class="history-table"><thead><tr><th>Rank</th><th>Player</th><th>Starts</th><th>Start %</th><th>Points While Starting</th><th>Avg Start</th><th>Best Start</th></tr></thead><tbody>{body}</tbody></table></div>')
 
 
@@ -5290,7 +5294,7 @@ def render_draft_board(
     <span class="draft-pick">{esc(pick_label)}</span>
     {f'<img class="draft-team-logo" src="{esc(logo)}" alt="{esc(team)}">' if logo else '<span></span>'}
   </div>
-  <img class="draft-player-photo" src="{esc(player_picture(player))}" alt="{esc(player, 'Player')}">
+  <img class="draft-player-photo" src="{esc(player_picture(player))}" alt="{esc(player, 'Player')}" onerror="{player_picture_fallback()}">
   <div class="draft-player {'draft-empty-player' if not player else ''}">{esc(player, 'TBD')}</div>
 </div>
 """
@@ -5415,7 +5419,7 @@ def render_league_draft_board(
   <div class="league-draft-pick-top">
     <span class="league-draft-pick-number">{esc(draft_slot)}</span>
     {f'<img src="{esc(team_logo)}" alt="{esc(team)}" title="{esc(team)}">' if team_logo else '<span></span>'}
-    <img class="league-draft-player-photo" src="{esc(player_picture(player))}" alt="{esc(player)}">
+    <img class="league-draft-player-photo" src="{esc(player_picture(player))}" alt="{esc(player)}" onerror="{player_picture_fallback()}">
   </div>
   <div class="league-draft-player">{esc(player)}</div>
 </div>
@@ -5502,7 +5506,7 @@ def render_roster_matrix(rosters: pd.DataFrame) -> None:
                         f"""
 <td>
   <div class="roster-player-cell">
-    <img src="{esc(player_picture(player_name))}" alt="{esc(player_name)}">
+    <img src="{esc(player_picture(player_name))}" alt="{esc(player_name)}" onerror="{player_picture_fallback()}">
     <span>{esc(player_name)}</span>
   </div>
 </td>
@@ -5697,7 +5701,7 @@ def render_league_roster_matrix(
                 f"""
 <td class="player-col">
   <div class="league-player">
-    <img src="{esc(player_picture(row["player_name"]))}" alt="{esc(row["player_name"])}">
+    <img src="{esc(player_picture(row["player_name"]))}" alt="{esc(row["player_name"])}" onerror="{player_picture_fallback()}">
     <span>{esc(row["player_name"])}</span>
   </div>
 </td>
@@ -5945,7 +5949,7 @@ def render_team_roster(
             rows.append(
                 f"""
 <div class="team-roster-player">
-  <img src="{esc(player_picture(player.get("player_name")))}" alt="{esc(player.get("player_name"))}">
+  <img src="{esc(player_picture(player.get("player_name")))}" alt="{esc(player.get("player_name"))}" onerror="{player_picture_fallback()}">
   <div>
     <div class="team-roster-player-name">{esc(player.get("player_name"))}</div>
     <div class="team-roster-player-meta">
