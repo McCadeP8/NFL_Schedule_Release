@@ -5191,12 +5191,7 @@ def render_rankings(
 ) -> None:
     weeks = ranking_weeks(rankings)
     if not weeks:
-        under_construction("Rankings")
-        with st.expander("Rankings data check"):
-            st.write("Rankings columns", rankings.columns.tolist())
-            st.write("Rankings rows", len(rankings))
-            st.dataframe(rankings.head(25), use_container_width=True, hide_index=True)
-        return
+        weeks = [0]
 
     selected_week = st.selectbox(
         "Week",
@@ -5281,6 +5276,17 @@ def render_rankings(
   </div>
 """
 
+    if ap_top.empty:
+        st.html(
+            """
+<div class="brand-panel" style="--accent:#f2cf68;margin:12px 0 18px;">
+  <div>
+    <div class="conf-kicker">Preseason Dynasty Valuation</div>
+    <div class="conf-title" style="font-size:42px;">144-Team Coaches Poll</div>
+  </div>
+</div>
+"""
+        )
     st.html(
         f"""
 <div class="rankings-layout {'ap-only' if coaches_top.empty else ''}">
