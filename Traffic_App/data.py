@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import sqlite3
 from typing import BinaryIO
@@ -13,6 +14,25 @@ import streamlit as st
 DATA_DIRECTORY = Path(__file__).parent / "data"
 DEFAULT_DATA_FILE = DATA_DIRECTORY / "accidents.csv"
 DATABASE_PATH = DATA_DIRECTORY / "traffic_data.sqlite"
+DEPLOY_DIRECTORY = DATA_DIRECTORY / "deploy"
+
+
+def load_table(table: str) -> pd.DataFrame:
+    """Load a table from local SQLite or its compact deployment fallback."""
+    force_deploy = os.getenv("ELYSIUM_FORCE_DEPLOY_DATA") == "1"
+    if DATABASE_PATH.exists() and not force_deploy:
+        with sqlite3.connect(DATABASE_PATH) as connection:
+            table_exists = connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
+            ).fetchone()
+            if table_exists:
+                return pd.read_sql_query(f'SELECT * FROM "{table}"', connection)
+
+    deployment_file = DEPLOY_DIRECTORY / f"{table}.csv.gz"
+    if deployment_file.exists():
+        dtype = {"state_fips": str, "county_geoid": str}
+        return pd.read_csv(deployment_file, low_memory=False, dtype=dtype)
+    return pd.DataFrame()
 
 
 @st.cache_data(show_spinner=False)
@@ -35,63 +55,34 @@ def load_accident_data(uploaded_file: BinaryIO | None = None) -> pd.DataFrame:
 @st.cache_data(show_spinner=False)
 def load_fars_crashes() -> pd.DataFrame:
     """Load normalized nationwide fatal-crash records."""
-    if not DATABASE_PATH.exists():
-        return pd.DataFrame()
-    with sqlite3.connect(DATABASE_PATH) as connection:
-        return pd.read_sql_query("SELECT * FROM fars_crashes", connection)
+    return load_table("fars_crashes")
 
 
 @st.cache_data(show_spinner=False)
 def load_business_patterns() -> pd.DataFrame:
     """Load target-industry county business counts."""
-    if not DATABASE_PATH.exists():
-        return pd.DataFrame()
-    with sqlite3.connect(DATABASE_PATH) as connection:
-        return pd.read_sql_query("SELECT * FROM county_business_patterns", connection)
+    return load_table("county_business_patterns")
 
 
 @st.cache_data(show_spinner=False)
 def load_data_sources() -> pd.DataFrame:
     """Load data provenance and refresh metadata."""
-    if not DATABASE_PATH.exists():
-        return pd.DataFrame()
-    with sqlite3.connect(DATABASE_PATH) as connection:
-        return pd.read_sql_query("SELECT * FROM data_sources", connection)
+    return load_table("data_sources")
 
 
 @st.cache_data(show_spinner=False)
 def load_county_analytics() -> pd.DataFrame:
     """Load the joined county-year crash, population, and market table."""
-    if not DATABASE_PATH.exists():
-        return pd.DataFrame()
-    with sqlite3.connect(DATABASE_PATH) as connection:
-        return pd.read_sql_query("SELECT * FROM county_marketing_analytics", connection)
+    return load_table("county_marketing_analytics")
 
 
 @st.cache_data(show_spinner=False)
 def load_utah_crashes() -> pd.DataFrame:
     """Load UDOT's anonymized all-severity Utah crash records."""
-    if not DATABASE_PATH.exists():
-        return pd.DataFrame()
-    with sqlite3.connect(DATABASE_PATH) as connection:
-        table_exists = connection.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='utah_crashes'"
-        ).fetchone()
-        if not table_exists:
-            return pd.DataFrame()
-        return pd.read_sql_query("SELECT * FROM utah_crashes", connection)
+    return load_table("utah_crashes")
 
 
 @st.cache_data(show_spinner=False)
 def load_utah_county_analytics() -> pd.DataFrame:
     """Load complete Utah county-year all-severity crash analytics."""
-    if not DATABASE_PATH.exists():
-        return pd.DataFrame()
-    with sqlite3.connect(DATABASE_PATH) as connection:
-        table_exists = connection.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' "
-            "AND name='utah_county_crash_analytics'"
-        ).fetchone()
-        if not table_exists:
-            return pd.DataFrame()
-        return pd.read_sql_query("SELECT * FROM utah_county_crash_analytics", connection)
+    return load_table("utah_county_crash_analytics")

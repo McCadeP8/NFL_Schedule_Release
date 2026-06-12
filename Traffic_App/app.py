@@ -430,7 +430,6 @@ if use_utah_all_crashes:
             "speed_related": raw_utah["speed_related"].eq("Y").astype(int),
             "distracted_driving": raw_utah["distracted_driving"].eq("Y").astype(int),
             "dui": raw_utah["dui"].eq("Y").astype(int),
-            "crash_datetime": raw_utah["crash_datetime"],
             "crash_severity_desc": raw_utah["crash_severity_desc"],
             "main_road_name": raw_utah["main_road_name"],
             "route_id": raw_utah["route_id"],

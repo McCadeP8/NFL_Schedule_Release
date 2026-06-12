@@ -56,6 +56,15 @@ The pipeline also loads UDOT's anonymized Utah Crash Locations service for all r
 crash severities from 2019-2024. UDOT refreshes the public service nightly; recent-year
 records may be preliminary or delayed, so the app intentionally uses completed years.
 
+To rebuild the compact data bundle committed for Streamlit Cloud:
+
+```powershell
+python build_deployment_data.py
+```
+
+The app reads the full SQLite database locally and automatically falls back to the
+compressed files in `data/deploy/` when deployed without SQLite.
+
 The app accepts CSV and Excel files from the sidebar. A default dataset may also be
 placed at `data/accidents.csv`.
 
