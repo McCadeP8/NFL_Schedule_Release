@@ -17,7 +17,13 @@ from data import load_branding_data as fetch_branding_data
 
 LEAGUE_NAME = "NCAA/NFL Crossover"
 LEAGUE_LOGO = "https://upload.wikimedia.org/wikipedia/en/c/cf/NCAA_football_icon_logo.svg"
-PLACEHOLDER_PLAYER_HEADSHOT = "https://www.pro-football-reference.com/req/20230307/images/headshots/HerbJu00_2025.jpg"
+SILHOUETTE_PLAYER_HEADSHOT = (
+    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E"
+    "%3Crect width='200' height='200' fill='%23eef2f7'/%3E"
+    "%3Ccircle cx='100' cy='72' r='42' fill='%2305070b'/%3E"
+    "%3Cpath d='M30 200c4-55 30-82 70-82s66 27 70 82z' fill='%2305070b'/%3E%3C/svg%3E"
+)
+PLAYER_PICTURE_LOOKUP: dict[str, str] = {}
 LEAGUE_ROSTER_ORDER = [
     "Big 12",
     "B1G",
@@ -46,7 +52,7 @@ SCHEDULE_STATUS_COLORS = {
     "pending": "#8a96b0",
 }
 CACHE_TTL_SECONDS = 60 * 60 * 24
-DATA_CACHE_VERSION = "history-archive-v4"
+DATA_CACHE_VERSION = "player-pictures-v1"
 
 
 def clean_text(value: object, fallback: str = "") -> str:
@@ -74,6 +80,17 @@ def first_value(frame: pd.DataFrame, column: str, fallback: str = "") -> str:
 
 def match_key(value: object) -> str:
     return clean_text(value).casefold()
+
+
+def player_picture_key(value: object) -> str:
+    return re.sub(r"[^a-z0-9]+", "", clean_text(value).casefold())
+
+
+def player_picture(player: object) -> str:
+    return PLAYER_PICTURE_LOOKUP.get(
+        player_picture_key(player),
+        SILHOUETTE_PLAYER_HEADSHOT,
+    )
 
 
 def canonical_team_key(value: object) -> str:
@@ -2646,7 +2663,7 @@ def under_construction(label: str) -> None:
 @st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner="Loading team branding...")
 def load_branding_data(
     cache_version: str,
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+) -> tuple[pd.DataFrame, ...]:
     del cache_version
     return fetch_branding_data()
 
@@ -3204,7 +3221,7 @@ def boxscore_rows_html(
         left_player_html = (
             f"""
     <div class="boxscore-player-wrap">
-      <img class="boxscore-headshot" src="{PLACEHOLDER_PLAYER_HEADSHOT}" alt="{esc(left_player)}">
+      <img class="boxscore-headshot" src="{esc(player_picture(left_player))}" alt="{esc(left_player)}">
       <div>
         <div class="boxscore-player-name">{esc(left_player)}</div>
         {left_stats}
@@ -3221,7 +3238,7 @@ def boxscore_rows_html(
         <div class="boxscore-player-name">{esc(right_player)}</div>
         {right_stats}
       </div>
-      <img class="boxscore-headshot" src="{PLACEHOLDER_PLAYER_HEADSHOT}" alt="{esc(right_player)}">
+      <img class="boxscore-headshot" src="{esc(player_picture(right_player))}" alt="{esc(right_player)}">
     </div>
 """
             if right_player
@@ -4560,7 +4577,7 @@ def team_starter_history(starters: pd.DataFrame, ledger: pd.DataFrame, team: str
     summary["StartPct"] = summary["Starts"] / summary["RosterGames"].clip(lower=1)
     summary = summary.sort_values(["Points", "Starts"], ascending=[False, False])
     position_colors = {"QB": "#ef4444", "RB": "#f97316", "WR": "#eab308", "TE": "#22c55e"}
-    body = "".join(f'<tr><td><span class="standings-rank">{index + 1}</span></td><td><div class="history-team"><img src="{PLACEHOLDER_PLAYER_HEADSHOT}" alt="{esc(row["Player"])}" style="border-radius:50%;object-fit:cover;object-position:center 12%;"><div style="display:flex;align-items:center;gap:7px;"><div class="history-team-name">{esc(row["Player"])}</div><span class="position-chip" style="background:{position_colors.get(clean_text(row["Position"]), "#e5e7eb")};">{esc(row["Position"])}</span></div></div></td><td>{int(row["Starts"])}</td><td>{row["StartPct"]:.1%}</td><td>{row["Points"]:,.2f}</td><td>{row["Average"]:,.2f}</td><td>{row["Best"]:,.2f}</td></tr>' for index, (_, row) in enumerate(summary.head(50).iterrows()))
+    body = "".join(f'<tr><td><span class="standings-rank">{index + 1}</span></td><td><div class="history-team"><img src="{esc(player_picture(row["Player"]))}" alt="{esc(row["Player"])}" style="border-radius:50%;object-fit:cover;object-position:center 12%;"><div style="display:flex;align-items:center;gap:7px;"><div class="history-team-name">{esc(row["Player"])}</div><span class="position-chip" style="background:{position_colors.get(clean_text(row["Position"]), "#e5e7eb")};">{esc(row["Position"])}</span></div></div></td><td>{int(row["Starts"])}</td><td>{row["StartPct"]:.1%}</td><td>{row["Points"]:,.2f}</td><td>{row["Average"]:,.2f}</td><td>{row["Best"]:,.2f}</td></tr>' for index, (_, row) in enumerate(summary.head(50).iterrows()))
     st.html(f'<div class="history-section-title"><span>All-Time Starter Production</span><div></div></div><div class="history-table-wrap"><table class="history-table"><thead><tr><th>Rank</th><th>Player</th><th>Starts</th><th>Start %</th><th>Points While Starting</th><th>Avg Start</th><th>Best Start</th></tr></thead><tbody>{body}</tbody></table></div>')
 
 
@@ -5273,7 +5290,7 @@ def render_draft_board(
     <span class="draft-pick">{esc(pick_label)}</span>
     {f'<img class="draft-team-logo" src="{esc(logo)}" alt="{esc(team)}">' if logo else '<span></span>'}
   </div>
-  <img class="draft-player-photo" src="{PLACEHOLDER_PLAYER_HEADSHOT}" alt="{esc(player, 'Player')}">
+  <img class="draft-player-photo" src="{esc(player_picture(player))}" alt="{esc(player, 'Player')}">
   <div class="draft-player {'draft-empty-player' if not player else ''}">{esc(player, 'TBD')}</div>
 </div>
 """
@@ -5398,7 +5415,7 @@ def render_league_draft_board(
   <div class="league-draft-pick-top">
     <span class="league-draft-pick-number">{esc(draft_slot)}</span>
     {f'<img src="{esc(team_logo)}" alt="{esc(team)}" title="{esc(team)}">' if team_logo else '<span></span>'}
-    <img class="league-draft-player-photo" src="{PLACEHOLDER_PLAYER_HEADSHOT}" alt="{esc(player)}">
+    <img class="league-draft-player-photo" src="{esc(player_picture(player))}" alt="{esc(player)}">
   </div>
   <div class="league-draft-player">{esc(player)}</div>
 </div>
@@ -5485,7 +5502,7 @@ def render_roster_matrix(rosters: pd.DataFrame) -> None:
                         f"""
 <td>
   <div class="roster-player-cell">
-    <img src="{PLACEHOLDER_PLAYER_HEADSHOT}" alt="{esc(player_name)}">
+    <img src="{esc(player_picture(player_name))}" alt="{esc(player_name)}">
     <span>{esc(player_name)}</span>
   </div>
 </td>
@@ -5680,7 +5697,7 @@ def render_league_roster_matrix(
                 f"""
 <td class="player-col">
   <div class="league-player">
-    <img src="{PLACEHOLDER_PLAYER_HEADSHOT}" alt="{esc(row["player_name"])}">
+    <img src="{esc(player_picture(row["player_name"]))}" alt="{esc(row["player_name"])}">
     <span>{esc(row["player_name"])}</span>
   </div>
 </td>
@@ -5928,7 +5945,7 @@ def render_team_roster(
             rows.append(
                 f"""
 <div class="team-roster-player">
-  <img src="{PLACEHOLDER_PLAYER_HEADSHOT}" alt="{esc(player.get("player_name"))}">
+  <img src="{esc(player_picture(player.get("player_name")))}" alt="{esc(player.get("player_name"))}">
   <div>
     <div class="team-roster-player-name">{esc(player.get("player_name"))}</div>
     <div class="team-roster-player-meta">
@@ -6093,16 +6110,25 @@ inject_css()
 selected_season = masthead()
 
 branding_data = load_branding_data(DATA_CACHE_VERSION)
-if len(branding_data) == 8:
+if len(branding_data) == 9:
+    schools, conferences, schedule, scores, rankings, drafts, starters, bowls, player_pictures = branding_data
+elif len(branding_data) == 8:
     schools, conferences, schedule, scores, rankings, drafts, starters, bowls = branding_data
+    player_pictures = pd.DataFrame(columns=["Player", "Picture"])
 elif len(branding_data) == 7:
     schools, conferences, schedule, scores, rankings, drafts, starters = branding_data
     bowls = pd.DataFrame(columns=["Bowl", "Logo"])
+    player_pictures = pd.DataFrame(columns=["Player", "Picture"])
 else:
     raise ValueError(
-        f"Expected 7 or 8 branding datasets, received {len(branding_data)}. "
+        f"Expected 7, 8, or 9 branding datasets, received {len(branding_data)}. "
         "Confirm the published app.py and data.py are from the same version."
     )
+PLAYER_PICTURE_LOOKUP = {
+    player_picture_key(row["Player"]): clean_text(row["Picture"])
+    for _, row in player_pictures.iterrows()
+    if player_picture_key(row.get("Player")) and clean_text(row.get("Picture"))
+}
 full_schedule = schedule.copy()
 full_rankings = rankings.copy()
 full_starters = starters.copy()

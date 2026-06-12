@@ -1,12 +1,20 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 from typing import Any, Iterable
 
 import pandas as pd
 import requests
 
-from data import SLEEPER_API_BASE_URL, get_players, load_branding_data
+import data as data_module
+from data import SLEEPER_API_BASE_URL, get_players, load_all_rosters, load_branding_data
+
+
+EXPORT_DIRECTORY = Path(data_module.__file__).resolve().parent
+NFLVERSE_PLAYERS_URL = (
+    "https://github.com/nflverse/nflverse-data/releases/download/players/players.csv"
+)
 
 
 LEAGUE_IDS_BY_YEAR: dict[int, dict[str, str]] = {
@@ -410,25 +418,213 @@ def get_draft_results(
     )
 
 
-def run_export(export: str = "drafts") -> None:
-    """Write a historical export CSV; defaults to draft results."""
+def get_all_app_players() -> pd.DataFrame:
+    """Return one alphabetized Player column containing everyone shown in the app."""
+    schools, _, _, _, _, drafts, starters, *_ = load_branding_data()
+    rosters = load_all_rosters(schools)
+    player_sources = []
+
+    for frame, column in [
+        (rosters, "player_name"),
+        (starters, "Player"),
+        (drafts, "Player"),
+    ]:
+        if not frame.empty and column in frame.columns:
+            player_sources.append(frame[column])
+
+    if not player_sources:
+        return pd.DataFrame(columns=["Player"])
+
+    players = pd.concat(player_sources, ignore_index=True).dropna().astype(str).str.strip()
+    players = players.loc[
+        players.ne("")
+        & ~players.str.casefold().isin({"nan", "none", "tbd"})
+    ]
+    result = pd.DataFrame({"Player": players})
+    result["_player_key"] = result["Player"].str.casefold()
+    return (
+        result.drop_duplicates("_player_key")
+        .sort_values("_player_key")
+        .drop(columns="_player_key")
+        .reset_index(drop=True)
+    )
+
+
+def _player_match_key(value: object) -> str:
+    return "".join(character for character in str(value).casefold() if character.isalnum())
+
+
+def _first_existing_column(frame: pd.DataFrame, candidates: Iterable[str]) -> str:
+    normalized = {
+        str(column).casefold().replace("-", "_").replace(" ", "_"): column
+        for column in frame.columns
+    }
+    for candidate in candidates:
+        key = candidate.casefold().replace("-", "_").replace(" ", "_")
+        if key in normalized:
+            return str(normalized[key])
+    return ""
+
+
+def get_all_app_player_images() -> pd.DataFrame:
+    """Match every app player to verified nflverse/PFR identifiers and headshots."""
+    schools, _, _, _, _, drafts, starters, *_ = load_branding_data()
+    rosters = load_all_rosters(schools)
+    source_frames = []
+
+    for frame, name_column, id_column, source in [
+        (rosters, "player_name", "player_id", "Current Roster"),
+        (starters, "Player", "PlayerID", "Historical Roster"),
+        (drafts, "Player", "PlayerID", "Draft"),
+    ]:
+        if frame.empty or name_column not in frame.columns:
+            continue
+        source_frame = pd.DataFrame({"Player": frame[name_column]})
+        source_frame["SleeperID"] = (
+            frame[id_column].astype("string")
+            if id_column in frame.columns
+            else pd.Series(pd.NA, index=frame.index, dtype="string")
+        )
+        source_frame["Source"] = source
+        source_frames.append(source_frame)
+
+    if not source_frames:
+        return pd.DataFrame(
+            columns=[
+                "Player", "SleeperID", "PFRID", "HeadshotURL",
+                "PFRHeadshotURL", "MatchMethod", "NeedsReview",
+            ]
+        )
+
+    app_players = pd.concat(source_frames, ignore_index=True)
+    app_players["Player"] = app_players["Player"].astype("string").str.strip()
+    app_players["SleeperID"] = app_players["SleeperID"].astype("string").str.strip()
+    app_players = app_players.loc[
+        app_players["Player"].notna()
+        & app_players["Player"].ne("")
+        & ~app_players["Player"].str.casefold().isin({"nan", "none", "tbd"})
+    ].copy()
+    app_players["_name_key"] = app_players["Player"].map(_player_match_key)
+    app_players = (
+        app_players.sort_values(["_name_key", "SleeperID"], na_position="last")
+        .drop_duplicates("_name_key")
+    )
+
+    nflverse = pd.read_csv(NFLVERSE_PLAYERS_URL, dtype="string")
+    name_column = _first_existing_column(
+        nflverse, ["display_name", "full_name", "player_name", "name"]
+    )
+    sleeper_column = _first_existing_column(
+        nflverse, ["sleeper_id", "sleeper_player_id", "sleeper"]
+    )
+    pfr_column = _first_existing_column(
+        nflverse, ["pfr_id", "pfr_player_id", "pfr"]
+    )
+    headshot_column = _first_existing_column(
+        nflverse, ["headshot", "headshot_url", "image_url", "image"]
+    )
+    if not name_column:
+        raise ValueError(
+            "The nflverse player file has no recognized player-name column. "
+            f"Available columns: {', '.join(map(str, nflverse.columns))}"
+        )
+
+    nflverse["_name_key"] = nflverse[name_column].map(_player_match_key)
+    if sleeper_column:
+        nflverse["_sleeper_id"] = nflverse[sleeper_column].astype("string").str.strip()
+        id_lookup = (
+            nflverse.dropna(subset=["_sleeper_id"])
+            .drop_duplicates("_sleeper_id")
+            .set_index("_sleeper_id")
+        )
+    else:
+        id_lookup = pd.DataFrame()
+        print(
+            "nflverse players.csv does not currently include a Sleeper ID column; "
+            "using unambiguous player-name matches."
+        )
+    unique_names = nflverse.loc[
+        ~nflverse["_name_key"].duplicated(keep=False)
+    ].drop_duplicates("_name_key").set_index("_name_key")
+
+    rows = []
+    for _, app_player in app_players.iterrows():
+        sleeper_id = app_player["SleeperID"]
+        match = None
+        match_method = ""
+        if not id_lookup.empty and pd.notna(sleeper_id) and sleeper_id in id_lookup.index:
+            match = id_lookup.loc[sleeper_id]
+            match_method = "Sleeper ID"
+        elif app_player["_name_key"] in unique_names.index:
+            match = unique_names.loc[app_player["_name_key"]]
+            match_method = "Unique Name"
+
+        pfr_value = match.get(pfr_column) if match is not None and pfr_column else pd.NA
+        headshot_value = (
+            match.get(headshot_column)
+            if match is not None and headshot_column
+            else pd.NA
+        )
+        pfr_id = "" if pd.isna(pfr_value) else str(pfr_value).strip()
+        headshot = "" if pd.isna(headshot_value) else str(headshot_value).strip()
+        if pfr_id.lower() in {"nan", "none", "<na>"}:
+            pfr_id = ""
+        if headshot.lower() in {"nan", "none", "<na>"}:
+            headshot = ""
+        rows.append(
+            {
+                "Player": app_player["Player"],
+                "SleeperID": "" if pd.isna(sleeper_id) else sleeper_id,
+                "PFRID": pfr_id,
+                "HeadshotURL": headshot,
+                "PFRHeadshotURL": (
+                    f"https://www.pro-football-reference.com/req/20230307/images/headshots/{pfr_id}_2025.jpg"
+                    if pfr_id
+                    else ""
+                ),
+                "MatchMethod": match_method,
+                "NeedsReview": not bool(match_method and (headshot or pfr_id)),
+            }
+        )
+
+    return pd.DataFrame(rows).sort_values("Player", key=lambda values: values.str.casefold()).reset_index(drop=True)
+
+
+def _write_export(frame: pd.DataFrame, filename: str, description: str) -> None:
+    output_path = EXPORT_DIRECTORY / filename
+    frame.to_csv(output_path, index=False)
+    print(f"Wrote {len(frame):,} {description} to {output_path}")
+
+
+def run_export(export: str = "images") -> None:
+    """Write an NCFL export CSV beside data.py; defaults to player images."""
     if export == "starters":
         starters = get_weekly_starters()
-        starters.to_csv("weekly_starters.csv", index=False)
         print(starters.head())
-        print(f"Wrote {len(starters):,} rows to weekly_starters.csv")
+        _write_export(starters, "weekly_starters.csv", "rows")
     elif export == "drafts":
         draft_results = get_draft_results()
-        draft_results.to_csv("draft_results.csv", index=False)
         print(draft_results.head())
-        print(f"Wrote {len(draft_results):,} rows to draft_results.csv")
+        _write_export(draft_results, "draft_results.csv", "rows")
+    elif export == "players":
+        app_players = get_all_app_players()
+        print(app_players.head())
+        _write_export(app_players, "all_app_players.csv", "unique players")
+    elif export == "images":
+        player_images = get_all_app_player_images()
+        print(player_images.head())
+        _write_export(player_images, "all_app_player_images.csv", "player image rows")
     else:
-        raise ValueError("export must be either 'drafts' or 'starters'")
+        raise ValueError("export must be 'drafts', 'starters', 'players', or 'images'")
 
 
 if __name__ == "__main__":
     requested_export = next(
-        (argument for argument in sys.argv[1:] if argument in {"drafts", "starters"}),
-        "drafts",
+        (
+            argument
+            for argument in sys.argv[1:]
+            if argument in {"drafts", "starters", "players", "images"}
+        ),
+        "images",
     )
     run_export(requested_export)
