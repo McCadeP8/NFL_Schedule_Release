@@ -2801,6 +2801,36 @@ def build_dynasty_coaches_poll(
     return team_values[columns].sort_values(["Rank", "Team"]).reset_index(drop=True)
 
 
+@st.cache_data(show_spinner=False, max_entries=8)
+def unmatched_dynasty_players(rosters: pd.DataFrame) -> pd.DataFrame:
+    columns = ["Team", "Conference", "Player", "Position", "Roster Spot"]
+    if rosters.empty:
+        return pd.DataFrame(columns=columns)
+
+    player_values, _ = load_dynasty_asset_values()
+    valued_keys = set(player_values["player"].map(dynasty_player_key))
+    audit = rosters.copy()
+    audit["_player_key"] = audit["player_name"].map(dynasty_player_key)
+    audit = audit.loc[~audit["_player_key"].isin(valued_keys)].copy()
+    if audit.empty:
+        return pd.DataFrame(columns=columns)
+
+    return (
+        audit.rename(
+            columns={
+                "team_name": "Team",
+                "league_name": "Conference",
+                "player_name": "Player",
+                "position": "Position",
+                "roster_spot": "Roster Spot",
+            }
+        )[columns]
+        .drop_duplicates()
+        .sort_values(["Team", "Player"])
+        .reset_index(drop=True)
+    )
+
+
 @st.cache_data(show_spinner=False, max_entries=16)
 def team_lookup(schools: pd.DataFrame) -> dict[str, dict[str, str]]:
     lookup = {}
@@ -5222,6 +5252,12 @@ def render_rankings(
     )
     ap_orv = sorted(set(team for team in ap_orv if team))
     coaches_top = coaches_poll.loc[coaches_poll["Rank"].le(25)].copy()
+    coaches_orv = sorted(
+        coaches_poll.loc[coaches_poll["Rank"].between(26, 35, inclusive="both"), "Team"]
+        .dropna()
+        .map(clean_text)
+        .unique()
+    )
     title_week = "Preseason" if selected_week == 0 else f"Week {selected_week}"
 
     ap_rows = poll_rows_html(
@@ -5273,20 +5309,13 @@ def render_rankings(
         <tbody>{coaches_rows}</tbody>
       </table>
     </div>
+    <div class="orv-box">
+      <div class="orv-title">Other Receiving Votes</div>
+      <div class="orv-text">{esc(", ".join(coaches_orv) if coaches_orv else "None")}</div>
+    </div>
   </div>
 """
 
-    if ap_top.empty:
-        st.html(
-            """
-<div class="brand-panel" style="--accent:#f2cf68;margin:12px 0 18px;">
-  <div>
-    <div class="conf-kicker">Preseason Dynasty Valuation</div>
-    <div class="conf-title" style="font-size:42px;">144-Team Coaches Poll</div>
-  </div>
-</div>
-"""
-        )
     st.html(
         f"""
 <div class="rankings-layout {'ap-only' if coaches_top.empty else ''}">
@@ -5340,7 +5369,7 @@ def render_rankings(
             "UnmatchedPlayers": "Unmatched Players",
         }
     )
-    with st.expander("Full 144-Team Coaches Poll"):
+    with st.expander("View Full 144-Team Coaches Poll"):
         st.dataframe(
             full_poll,
             hide_index=True,
@@ -5352,6 +5381,19 @@ def render_rankings(
                 "Draft Pick Value": st.column_config.NumberColumn(format="%,.0f"),
             },
         )
+    unmatched = unmatched_dynasty_players(rosters)
+    if not unmatched.empty:
+        with st.expander(f"Review {len(unmatched):,} Unmatched Players"):
+            st.caption(
+                "These rostered players receive zero dynasty value because their names "
+                "did not match the current DynastyProcess player file."
+            )
+            st.dataframe(
+                unmatched,
+                hide_index=True,
+                height="content",
+                use_container_width=True,
+            )
 
 
 def render_draft_board(
