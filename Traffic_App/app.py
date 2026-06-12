@@ -380,15 +380,28 @@ with st.sidebar:
     st.caption("OFFICIAL DATA FILTERS")
     states = sorted(fars["state"].dropna().unique()) if not fars.empty else ["Utah"]
     selected_state = st.selectbox("State", states, index=states.index("Utah") if "Utah" in states else 0)
-    crash_scope = "All Reported Crashes"
-    if selected_state == "Utah" and not utah_crashes.empty:
+    utah_all_crash_available = (
+        not utah_crashes.empty and "year" in utah_crashes.columns
+    )
+    crash_scope = "Fatal Crashes Only"
+    if selected_state == "Utah" and utah_all_crash_available:
         crash_scope = st.radio(
             "Crash scope",
             ("All Reported Crashes", "Fatal Crashes Only"),
         )
-    use_utah_all_crashes = selected_state == "Utah" and crash_scope == "All Reported Crashes"
+    elif selected_state == "Utah":
+        st.caption("All-crash UDOT data is not installed in this deployment.")
+    use_utah_all_crashes = (
+        selected_state == "Utah"
+        and crash_scope == "All Reported Crashes"
+        and utah_all_crash_available
+    )
     year_source = utah_crashes if use_utah_all_crashes else fars
-    available_years = sorted(year_source["year"].dropna().astype(int).unique(), reverse=True)
+    available_years = (
+        sorted(year_source["year"].dropna().astype(int).unique(), reverse=True)
+        if "year" in year_source.columns
+        else []
+    )
     selected_years = st.multiselect("Crash years", available_years, default=available_years)
     st.divider()
     st.caption("NHTSA FARS · CENSUS CBP · CENSUS POPULATION ESTIMATES")
