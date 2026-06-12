@@ -58,12 +58,16 @@ html, body, [class*="css"] { font-family:'Barlow',sans-serif; color:var(--ink); 
 }
 .block-container { max-width:1580px!important; padding:1.2rem 2.2rem 4rem!important; }
 footer { visibility:hidden; }
-header[data-testid="stHeader"] { background:transparent; }
+header[data-testid="stHeader"] {
+  background:linear-gradient(90deg,#19364c 0%,#213f57 58%,#29556e 100%)!important;
+  border-bottom:1px solid rgba(49,213,208,.42)!important;
+  box-shadow:0 3px 14px rgba(23,44,61,.18)!important;
+}
 [data-testid="stToolbar"] {
-  background:rgba(255,255,255,.92)!important;
-  border:1px solid var(--line)!important;
-  border-radius:7px!important;
-  box-shadow:0 2px 10px rgba(23,44,61,.08)!important;
+  background:transparent!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
   padding:2px 5px!important;
 }
 [data-testid="stToolbar"] button,
@@ -74,15 +78,15 @@ header[data-testid="stHeader"] { background:transparent; }
 [data-testid="stAppDeployButton"] *,
 [data-testid="stMainMenu"],
 [data-testid="stMainMenu"] * {
-  color:var(--navy)!important;
-  fill:var(--navy)!important;
+  color:#fff!important;
+  fill:#fff!important;
   opacity:1!important;
   visibility:visible!important;
 }
 [data-testid="stToolbar"] button:hover,
 [data-testid="stAppDeployButton"] button:hover,
 [data-testid="stMainMenu"] button:hover {
-  background:#e8f7f7!important;
+  background:rgba(49,213,208,.18)!important;
 }
 
 [data-testid="stSidebar"] { background:linear-gradient(180deg,#19364c 0%,#234b64 100%); border-right:1px solid rgba(49,213,208,.28); }
@@ -173,6 +177,34 @@ header[data-testid="stHeader"] { background:transparent; }
 .condition-rank-title { color:var(--navy); font-size:12px; font-weight:700; line-height:1.3; margin:5px 0 8px; }
 .condition-rank-value { color:var(--ink); font-family:'Rajdhani',sans-serif; font-size:22px; font-weight:800; line-height:1; }
 .condition-rank-share { color:#8b9ba6; font-size:10px; font-weight:700; margin-top:3px; text-transform:uppercase; }
+
+.st-key-severity_toggle_group div[data-testid="stWidgetLabel"] { display:none!important; }
+.st-key-severity_toggle_group div[data-testid="stCheckbox"] label {
+  display:flex!important; align-items:center!important; min-height:48px!important;
+  background:#fff!important; border:1px solid var(--line)!important; border-top:5px solid var(--severity-color)!important;
+  border-radius:7px!important; box-shadow:0 2px 8px rgba(23,44,61,.06)!important;
+  padding:8px 11px!important; transition:transform .15s ease,box-shadow .15s ease,background .15s ease!important;
+}
+.st-key-severity_toggle_group div[data-testid="stCheckbox"] label:hover {
+  transform:translateY(-1px); box-shadow:0 5px 14px rgba(23,44,61,.11)!important;
+}
+.st-key-severity_toggle_group div[data-testid="stCheckbox"] label:has(input:checked) {
+  background:color-mix(in srgb,var(--severity-color) 13%,white)!important;
+  border-color:var(--severity-color)!important;
+}
+.st-key-severity_toggle_group div[data-testid="stCheckbox"] label p {
+  color:var(--navy)!important; font-family:'Barlow Condensed',sans-serif!important;
+  font-size:12px!important; font-weight:800!important; letter-spacing:.7px!important; text-transform:uppercase!important;
+}
+.st-key-severity_toggle_group div[data-testid="stCheckbox"] [data-testid="stCheckboxIcon"] {
+  color:var(--severity-color)!important; fill:var(--severity-color)!important;
+}
+.st-key-severity_fatal { --severity-color:#b4232d; }
+.st-key-severity_serious { --severity-color:#e68723; }
+.st-key-severity_minor { --severity-color:#31d5d0; }
+.st-key-severity_possible { --severity-color:#5bb1ad; }
+.st-key-severity_pdo { --severity-color:#213f57; }
+.severity-toggle-title { color:var(--navy); font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:800; letter-spacing:2px; margin:4px 0 8px; text-transform:uppercase; }
 
 .insight-strip { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:12px 0 4px; }
 .insight-card { background:linear-gradient(135deg,#213f57,#2a566f); border-radius:8px; color:#fff; padding:18px 19px; box-shadow:0 8px 20px rgba(23,44,61,.14); }
@@ -582,19 +614,24 @@ else:
     section_title(map_title, f"Reported {map_source} coordinates for {selected_state} during {period}.")
     map_data = state_crashes.dropna(subset=["latitude", "longitude"]).copy()
     if use_utah_all_crashes:
-        severity_order = [
-            "Fatal",
-            "Suspected Serious Injury",
-            "Suspected Minor Injury",
-            "Possible Injury",
-            "No Injury/PDO",
+        severity_options = [
+            ("Fatal", "severity_fatal"),
+            ("Suspected Serious Injury", "severity_serious"),
+            ("Suspected Minor Injury", "severity_minor"),
+            ("Possible Injury", "severity_possible"),
+            ("No Injury / PDO", "severity_pdo"),
         ]
-        selected_severities = st.multiselect(
-            "Injury level",
-            severity_order,
-            default=severity_order,
-            help="Filter the crash points displayed on the map by reported injury severity.",
-        )
+        st.html('<div class="severity-toggle-title">Injury Level Filters</div>')
+        selected_severities = []
+        with st.container(key="severity_toggle_group"):
+            toggle_columns = st.columns(5, gap="small")
+            for column, (label, key) in zip(toggle_columns, severity_options):
+                with column:
+                    enabled = st.checkbox(label, value=True, key=key)
+                    if enabled:
+                        selected_severities.append(
+                            "No Injury/PDO" if label == "No Injury / PDO" else label
+                        )
         map_data = map_data[
             map_data["crash_severity_desc"].isin(selected_severities)
         ].copy()
