@@ -38,6 +38,9 @@ LEAGUE_ROSTER_ORDER = [
     "AAC",
     "F12",
 ]
+SUPERFLEX_CONFERENCES = {"Big 12", "B1G", "SEC", "Pac-12", "ACC", "G6"}
+DYNASTY_PLAYER_VALUES_URL = "https://raw.githubusercontent.com/dynastyprocess/data/master/files/values-players.csv"
+DYNASTY_PICK_VALUES_URL = "https://raw.githubusercontent.com/dynastyprocess/data/master/files/values-picks.csv"
 ROSTER_STATUS_ORDER = {"Starter": 0, "Bench": 1, "Taxi": 2, "Reserve": 3}
 POSITION_LABELS = {
     "QB": "Quarterback",
@@ -95,6 +98,13 @@ def player_picture(player: object) -> str:
 
 def player_picture_fallback() -> str:
     return f"this.onerror=null;this.src='{SILHOUETTE_PLAYER_HEADSHOT}';"
+
+
+def dynasty_player_key(value: object) -> str:
+    words = re.findall(r"[a-z0-9]+", clean_text(value).casefold())
+    while words and words[-1] in {"jr", "sr", "ii", "iii", "iv", "v"}:
+        words.pop()
+    return "".join(words)
 
 
 def canonical_team_key(value: object) -> str:
@@ -2682,6 +2692,115 @@ def load_future_draft_picks() -> pd.DataFrame:
     return fetch_future_draft_picks()
 
 
+@st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner="Loading dynasty asset values...")
+def load_dynasty_asset_values() -> tuple[pd.DataFrame, pd.DataFrame]:
+    players = pd.read_csv(DYNASTY_PLAYER_VALUES_URL)
+    picks = pd.read_csv(DYNASTY_PICK_VALUES_URL)
+    return players, picks
+
+
+@st.cache_data(show_spinner=False, max_entries=8)
+def build_dynasty_coaches_poll(
+    rosters: pd.DataFrame,
+    draft_picks: pd.DataFrame,
+    schools: pd.DataFrame,
+) -> pd.DataFrame:
+    columns = [
+        "Team", "Conference", "Format", "PlayerValue", "DraftPickValue",
+        "TotalValue", "MatchedPlayers", "UnmatchedPlayers", "Rank", "ConferenceRank",
+    ]
+    if rosters.empty:
+        return pd.DataFrame(columns=columns)
+
+    player_values, pick_values = load_dynasty_asset_values()
+    player_values["_player_key"] = player_values["player"].map(dynasty_player_key)
+    player_values = player_values.drop_duplicates("_player_key", keep="first")
+    player_value_lookup = player_values.set_index("_player_key")
+
+    valued_rosters = rosters.copy()
+    valued_rosters["_player_key"] = valued_rosters["player_name"].map(dynasty_player_key)
+    valued_rosters = valued_rosters.merge(
+        player_value_lookup[["value_1qb", "value_2qb"]],
+        left_on="_player_key",
+        right_index=True,
+        how="left",
+    )
+    valued_rosters["Format"] = valued_rosters["league_name"].map(
+        lambda conference: "Superflex" if conference in SUPERFLEX_CONFERENCES else "1QB"
+    )
+    valued_rosters["PlayerValue"] = valued_rosters.apply(
+        lambda row: row["value_2qb"] if row["Format"] == "Superflex" else row["value_1qb"],
+        axis=1,
+    )
+    valued_rosters["MatchedPlayer"] = valued_rosters["PlayerValue"].notna()
+    valued_rosters["PlayerValue"] = pd.to_numeric(
+        valued_rosters["PlayerValue"], errors="coerce"
+    ).fillna(0)
+    team_values = (
+        valued_rosters.groupby(
+            ["league_name", "roster_id", "team_name", "Format"],
+            as_index=False,
+            dropna=False,
+        )
+        .agg(
+            PlayerValue=("PlayerValue", "sum"),
+            Players=("player_name", "count"),
+            MatchedPlayers=("MatchedPlayer", "sum"),
+        )
+        .rename(columns={"league_name": "Conference", "team_name": "Team"})
+    )
+    team_values["UnmatchedPlayers"] = team_values["Players"] - team_values["MatchedPlayers"]
+
+    pick_values["round"] = pick_values["player"].astype(str).str.extract(r"Pick\s+(\d+)\.")[0]
+    pick_values["round"] = pd.to_numeric(pick_values["round"], errors="coerce")
+    for value_column, ecr_column in [("value_1qb", "ecr_1qb"), ("value_2qb", "ecr_2qb")]:
+        reference = (
+            player_values[[ecr_column, value_column]]
+            .dropna()
+            .groupby(ecr_column, as_index=False)[value_column]
+            .mean()
+            .sort_values(ecr_column)
+        )
+        pick_values[value_column] = pd.to_numeric(pick_values[ecr_column], errors="coerce").map(
+            lambda ecr: float(
+                pd.Series(reference[value_column].values, index=reference[ecr_column])
+                .reindex(reference[ecr_column].tolist() + [ecr])
+                .sort_index()
+                .interpolate(method="index", limit_direction="both")
+                .loc[ecr]
+            )
+            if not pd.isna(ecr)
+            else 0
+        )
+    round_values = pick_values.groupby("round")[["value_1qb", "value_2qb"]].mean()
+
+    pick_totals: dict[tuple[str, int], float] = {}
+    current_year = current_roster_season()
+    if not draft_picks.empty:
+        for _, pick in draft_picks.iterrows():
+            conference = clean_text(pick.get("league_name"))
+            owner_id = pd.to_numeric(pick.get("owner_roster_id"), errors="coerce")
+            round_number = pd.to_numeric(pick.get("round"), errors="coerce")
+            season = pd.to_numeric(pick.get("season"), errors="coerce")
+            if pd.isna(owner_id) or pd.isna(round_number) or round_number not in round_values.index:
+                continue
+            value_column = "value_2qb" if conference in SUPERFLEX_CONFERENCES else "value_1qb"
+            discount = 0.85 ** max(int(season) - current_year - 1, 0) if not pd.isna(season) else 1
+            key = (conference, int(owner_id))
+            pick_totals[key] = pick_totals.get(key, 0.0) + float(round_values.loc[round_number, value_column]) * discount
+
+    team_values["DraftPickValue"] = team_values.apply(
+        lambda row: pick_totals.get((row["Conference"], int(row["roster_id"])), 0.0),
+        axis=1,
+    )
+    team_values["TotalValue"] = team_values["PlayerValue"] + team_values["DraftPickValue"]
+    team_values["Rank"] = team_values["TotalValue"].rank(ascending=False, method="min").astype(int)
+    team_values["ConferenceRank"] = (
+        team_values.groupby("Conference")["TotalValue"].rank(ascending=False, method="min").astype(int)
+    )
+    return team_values[columns].sort_values(["Rank", "Team"]).reset_index(drop=True)
+
+
 @st.cache_data(show_spinner=False, max_entries=16)
 def team_lookup(schools: pd.DataFrame) -> dict[str, dict[str, str]]:
     lookup = {}
@@ -5006,6 +5125,7 @@ def poll_rows_html(
     scores: pd.DataFrame,
     week: int,
     include_last_game: bool,
+    dynasty_values: Optional[dict[str, float]] = None,
 ) -> str:
     rows = []
     poll = poll.sort_values(["Rank", "Team"])
@@ -5022,6 +5142,11 @@ def poll_rows_html(
         previous_rank = previous_ranks.get(team)
         last_rank = previous_rank if previous_rank is not None else "-"
         last_game = last_game_html(schedule, scores, team, week) if include_last_game else ""
+        final_metric = (
+            f"{dynasty_values.get(team, 0):,.0f}"
+            if dynasty_values is not None
+            else f'{stats["pf"]:,.2f}'
+        )
 
         extra_cells = ""
         if include_last_game:
@@ -5047,7 +5172,7 @@ def poll_rows_html(
   </td>
   <td class="poll-metric">{stats["record"]}</td>
   <td class="poll-metric">{stats["conf_record"]}</td>
-  <td class="poll-metric">{stats["pf"]:,.2f}</td>
+  <td class="poll-metric">{final_metric}</td>
   {extra_cells}
 </tr>
 """
@@ -5061,6 +5186,8 @@ def render_rankings(
     scores: pd.DataFrame,
     schools: pd.DataFrame,
     conferences: pd.DataFrame,
+    rosters: pd.DataFrame,
+    draft_picks: pd.DataFrame,
 ) -> None:
     weeks = ranking_weeks(rankings)
     if not weeks:
@@ -5088,11 +5215,8 @@ def render_rankings(
         & rankings["Week"].eq(selected_week)
         & rankings["Rank"].notna()
     ].copy()
-    coaches_poll = rankings.loc[
-        rankings["Type"].astype(str).eq("Coaches Poll")
-        & rankings["Week"].eq(selected_week)
-        & rankings["Rank"].notna()
-    ].copy()
+    dynasty_poll = build_dynasty_coaches_poll(rosters, draft_picks, schools)
+    coaches_poll = dynasty_poll[["Team", "Rank"]].copy()
     previous_ap = rank_map(rankings, "AP Poll", selected_week - 1)
 
     ap_top = ap_poll.loc[ap_poll["Rank"].le(25)].copy()
@@ -5126,6 +5250,7 @@ def render_rankings(
         scores,
         selected_week,
         include_last_game=False,
+        dynasty_values=dict(zip(dynasty_poll["Team"], dynasty_poll["TotalValue"])),
     )
     orv_text = ", ".join(ap_orv) if ap_orv else "None"
     coaches_panel = ""
@@ -5147,7 +5272,7 @@ def render_rankings(
             <th>Team</th>
             <th>Total</th>
             <th>Conf</th>
-            <th>PF</th>
+            <th>Value</th>
           </tr>
         </thead>
         <tbody>{coaches_rows}</tbody>
@@ -5193,6 +5318,34 @@ def render_rankings(
 </div>
 """
     )
+    full_poll = dynasty_poll[
+        [
+            "Rank", "ConferenceRank", "Team", "Conference", "Format",
+            "TotalValue", "PlayerValue", "DraftPickValue",
+            "MatchedPlayers", "UnmatchedPlayers",
+        ]
+    ].rename(
+        columns={
+            "ConferenceRank": "Conf Rank",
+            "TotalValue": "Total Value",
+            "PlayerValue": "Player Value",
+            "DraftPickValue": "Draft Pick Value",
+            "MatchedPlayers": "Matched Players",
+            "UnmatchedPlayers": "Unmatched Players",
+        }
+    )
+    with st.expander("Full 144-Team Coaches Poll"):
+        st.dataframe(
+            full_poll,
+            hide_index=True,
+            height="content",
+            use_container_width=True,
+            column_config={
+                "Total Value": st.column_config.NumberColumn(format="%,.0f"),
+                "Player Value": st.column_config.NumberColumn(format="%,.0f"),
+                "Draft Pick Value": st.column_config.NumberColumn(format="%,.0f"),
+            },
+        )
 
 
 def render_draft_board(
@@ -6214,7 +6367,15 @@ with league_tab:
                 key_prefix="league_schedule_empty",
             )
     with league_rankings_tab:
-        render_rankings(rankings, schedule, scores, schools, conferences)
+        render_rankings(
+            rankings,
+            schedule,
+            scores,
+            schools,
+            conferences,
+            all_rosters,
+            future_draft_picks,
+        )
     with league_rosters_tab:
         # player_download = unique_player_download(all_rosters)
         # st.download_button(
