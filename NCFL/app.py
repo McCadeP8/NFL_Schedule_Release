@@ -41,6 +41,9 @@ LEAGUE_ROSTER_ORDER = [
 SUPERFLEX_CONFERENCES = {"Big 12", "B1G", "SEC", "Pac-12", "ACC", "G6"}
 DYNASTY_PLAYER_VALUES_URL = "https://raw.githubusercontent.com/dynastyprocess/data/master/files/values-players.csv"
 DYNASTY_PICK_VALUES_URL = "https://raw.githubusercontent.com/dynastyprocess/data/master/files/values-picks.csv"
+DYNASTY_PLAYER_ALIASES = {
+    "marquisebrown": "hollywoodbrown",
+}
 ROSTER_STATUS_ORDER = {"Starter": 0, "Bench": 1, "Taxi": 2, "Reserve": 3}
 POSITION_LABELS = {
     "QB": "Quarterback",
@@ -55,7 +58,7 @@ SCHEDULE_STATUS_COLORS = {
     "pending": "#8a96b0",
 }
 CACHE_TTL_SECONDS = 60 * 60 * 24
-DATA_CACHE_VERSION = "player-pictures-v1"
+DATA_CACHE_VERSION = "dynasty-aliases-v1"
 
 
 def clean_text(value: object, fallback: str = "") -> str:
@@ -104,7 +107,8 @@ def dynasty_player_key(value: object) -> str:
     words = re.findall(r"[a-z0-9]+", clean_text(value).casefold())
     while words and words[-1] in {"jr", "sr", "ii", "iii", "iv", "v"}:
         words.pop()
-    return "".join(words)
+    key = "".join(words)
+    return DYNASTY_PLAYER_ALIASES.get(key, key)
 
 
 def canonical_team_key(value: object) -> str:
@@ -5156,6 +5160,7 @@ def poll_rows_html(
     week: int,
     include_last_game: bool,
     dynasty_values: Optional[dict[str, float]] = None,
+    show_final_metric: bool = True,
 ) -> str:
     rows = []
     poll = poll.sort_values(["Rank", "Team"])
@@ -5202,7 +5207,7 @@ def poll_rows_html(
   </td>
   <td class="poll-metric">{stats["record"]}</td>
   <td class="poll-metric">{stats["conf_record"]}</td>
-  <td class="poll-metric">{final_metric}</td>
+  {f'<td class="poll-metric">{final_metric}</td>' if show_final_metric else ''}
   {extra_cells}
 </tr>
 """
@@ -5282,6 +5287,7 @@ def render_rankings(
         selected_week,
         include_last_game=False,
         dynasty_values=dict(zip(dynasty_poll["Team"], dynasty_poll["TotalValue"])),
+        show_final_metric=False,
     )
     orv_text = ", ".join(ap_orv) if ap_orv else "None"
     coaches_panel = ""
@@ -5303,7 +5309,6 @@ def render_rankings(
             <th>Team</th>
             <th>Total</th>
             <th>Conf</th>
-            <th>Value</th>
           </tr>
         </thead>
         <tbody>{coaches_rows}</tbody>
