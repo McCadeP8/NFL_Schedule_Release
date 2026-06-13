@@ -96,20 +96,20 @@ header[data-testid="stHeader"] {
 .top-brand { display:flex; align-items:center; gap:20px; padding:22px 0 17px; border-bottom:1px solid var(--line); }
 .top-brand img { width:min(380px,45vw); height:auto; object-fit:contain; }
 .top-brand-copy { border-left:1px solid var(--line); color:#8294a0; font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:800; letter-spacing:3px; padding-left:20px; text-transform:uppercase; }
-.st-key-top_control_deck { background:#fff; border:1px solid var(--line); border-radius:8px; box-shadow:0 2px 10px rgba(23,44,61,.06); margin:14px 0 8px; padding:11px 14px 4px; }
-.st-key-top_control_deck div[data-testid="stWidgetLabel"] p { color:var(--navy)!important; font-family:'Barlow Condensed',sans-serif!important; font-size:12px!important; font-weight:800!important; letter-spacing:1.5px!important; text-transform:uppercase!important; }
-.st-key-top_control_deck div[data-baseweb="select"]>div { background:#f7fafb!important; border-color:var(--line)!important; color:var(--navy)!important; }
+.st-key-top_control_deck { background:transparent; border-top:1px solid var(--line); border-bottom:1px solid var(--line); margin:12px 0 18px; padding:13px 2px 8px; }
+.st-key-top_control_deck div[data-testid="stWidgetLabel"] p { color:#7c909d!important; font-family:'Barlow Condensed',sans-serif!important; font-size:11px!important; font-weight:800!important; letter-spacing:2px!important; text-transform:uppercase!important; }
+.st-key-top_control_deck div[data-baseweb="select"]>div { background:#fff!important; border:1px solid #d7e2e7!important; border-radius:5px!important; box-shadow:0 1px 4px rgba(23,44,61,.04)!important; color:var(--navy)!important; min-height:42px!important; }
 .st-key-top_control_deck div[data-baseweb="select"] * { color:var(--navy)!important; }
 
 .st-key-navigation_tabs div[data-testid="stWidgetLabel"] { display:none!important; }
-.st-key-navigation_tabs [data-baseweb="button-group"] { background:transparent!important; border-bottom:2px solid var(--line); border-radius:0!important; gap:0!important; width:100%; }
-.st-key-navigation_tabs button { background:#fff!important; border:1px solid var(--line)!important; border-bottom:5px solid transparent!important; border-radius:7px 7px 0 0!important; color:#768b99!important; flex:1!important; font-family:'Barlow Condensed',sans-serif!important; font-size:16px!important; font-weight:800!important; letter-spacing:1.2px!important; margin:0 3px!important; padding:14px 18px 11px!important; text-transform:uppercase!important; }
-.st-key-navigation_tabs button:hover { color:var(--navy)!important; background:#edf8f8!important; border-color:#b9e8e6!important; }
-.st-key-navigation_tabs button[aria-pressed="true"] { color:#fff!important; border-color:var(--navy)!important; border-bottom-color:var(--aqua)!important; background:linear-gradient(135deg,#213f57,#2c5b73)!important; box-shadow:0 6px 14px rgba(23,44,61,.18)!important; transform:translateY(-2px); }
-.st-key-top_control_deck [data-baseweb="button-group"] { background:#f1f6f7!important; border:1px solid var(--line)!important; border-radius:6px!important; padding:3px!important; }
-.st-key-top_control_deck [data-baseweb="button-group"] button { background:transparent!important; border:0!important; border-radius:4px!important; color:var(--navy)!important; font-family:'Barlow Condensed',sans-serif!important; font-size:12px!important; font-weight:800!important; }
-.st-key-top_control_deck [data-baseweb="button-group"] button[aria-pressed="true"] { background:var(--navy)!important; color:#fff!important; box-shadow:0 2px 6px rgba(23,44,61,.16)!important; }
-.st-key-top_control_deck input { background:#f7fafb!important; color:var(--navy)!important; -webkit-text-fill-color:var(--navy)!important; }
+.st-key-navigation_tabs [data-baseweb="button-group"] { background:transparent!important; border-bottom:2px solid var(--line)!important; border-radius:0!important; gap:0!important; width:100%; }
+.st-key-navigation_tabs button { background:transparent!important; border:0!important; border-bottom:4px solid transparent!important; border-radius:0!important; color:#95a4ae!important; flex:1!important; font-family:'Barlow Condensed',sans-serif!important; font-size:17px!important; font-weight:800!important; letter-spacing:1.5px!important; margin:0!important; padding:14px 18px 12px!important; text-transform:uppercase!important; }
+.st-key-navigation_tabs button:hover { color:var(--navy)!important; background:rgba(49,213,208,.06)!important; }
+.st-key-navigation_tabs button[aria-pressed="true"] { color:var(--navy)!important; border-bottom-color:var(--aqua)!important; background:transparent!important; box-shadow:none!important; }
+.st-key-top_control_deck [data-baseweb="button-group"] { background:#fff!important; border:1px solid #d7e2e7!important; border-radius:5px!important; box-shadow:0 1px 4px rgba(23,44,61,.04)!important; gap:3px!important; padding:3px!important; }
+.st-key-top_control_deck [data-baseweb="button-group"] button { background:transparent!important; border:0!important; border-radius:3px!important; color:#6e8492!important; font-family:'Barlow Condensed',sans-serif!important; font-size:12px!important; font-weight:800!important; }
+.st-key-top_control_deck [data-baseweb="button-group"] button[aria-pressed="true"] { background:#e7f8f7!important; color:var(--navy)!important; box-shadow:inset 0 -3px 0 var(--aqua)!important; }
+.st-key-top_control_deck input { background:#fff!important; color:var(--navy)!important; -webkit-text-fill-color:var(--navy)!important; }
 .st-key-top_control_deck [data-baseweb="select"] { color:var(--navy)!important; }
 .st-key-top_control_deck [data-baseweb="select"] span { color:var(--navy)!important; }
 .st-key-top_control_deck svg { fill:var(--navy)!important; color:var(--navy)!important; }
@@ -426,17 +426,17 @@ page = st.segmented_control(
 states = sorted(fars["state"].dropna().unique()) if not fars.empty else ["Utah"]
 utah_all_crash_available = not utah_crashes.empty and "year" in utah_crashes.columns
 with st.container(key="top_control_deck"):
-    state_column, scope_column, years_column = st.columns((1, 1.45, 2.7), gap="medium")
+    state_column, scope_column, years_column = st.columns((0.85, 1.45, 3), gap="large")
     with state_column:
         selected_state = st.selectbox(
-            "State",
+            "Market",
             states,
             index=states.index("Utah") if "Utah" in states else 0,
         )
     with scope_column:
         if selected_state == "Utah" and utah_all_crash_available:
             crash_scope = st.segmented_control(
-                "Crash Scope",
+                "Data Scope",
                 ("All Reported Crashes", "Fatal Crashes Only"),
                 default="All Reported Crashes",
                 width="stretch",
@@ -444,7 +444,7 @@ with st.container(key="top_control_deck"):
             )
         else:
             crash_scope = "Fatal Crashes Only"
-            st.text_input("Crash Scope", value=crash_scope, disabled=True)
+            st.text_input("Data Scope", value=crash_scope, disabled=True)
     use_utah_all_crashes = (
         selected_state == "Utah"
         and crash_scope == "All Reported Crashes"
