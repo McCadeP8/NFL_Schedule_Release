@@ -73,16 +73,25 @@ header[data-testid="stHeader"] {
 [data-testid="stToolbar"] button,
 [data-testid="stToolbar"] button *,
 [data-testid="stToolbar"] a,
-[data-testid="stToolbar"] svg,
 [data-testid="stAppDeployButton"],
 [data-testid="stAppDeployButton"] *,
 [data-testid="stMainMenu"],
 [data-testid="stMainMenu"] * {
   color:#fff!important;
-  fill:#fff!important;
   opacity:1!important;
   visibility:visible!important;
 }
+[data-testid="stToolbar"] svg,
+[data-testid="stMainMenu"] svg,
+[data-testid="stMainMenuButton"] svg { color:#fff!important; fill:#fff!important; stroke:#fff!important; }
+[data-testid="stMainMenuButton"] {
+  background:transparent!important; border:1px solid rgba(255,255,255,.22)!important;
+  border-radius:5px!important; color:#fff!important; min-width:38px!important;
+}
+[data-testid="stMainMenuButton"]:after {
+  color:#fff!important; content:"⋮"; font-size:24px; font-weight:800; line-height:1;
+}
+[data-testid="stMainMenuButton"] svg { display:none!important; }
 [data-testid="stToolbar"] button:hover,
 [data-testid="stAppDeployButton"] button:hover,
 [data-testid="stMainMenu"] button:hover {
@@ -96,23 +105,16 @@ header[data-testid="stHeader"] {
 .top-brand { display:flex; align-items:center; gap:20px; padding:22px 0 17px; border-bottom:1px solid var(--line); }
 .top-brand img { width:min(380px,45vw); height:auto; object-fit:contain; }
 .top-brand-copy { border-left:1px solid var(--line); color:#8294a0; font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:800; letter-spacing:3px; padding-left:20px; text-transform:uppercase; }
-.st-key-top_control_deck { background:transparent; border-top:1px solid var(--line); border-bottom:1px solid var(--line); margin:12px 0 18px; padding:13px 2px 8px; }
-.st-key-top_control_deck div[data-testid="stWidgetLabel"] p { color:#7c909d!important; font-family:'Barlow Condensed',sans-serif!important; font-size:11px!important; font-weight:800!important; letter-spacing:2px!important; text-transform:uppercase!important; }
-.st-key-top_control_deck div[data-baseweb="select"]>div { background:#fff!important; border:1px solid #d7e2e7!important; border-radius:5px!important; box-shadow:0 1px 4px rgba(23,44,61,.04)!important; color:var(--navy)!important; min-height:42px!important; }
-.st-key-top_control_deck div[data-baseweb="select"] * { color:var(--navy)!important; }
-
-.st-key-navigation_tabs div[data-testid="stWidgetLabel"] { display:none!important; }
-.st-key-navigation_tabs [data-baseweb="button-group"] { background:transparent!important; border-bottom:2px solid var(--line)!important; border-radius:0!important; gap:0!important; width:100%; }
-.st-key-navigation_tabs button { background:transparent!important; border:0!important; border-bottom:4px solid transparent!important; border-radius:0!important; color:#95a4ae!important; flex:1!important; font-family:'Barlow Condensed',sans-serif!important; font-size:17px!important; font-weight:800!important; letter-spacing:1.5px!important; margin:0!important; padding:14px 18px 12px!important; text-transform:uppercase!important; }
-.st-key-navigation_tabs button:hover { color:var(--navy)!important; background:rgba(49,213,208,.06)!important; }
-.st-key-navigation_tabs button[aria-pressed="true"] { color:var(--navy)!important; border-bottom-color:var(--aqua)!important; background:transparent!important; box-shadow:none!important; }
-.st-key-top_control_deck [data-baseweb="button-group"] { background:#fff!important; border:1px solid #d7e2e7!important; border-radius:5px!important; box-shadow:0 1px 4px rgba(23,44,61,.04)!important; gap:3px!important; padding:3px!important; }
-.st-key-top_control_deck [data-baseweb="button-group"] button { background:transparent!important; border:0!important; border-radius:3px!important; color:#6e8492!important; font-family:'Barlow Condensed',sans-serif!important; font-size:12px!important; font-weight:800!important; }
-.st-key-top_control_deck [data-baseweb="button-group"] button[aria-pressed="true"] { background:#e7f8f7!important; color:var(--navy)!important; box-shadow:inset 0 -3px 0 var(--aqua)!important; }
-.st-key-top_control_deck input { background:#fff!important; color:var(--navy)!important; -webkit-text-fill-color:var(--navy)!important; }
-.st-key-top_control_deck [data-baseweb="select"] { color:var(--navy)!important; }
-.st-key-top_control_deck [data-baseweb="select"] span { color:var(--navy)!important; }
-.st-key-top_control_deck svg { fill:var(--navy)!important; color:var(--navy)!important; }
+.st-key-navigation_row { border-bottom:2px solid var(--line); margin:8px 0 14px; padding-bottom:0; }
+.st-key-navigation_row button { background:transparent!important; border:0!important; border-bottom:4px solid transparent!important; border-radius:0!important; color:#96a5ae!important; font-family:'Barlow Condensed',sans-serif!important; font-size:16px!important; font-weight:800!important; letter-spacing:1.3px!important; padding:13px 14px 11px!important; text-transform:uppercase!important; width:100%!important; }
+.st-key-navigation_row button:hover { background:#edf8f8!important; color:var(--navy)!important; }
+.st-key-navigation_row .st-key-nav_active button { background:var(--navy)!important; border-bottom-color:var(--aqua)!important; color:#fff!important; box-shadow:0 4px 10px rgba(23,44,61,.13)!important; }
+.st-key-filter_strip { background:#fff; border-left:5px solid var(--aqua); border-radius:6px; box-shadow:0 2px 9px rgba(23,44,61,.06); margin:12px 0 20px; padding:12px 16px 4px; }
+.st-key-filter_strip div[data-testid="stWidgetLabel"] p { color:#708692!important; font-family:'Barlow Condensed',sans-serif!important; font-size:11px!important; font-weight:800!important; letter-spacing:1.7px!important; text-transform:uppercase!important; }
+.st-key-filter_strip div[data-baseweb="select"]>div { background:#f7fafb!important; border-color:#d7e2e7!important; color:var(--navy)!important; min-height:40px!important; }
+.st-key-filter_strip div[data-baseweb="select"] * { color:var(--navy)!important; }
+.st-key-filter_strip [data-baseweb="button-group"] button { color:var(--navy)!important; font-family:'Barlow Condensed',sans-serif!important; font-size:11px!important; font-weight:800!important; }
+.st-key-filter-strip [data-testid="stSlider"] { padding-top:0!important; }
 
 .masthead { display:flex; justify-content:space-between; align-items:flex-end; gap:24px; padding:30px 0 22px; border-bottom:2px solid var(--line); margin-bottom:20px; }
 .mast-kicker { font-family:'Barlow Condensed',sans-serif; color:#168f8c; font-weight:800; font-size:13px; letter-spacing:4px; text-transform:uppercase; }
@@ -408,25 +410,28 @@ st.html(
     """
 )
 
-page = st.segmented_control(
-    "Navigation",
-    ("Executive Overview", "Accident Trends", "Risk Factors", "Geographic Analysis"),
-    default="Executive Overview",
-    format_func=lambda value: {
-        "Executive Overview": "📊 Executive Overview",
-        "Accident Trends": "📈 Accident Trends",
-        "Risk Factors": "⚠️ Risk Factors",
-        "Geographic Analysis": "🗺️ Geographic Analysis",
-    }[value],
-    label_visibility="collapsed",
-    width="stretch",
-    key="navigation_tabs",
+if "page" not in st.session_state:
+    st.session_state.page = "Executive Overview"
+nav_items = (
+    ("📊 Executive Overview", "Executive Overview"),
+    ("📈 Accident Trends", "Accident Trends"),
+    ("⚠️ Risk Factors", "Risk Factors"),
+    ("🗺️ Geographic Analysis", "Geographic Analysis"),
 )
+with st.container(key="navigation_row"):
+    nav_columns = st.columns(4, gap="small")
+    for column, (label, destination) in zip(nav_columns, nav_items):
+        with column:
+            button_key = "nav_active" if st.session_state.page == destination else f"nav_{destination}"
+            if st.button(label, key=button_key, width="stretch"):
+                st.session_state.page = destination
+                st.rerun()
+page = st.session_state.page
 
 states = sorted(fars["state"].dropna().unique()) if not fars.empty else ["Utah"]
 utah_all_crash_available = not utah_crashes.empty and "year" in utah_crashes.columns
-with st.container(key="top_control_deck"):
-    state_column, scope_column, years_column = st.columns((0.85, 1.45, 3), gap="large")
+with st.container(key="filter_strip"):
+    state_column, scope_column, years_column = st.columns((0.9, 1.5, 2.8), gap="large")
     with state_column:
         selected_state = st.selectbox(
             "Market",
@@ -435,12 +440,11 @@ with st.container(key="top_control_deck"):
         )
     with scope_column:
         if selected_state == "Utah" and utah_all_crash_available:
-            crash_scope = st.segmented_control(
+            crash_scope = st.radio(
                 "Data Scope",
                 ("All Reported Crashes", "Fatal Crashes Only"),
-                default="All Reported Crashes",
-                width="stretch",
-                key="crash_scope_tabs",
+                index=0,
+                horizontal=True,
             )
         else:
             crash_scope = "Fatal Crashes Only"
@@ -457,11 +461,16 @@ with st.container(key="top_control_deck"):
         else []
     )
     with years_column:
-        selected_years = st.multiselect(
-            "Crash Years",
-            available_years,
-            default=available_years,
+        year_min, year_max = min(available_years), max(available_years)
+        selected_range = st.slider(
+            "Crash Year Range",
+            min_value=year_min,
+            max_value=year_max,
+            value=(year_min, year_max),
         )
+        selected_years = [
+            year for year in available_years if selected_range[0] <= year <= selected_range[1]
+        ]
 
 if fars.empty or not selected_years:
     st.info("Select at least one year or run `python ingest.py` to load official data.")
