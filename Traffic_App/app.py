@@ -112,8 +112,25 @@ header[data-testid="stHeader"] {
 .st-key-filter_strip { background:#fff; border-left:5px solid var(--aqua); border-radius:6px; box-shadow:0 2px 9px rgba(23,44,61,.06); margin:12px 0 20px; padding:12px 16px 4px; }
 .st-key-filter_strip div[data-testid="stWidgetLabel"] p { color:#708692!important; font-family:'Barlow Condensed',sans-serif!important; font-size:11px!important; font-weight:800!important; letter-spacing:1.7px!important; text-transform:uppercase!important; }
 .st-key-filter_strip div[data-baseweb="select"]>div { background:#f7fafb!important; border-color:#d7e2e7!important; color:var(--navy)!important; min-height:40px!important; }
-.st-key-filter_strip div[data-baseweb="select"] * { color:var(--navy)!important; }
-.st-key-filter_strip [data-baseweb="button-group"] button { color:var(--navy)!important; font-family:'Barlow Condensed',sans-serif!important; font-size:11px!important; font-weight:800!important; }
+.st-key-filter_strip,
+.st-key-filter_strip p,
+.st-key-filter_strip span,
+.st-key-filter_strip label,
+.st-key-filter_strip div,
+.st-key-filter_strip input,
+.st-key-filter_strip div[data-baseweb="select"] *,
+.st-key-filter_strip [data-baseweb="button-group"] button,
+.st-key-filter_strip [data-testid="stSlider"] * {
+  color:#172c3d!important;
+  -webkit-text-fill-color:#172c3d!important;
+}
+.st-key-filter_strip svg { color:#213f57!important; fill:#213f57!important; }
+.st-key-filter_strip [data-baseweb="button-group"] button { font-family:'Barlow Condensed',sans-serif!important; font-size:11px!important; font-weight:800!important; }
+.st-key-filter_strip [data-baseweb="button-group"] button[aria-checked="true"],
+.st-key-filter_strip [data-baseweb="button-group"] button[aria-pressed="true"] {
+  color:#172c3d!important;
+  -webkit-text-fill-color:#172c3d!important;
+}
 .st-key-filter-strip [data-testid="stSlider"] { padding-top:0!important; }
 
 .masthead { display:flex; justify-content:space-between; align-items:flex-end; gap:24px; padding:30px 0 22px; border-bottom:2px solid var(--line); margin-bottom:20px; }
