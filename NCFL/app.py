@@ -5248,11 +5248,22 @@ def render_player_dashboard(
             st.html(f'<div class="player-draft-stack">{"".join(tiles)}</div>')
 
     with chart_column:
+        positive_weekly_points = weekly_points.loc[weekly_points["Points"].gt(0)].copy()
+        chart_years = sorted(
+            positive_weekly_points["Year"].dropna().astype(int).unique(), reverse=True
+        )
+        selected_chart_year = st.selectbox(
+            "Chart Year",
+            ["All"] + chart_years,
+            key=f"player_chart_year_{match_key(player)}",
+        )
         st.html('<div class="history-section-title"><span>Weekly Scoring Trend</span><div></div></div>')
-        if weekly_points.empty:
+        if positive_weekly_points.empty:
             st.caption("No completed weekly scoring history is available.")
         else:
-            chart_data = weekly_points.copy()
+            chart_data = positive_weekly_points.copy()
+            if selected_chart_year != "All":
+                chart_data = chart_data.loc[chart_data["Year"].eq(selected_chart_year)].copy()
             chart_data["Year"] = chart_data["Year"].astype(int)
             chart_data["Week"] = chart_data["Week"].astype(int)
             chart_data["Game"] = chart_data.apply(
@@ -5279,7 +5290,13 @@ def render_player_dashboard(
                 ),
             )
             line = (
-                base.mark_line(color="#c8102e", strokeWidth=3.5)
+                base.mark_line(
+                    color="#c8102e",
+                    strokeWidth=3.5,
+                    interpolate="monotone",
+                    strokeCap="round",
+                    strokeJoin="round",
+                )
                 .encode(
                     y=alt.Y(
                         "Points:Q",
@@ -5344,6 +5361,10 @@ def render_player_dashboard(
             player_ranks = player_ranks.loc[player_ranks["Points"].ne(0)].copy()
             player_ranks["Year"] = player_ranks["Year"].astype(int)
             player_ranks["Week"] = player_ranks["Week"].astype(int)
+            if selected_chart_year != "All":
+                player_ranks = player_ranks.loc[
+                    player_ranks["Year"].eq(selected_chart_year)
+                ].copy()
             player_ranks = player_ranks.sort_values(["Year", "Week"]).reset_index(drop=True)
             player_ranks["GameOrder"] = range(len(player_ranks))
             player_ranks["Game"] = player_ranks.apply(
@@ -5352,7 +5373,8 @@ def render_player_dashboard(
             player_ranks["RankLabel"] = position + player_ranks["WeeklyRank"].astype(int).astype(str)
             if not player_ranks.empty:
                 max_rank = max(int(player_ranks["WeeklyRank"].max()), 1)
-                rank_domain = [max_rank + 2, 0]
+                rank_domain = [max(max_rank, 2), 1]
+                rank_ticks = list(range(1, max_rank + 1))
                 rank_base = alt.Chart(player_ranks).encode(
                     x=alt.X(
                         "Game:N",
@@ -5367,12 +5389,17 @@ def render_player_dashboard(
                             labelOverlap="greedy",
                             tickColor="#cbd5e1",
                             domainColor="#94a3b8",
-                            grid=False,
+                            grid=True,
+                            gridColor="#edf0f7",
                         ),
                     )
                 )
                 rank_line = rank_base.mark_line(
-                    color="#2563eb", strokeWidth=3, interpolate="monotone"
+                    color="#2563eb",
+                    strokeWidth=3,
+                    interpolate="monotone",
+                    strokeCap="round",
+                    strokeJoin="round",
                 ).encode(
                     y=alt.Y(
                         "WeeklyRank:Q",
@@ -5385,8 +5412,8 @@ def render_player_dashboard(
                             domain=True,
                             domainColor="#94a3b8",
                             tickColor="#94a3b8",
-                            tickMinStep=1,
-                            tickCount=min(max_rank + 1, 10),
+                            values=rank_ticks,
+                            format="d",
                             labelPadding=7,
                             titlePadding=12,
                         ),
@@ -5395,7 +5422,7 @@ def render_player_dashboard(
                 rank_points = rank_base.mark_circle(
                     size=105, color="#ffffff", stroke="#2563eb", strokeWidth=3
                 ).encode(
-                    y=alt.Y("WeeklyRank:Q", scale=alt.Scale(domain=rank_domain)),
+                    y=alt.Y("WeeklyRank:Q", scale=alt.Scale(domain=rank_domain), axis=None),
                     tooltip=[
                         alt.Tooltip("Year:O"),
                         alt.Tooltip("Week:O"),
@@ -5410,7 +5437,7 @@ def render_player_dashboard(
                     fontSize=11,
                     fontWeight="bold",
                 ).encode(
-                    y=alt.Y("WeeklyRank:Q", scale=alt.Scale(domain=rank_domain)),
+                    y=alt.Y("WeeklyRank:Q", scale=alt.Scale(domain=rank_domain), axis=None),
                     text="RankLabel:N",
                 )
                 rank_chart = (
