@@ -2432,12 +2432,13 @@ div[data-testid="stButton"] button {
   text-transform: uppercase;
   color: #8a96b0;
 }
-.player-value-ranks {
-  margin-top: 5px;
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 14px;
-  font-weight: 900;
-  color: #64748b;
+.player-value-main {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 34px;
+  line-height: 1;
+  letter-spacing: 1px;
+  color: #111827;
+  white-space: nowrap;
 }
 .history-section-title {
   display: flex;
@@ -4585,26 +4586,23 @@ def history_metrics(items: list[tuple[str, str]], accent: str = "#c8102e") -> No
 def player_value_metrics(dynasty: dict[str, object], last_finish: str) -> None:
     items = [
         (
-            f'{float(dynasty["one_qb"]):,.0f}',
-            f'{dynasty["one_qb_rank"]} · {dynasty["one_qb_overall"]}',
+            f'{float(dynasty["one_qb"]):,.0f} · {dynasty["one_qb_rank"]} · {dynasty["one_qb_overall"]}',
             "Current Flex Value",
         ),
         (
-            f'{float(dynasty["superflex"]):,.0f}',
-            f'{dynasty["superflex_rank"]} · {dynasty["superflex_overall"]}',
+            f'{float(dynasty["superflex"]):,.0f} · {dynasty["superflex_rank"]} · {dynasty["superflex_overall"]}',
             "Current Superflex Value",
         ),
-        (last_finish, "", "Last Season Finish"),
+        (last_finish, "Last Season Finish"),
     ]
     cards = "".join(
         f"""
 <div class="history-metric" style="--accent:#7dd3fc;">
-  <div class="history-metric-value">{esc(value)}</div>
-  {f'<div class="player-value-ranks">{esc(ranks)}</div>' if ranks else ''}
+  <div class="player-value-main">{esc(value)}</div>
   <div class="history-metric-label">{esc(label)}</div>
 </div>
 """
-        for value, ranks, label in items
+        for value, label in items
     )
     st.html(f'<div class="history-metrics" style="--metric-count:3;">{cards}</div>')
 
@@ -5061,8 +5059,8 @@ def player_dynasty_snapshot(player: str) -> dict[str, object]:
         "superflex": float(pd.to_numeric(row.get("value_2qb"), errors="coerce") or 0),
         "one_qb_rank": f'{position}{int(ranked["one_qb_rank"])}',
         "superflex_rank": f'{position}{int(ranked["superflex_rank"])}',
-        "one_qb_overall": f'OVR {int(overall["one_qb_overall"])}',
-        "superflex_overall": f'OVR {int(overall["superflex_overall"])}',
+        "one_qb_overall": f'OVR{int(overall["one_qb_overall"])}',
+        "superflex_overall": f'OVR{int(overall["superflex_overall"])}',
     }
 
 
@@ -5202,7 +5200,7 @@ def render_player_dashboard(
 
     render_player_current_ownership(player, rosters, conferences)
 
-    draft_column, chart_column = st.columns([0.15, 0.85], gap="large")
+    draft_column, chart_column = st.columns([0.17, 0.83], gap="large")
     with draft_column:
         st.html('<div class="history-section-title"><span>Draft History</span><div></div></div>')
         if draft_history.empty:
@@ -5261,13 +5259,23 @@ def render_player_dashboard(
                 lambda row: f'{int(row["Year"])} W{int(row["Week"]):02d}', axis=1
             )
             chart_data = chart_data.sort_values(["Year", "Week"]).reset_index(drop=True)
-            chart_data["GameOrder"] = range(len(chart_data))
             max_points = max(float(chart_data["Points"].max()) * 1.2, 1)
             base = alt.Chart(chart_data).encode(
                 x=alt.X(
-                    "GameOrder:Q",
+                    "Game:N",
+                    sort=chart_data["Game"].tolist(),
                     title=None,
-                    axis=alt.Axis(labels=False, ticks=False, grid=False, domain=False),
+                    axis=alt.Axis(
+                        labelAngle=-55,
+                        labelColor="#64748b",
+                        labelFont="Rajdhani",
+                        labelFontSize=10,
+                        labelLimit=80,
+                        labelOverlap="greedy",
+                        tickColor="#cbd5e1",
+                        domainColor="#94a3b8",
+                        grid=False,
+                    ),
                 ),
             )
             line = (
@@ -5282,7 +5290,8 @@ def render_player_dashboard(
                 )
             )
             points = (
-                base.mark_circle(size=82, color="#c8102e", stroke="#ffffff", strokeWidth=2)
+                base.transform_filter(alt.datum.Points > 0)
+                .mark_circle(size=82, color="#c8102e", stroke="#ffffff", strokeWidth=2)
                 .encode(
                     y=alt.Y("Points:Q", scale=alt.Scale(domain=[0, max_points])),
                     tooltip=[
@@ -5292,9 +5301,23 @@ def render_player_dashboard(
                     ],
                 )
             )
+            point_labels = (
+                base.transform_filter(alt.datum.Points > 0)
+                .mark_text(
+                    dy=-13,
+                    color="#111827",
+                    font="Barlow Condensed",
+                    fontSize=11,
+                    fontWeight="bold",
+                )
+                .encode(
+                    y=alt.Y("Points:Q", scale=alt.Scale(domain=[0, max_points])),
+                    text=alt.Text("Points:Q", format=".2f"),
+                )
+            )
             points_chart = (
-                (line + points)
-                .properties(height=320, background="#f8fafc")
+                (line + points + point_labels)
+                .properties(height=336, background="#f8fafc")
                 .configure_view(stroke=None)
                 .configure_axis(
                     labelFont="Rajdhani",
@@ -5318,6 +5341,7 @@ def render_player_dashboard(
                 ascending=False, method="min"
             )
             player_ranks = rank_source.loc[rank_source["Player"].astype(str).eq(player)].copy()
+            player_ranks = player_ranks.loc[player_ranks["Points"].ne(0)].copy()
             player_ranks["Year"] = player_ranks["Year"].astype(int)
             player_ranks["Week"] = player_ranks["Week"].astype(int)
             player_ranks = player_ranks.sort_values(["Year", "Week"]).reset_index(drop=True)
@@ -5391,7 +5415,7 @@ def render_player_dashboard(
                 )
                 rank_chart = (
                     (rank_line + rank_points + rank_labels)
-                    .properties(height=370, background="#f8fafc")
+                    .properties(height=389, background="#f8fafc")
                     .configure_view(stroke=None)
                     .configure_axis(
                         labelFont="Rajdhani",
@@ -5493,7 +5517,7 @@ def render_player_dashboard(
                     rank_row = rank_row.iloc[0]
                 rank_position = clean_text(rank_row.get("Position"), position)
                 cells.append(f'<td>{esc(rank_position)}{int(rank_row["PositionRank"])}</td>')
-                cells.append(f'<td>OVR {int(rank_row["OverallRank"])}</td>')
+                cells.append(f'<td>OVR{int(rank_row["OverallRank"])}</td>')
             else:
                 cells.append("<td></td>")
                 cells.append("<td></td>")
