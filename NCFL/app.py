@@ -5095,13 +5095,16 @@ def last_season_player_finish(starters: pd.DataFrame, player: str) -> str:
     position_totals = totals.loc[totals["Position"].astype(str).eq(position)].copy()
     position_totals["Rank"] = position_totals["Points"].rank(ascending=False, method="min")
     rank = int(position_totals.loc[position_totals["Player"].eq(player), "Rank"].iloc[0])
+    totals["OverallRank"] = totals["Points"].rank(ascending=False, method="min")
+    overall_rank = int(totals.loc[totals["Player"].eq(player), "OverallRank"].iloc[0])
     points = float(player_row.iloc[0]["Points"])
-    return f"{position}{rank} · {points:,.2f}"
+    points_label = f"{points:,.2f}".rstrip("0").rstrip(".")
+    return f"{points_label} · {position}{rank} · OVR{overall_rank}"
 
 
 def current_season_player_rank(starters: pd.DataFrame, player: str) -> str:
     if starters.empty:
-        return "- · 0"
+        return "0 · - · OVR1"
     player_history = starters.loc[starters["Player"].astype(str).eq(player)]
     fallback_position = (
         clean_text(player_history.iloc[-1].get("Position"))
@@ -5119,13 +5122,18 @@ def current_season_player_rank(starters: pd.DataFrame, player: str) -> str:
     totals = season.groupby(["Player", "Position"], as_index=False)["Points"].sum()
     player_row = totals.loc[totals["Player"].astype(str).eq(player)]
     if player_row.empty:
-        return f"{fallback_position}1 · 0"
+        return f"0 · {fallback_position}1 · OVR1"
     position = clean_text(player_row.iloc[0]["Position"])
     position_totals = totals.loc[totals["Position"].astype(str).eq(position)].copy()
     position_totals["Rank"] = position_totals["Points"].rank(ascending=False, method="min")
     rank = int(position_totals.loc[position_totals["Player"].astype(str).eq(player), "Rank"].iloc[0])
+    totals["OverallRank"] = totals["Points"].rank(ascending=False, method="min")
+    overall_rank = int(
+        totals.loc[totals["Player"].astype(str).eq(player), "OverallRank"].iloc[0]
+    )
     points = float(player_row.iloc[0]["Points"])
-    return f"{position}{rank} · {points:,.2f}".rstrip("0").rstrip(".")
+    points_label = f"{points:,.2f}".rstrip("0").rstrip(".")
+    return f"{points_label} · {position}{rank} · OVR{overall_rank}"
 
 
 def render_player_current_ownership(
@@ -5411,8 +5419,9 @@ def render_player_dashboard(
             player_ranks["RankLabel"] = position + player_ranks["WeeklyRank"].astype(int).astype(str)
             if not player_ranks.empty:
                 max_rank = max(int(player_ranks["WeeklyRank"].max()), 1)
-                rank_domain = [max(max_rank, 2), 1]
-                rank_ticks = list(range(1, max_rank + 1))
+                rank_ceiling = max(5, ((max_rank + 4) // 5) * 5)
+                rank_domain = [rank_ceiling, 1]
+                rank_ticks = [1] + list(range(5, rank_ceiling + 1, 5))
                 rank_base = alt.Chart(player_ranks).encode(
                     x=alt.X(
                         "Game:N",
