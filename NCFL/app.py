@@ -5342,9 +5342,18 @@ def render_player_dashboard(
                 how="left",
             )
             chart_data = chart_data.sort_values(["Year", "Week"]).reset_index(drop=True)
+            plotted_chart_data = chart_data.dropna(subset=["Points"]).copy()
             plotted_points = pd.to_numeric(chart_data["Points"], errors="coerce").dropna()
             max_points = max(float(plotted_points.max()) * 1.2, 1) if not plotted_points.empty else 1
-            base = alt.Chart(chart_data).encode(
+            base = alt.Chart(plotted_chart_data).encode(
+                x=alt.X(
+                    "Game:N",
+                    sort=chart_game_order,
+                    title=None,
+                    axis=None,
+                ),
+            )
+            scoring_axis = alt.Chart(chart_axis).mark_point(opacity=0).encode(
                 x=alt.X(
                     "Game:N",
                     sort=chart_game_order,
@@ -5361,6 +5370,7 @@ def render_player_dashboard(
                         grid=False,
                     ),
                 ),
+                y=alt.value(0),
             )
             line = (
                 base.mark_line(
@@ -5369,7 +5379,6 @@ def render_player_dashboard(
                     interpolate="monotone",
                     strokeCap="round",
                     strokeJoin="round",
-                    invalid=None,
                 )
                 .encode(
                     y=alt.Y(
@@ -5407,7 +5416,7 @@ def render_player_dashboard(
                 )
             )
             points_chart = (
-                (line + points + point_labels)
+                (scoring_axis + line + points + point_labels)
                 .properties(height=336, background="#f8fafc")
                 .configure_view(stroke=None)
                 .configure_axis(
@@ -5452,26 +5461,17 @@ def render_player_dashboard(
             )
             if not rank_data.empty:
                 plotted_ranks = pd.to_numeric(rank_data["WeeklyRank"], errors="coerce").dropna()
+                plotted_rank_data = rank_data.dropna(subset=["WeeklyRank"]).copy()
                 max_rank = max(int(plotted_ranks.max()), 1) if not plotted_ranks.empty else 1
                 rank_ceiling = max(5, ((max_rank + 4) // 5) * 5)
                 rank_domain = [rank_ceiling, 1]
                 rank_ticks = [1] + list(range(5, rank_ceiling + 1, 5))
-                rank_base = alt.Chart(rank_data).encode(
+                rank_base = alt.Chart(plotted_rank_data).encode(
                     x=alt.X(
                         "Game:N",
                         sort=chart_game_order,
                         title=None,
-                        axis=alt.Axis(
-                            labelAngle=-55,
-                            labelColor="#64748b",
-                            labelFont="Rajdhani",
-                            labelFontSize=10,
-                            labelLimit=80,
-                            labelOverlap="greedy",
-                            tickColor="#cbd5e1",
-                            domainColor="#94a3b8",
-                            grid=False,
-                        ),
+                        axis=None,
                     ),
                     y=alt.Y(
                         "WeeklyRank:Q",
@@ -5499,13 +5499,31 @@ def render_player_dashboard(
                         ),
                     ),
                 )
+                rank_axis = alt.Chart(chart_axis).mark_point(opacity=0).encode(
+                    x=alt.X(
+                        "Game:N",
+                        sort=chart_game_order,
+                        title=None,
+                        axis=alt.Axis(
+                            labelAngle=-55,
+                            labelColor="#64748b",
+                            labelFont="Rajdhani",
+                            labelFontSize=10,
+                            labelLimit=80,
+                            labelOverlap="greedy",
+                            tickColor="#cbd5e1",
+                            domainColor="#94a3b8",
+                            grid=False,
+                        ),
+                    ),
+                    y=alt.value(0),
+                )
                 rank_line = rank_base.mark_line(
                     color="#2563eb",
                     strokeWidth=3,
                     interpolate="monotone",
                     strokeCap="round",
                     strokeJoin="round",
-                    invalid=None,
                 )
                 rank_points = rank_base.mark_circle(
                     size=105, color="#ffffff", stroke="#2563eb", strokeWidth=3
@@ -5527,7 +5545,7 @@ def render_player_dashboard(
                     text="RankLabel:N",
                 )
                 rank_chart = (
-                    (rank_line + rank_points + rank_labels)
+                    (rank_axis + rank_line + rank_points + rank_labels)
                     .properties(height=389, background="#f8fafc")
                     .configure_view(stroke=None)
                     .configure_axis(
