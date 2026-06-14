@@ -4583,7 +4583,11 @@ def history_metrics(items: list[tuple[str, str]], accent: str = "#c8102e") -> No
     st.html(f'<div class="history-metrics" style="--metric-count:{len(items)};">{cards}</div>')
 
 
-def player_value_metrics(dynasty: dict[str, object], last_finish: str) -> None:
+def player_value_metrics(
+    dynasty: dict[str, object],
+    last_finish: str,
+    current_rank: str,
+) -> None:
     items = [
         (
             f'{float(dynasty["one_qb"]):,.0f} · {dynasty["one_qb_rank"]} · {dynasty["one_qb_overall"]}',
@@ -4594,6 +4598,7 @@ def player_value_metrics(dynasty: dict[str, object], last_finish: str) -> None:
             "Current Superflex Value",
         ),
         (last_finish, "Last Season Finish"),
+        (current_rank, "This Season Rank"),
     ]
     cards = "".join(
         f"""
@@ -4604,7 +4609,7 @@ def player_value_metrics(dynasty: dict[str, object], last_finish: str) -> None:
 """
         for value, label in items
     )
-    st.html(f'<div class="history-metrics" style="--metric-count:3;">{cards}</div>')
+    st.html(f'<div class="history-metrics" style="--metric-count:4;">{cards}</div>')
 
 
 def history_program_table(aggregate: pd.DataFrame, schools: pd.DataFrame, limit: Optional[int] = None) -> None:
@@ -5094,6 +5099,29 @@ def last_season_player_finish(starters: pd.DataFrame, player: str) -> str:
     return f"{position}{rank} · {points:,.2f}"
 
 
+def current_season_player_rank(starters: pd.DataFrame, player: str) -> str:
+    if starters.empty:
+        return "#1 · 0"
+    season = starters.copy()
+    season["Year"] = pd.to_numeric(season["Year"], errors="coerce")
+    season["Week"] = pd.to_numeric(season["Week"], errors="coerce")
+    season["Points"] = pd.to_numeric(season["Points"], errors="coerce").fillna(0)
+    season = season.loc[season["Year"].eq(current_roster_season())]
+    season = season.sort_values(["Year", "Week", "Player"]).drop_duplicates(
+        ["Year", "Week", "Player"], keep="last"
+    )
+    totals = season.groupby(["Player", "Position"], as_index=False)["Points"].sum()
+    player_row = totals.loc[totals["Player"].astype(str).eq(player)]
+    if player_row.empty:
+        return "#1 · 0"
+    position = clean_text(player_row.iloc[0]["Position"])
+    position_totals = totals.loc[totals["Position"].astype(str).eq(position)].copy()
+    position_totals["Rank"] = position_totals["Points"].rank(ascending=False, method="min")
+    rank = int(position_totals.loc[position_totals["Player"].astype(str).eq(player), "Rank"].iloc[0])
+    points = float(player_row.iloc[0]["Points"])
+    return f"#{rank} · {points:,.2f}".rstrip("0").rstrip(".")
+
+
 def render_player_current_ownership(
     player: str,
     rosters: pd.DataFrame,
@@ -5196,7 +5224,11 @@ def render_player_dashboard(
         ],
         "#f2cf68",
     )
-    player_value_metrics(dynasty, last_season_player_finish(starters, player))
+    player_value_metrics(
+        dynasty,
+        last_season_player_finish(starters, player),
+        current_season_player_rank(starters, player),
+    )
 
     render_player_current_ownership(player, rosters, conferences)
 
@@ -5389,8 +5421,7 @@ def render_player_dashboard(
                             labelOverlap="greedy",
                             tickColor="#cbd5e1",
                             domainColor="#94a3b8",
-                            grid=True,
-                            gridColor="#edf0f7",
+                            grid=False,
                         ),
                     )
                 )
@@ -5412,6 +5443,8 @@ def render_player_dashboard(
                             domain=True,
                             domainColor="#94a3b8",
                             tickColor="#94a3b8",
+                            labels=True,
+                            orient="left",
                             values=rank_ticks,
                             format="d",
                             labelPadding=7,
