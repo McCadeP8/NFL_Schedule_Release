@@ -2672,7 +2672,7 @@ div[data-testid="stButton"] button {
 }
 .player-chart-shell {
   padding: 4px 10px 10px;
-  background: #ffffff;
+  background: #f8fafc;
   border: 1px solid #e2e6ef;
   border-top: 5px solid var(--accent);
   border-radius: 8px;
@@ -5166,7 +5166,7 @@ def render_player_dashboard(
 
     render_player_current_ownership(player, rosters, conferences)
 
-    draft_column, chart_column = st.columns([1, 3], gap="large")
+    draft_column, chart_column = st.columns([0.15, 0.85], gap="large")
     with draft_column:
         st.html('<div class="history-section-title"><span>Draft History</span><div></div></div>')
         if draft_history.empty:
@@ -5228,22 +5228,8 @@ def render_player_dashboard(
                     axis=alt.Axis(labels=False, ticks=False, grid=False, domain=False),
                 ),
             )
-            area = (
-                base.mark_area(
-                    line={"color": "#c8102e", "strokeWidth": 3},
-                    color=alt.Gradient(
-                        gradient="linear",
-                        stops=[
-                            alt.GradientStop(color="#c8102e", offset=0),
-                            alt.GradientStop(color="#ffffff", offset=1),
-                        ],
-                        x1=1,
-                        x2=1,
-                        y1=0,
-                        y2=1,
-                    ),
-                    opacity=0.24,
-                )
+            line = (
+                base.mark_line(color="#c8102e", strokeWidth=3.5)
                 .encode(
                     y=alt.Y(
                         "Points:Q",
@@ -5254,7 +5240,7 @@ def render_player_dashboard(
                 )
             )
             points = (
-                base.mark_circle(size=78, color="#111827", stroke="#ffffff", strokeWidth=2)
+                base.mark_circle(size=82, color="#c8102e", stroke="#ffffff", strokeWidth=2)
                 .encode(
                     y=alt.Y("Points:Q", scale=alt.Scale(domain=[0, max_points])),
                     tooltip=[
@@ -5264,8 +5250,16 @@ def render_player_dashboard(
                     ],
                 )
             )
-            points_chart = (area + points).properties(height=245).configure_view(stroke=None).configure_axis(
-                labelFont="Rajdhani", titleFont="Barlow Condensed", labelColor="#64748b", titleColor="#334155"
+            points_chart = (
+                (line + points)
+                .properties(height=245, background="#f8fafc")
+                .configure_view(stroke=None)
+                .configure_axis(
+                    labelFont="Rajdhani",
+                    titleFont="Barlow Condensed",
+                    labelColor="#64748b",
+                    titleColor="#334155",
+                )
             )
             st.html('<div class="player-chart-shell" style="--accent:#c8102e;">')
             st.altair_chart(points_chart, use_container_width=True)
@@ -5297,7 +5291,7 @@ def render_player_dashboard(
                     )
                 )
                 rank_line = rank_base.mark_line(
-                    color="#111827", strokeWidth=3, point=False
+                    color="#2563eb", strokeWidth=3.5, point=False
                 ).encode(
                     y=alt.Y(
                         "WeeklyRank:Q",
@@ -5307,7 +5301,7 @@ def render_player_dashboard(
                     )
                 )
                 rank_points = rank_base.mark_circle(
-                    size=78, color="#f2cf68", stroke="#111827", strokeWidth=2
+                    size=82, color="#2563eb", stroke="#ffffff", strokeWidth=2
                 ).encode(
                     y=alt.Y("WeeklyRank:Q", scale=alt.Scale(domain=[max_rank + 1, 1])),
                     tooltip=[
@@ -5317,10 +5311,16 @@ def render_player_dashboard(
                         alt.Tooltip("Points:Q", format=".2f"),
                     ],
                 )
-                rank_chart = (rank_line + rank_points).properties(height=245).configure_view(
-                    stroke=None
-                ).configure_axis(
-                    labelFont="Rajdhani", titleFont="Barlow Condensed", labelColor="#64748b", titleColor="#334155"
+                rank_chart = (
+                    (rank_line + rank_points)
+                    .properties(height=245, background="#f8fafc")
+                    .configure_view(stroke=None)
+                    .configure_axis(
+                        labelFont="Rajdhani",
+                        titleFont="Barlow Condensed",
+                        labelColor="#64748b",
+                        titleColor="#334155",
+                    )
                 )
                 st.html('<div class="history-section-title"><span>Weekly Position Rank</span><div></div></div>')
                 st.html('<div class="player-chart-shell" style="--accent:#f2cf68;">')
@@ -5333,7 +5333,7 @@ def render_player_dashboard(
         return
     status_symbols = {
         "Starter": ("✅", "Starter"),
-        "Bench": ("☑", "Bench"),
+        "Bench": ("❌", "Bench"),
         "Reserve": ("🏥", "Injured Reserve"),
         "Taxi": ("🚕", "Taxi"),
     }
