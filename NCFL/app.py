@@ -5142,17 +5142,8 @@ def render_player_current_ownership(
     conferences: pd.DataFrame,
 ) -> None:
     owned = rosters.loc[rosters["player_name"].astype(str).eq(player)].copy()
-    headers = ['<th class="player-col">Player</th>']
-    cells = [
-        f"""
-<td class="player-col">
-  <div class="league-player">
-    <img src="{esc(player_picture(player))}" alt="{esc(player)}" onerror="{player_picture_fallback()}">
-    <span>{esc(player)}</span>
-  </div>
-</td>
-"""
-    ]
+    headers = []
+    cells = []
     for conference in LEAGUE_ROSTER_ORDER:
         conf_logo = conference_logo(conferences, conference)
         headers.append(
@@ -5296,15 +5287,30 @@ def render_player_dashboard(
     with chart_column:
         positive_weekly_points = weekly_points.loc[weekly_points["Points"].gt(0)].copy()
         chart_years = sorted(
-            positive_weekly_points["Year"].dropna().astype(int).unique(), reverse=True
+            weekly_points["Year"].dropna().astype(int).unique(), reverse=True
         )
         selected_chart_year = st.selectbox(
             "Chart Year",
             ["All"] + chart_years,
             key=f"player_chart_year_{match_key(player)}",
         )
+        displayed_chart_years = (
+            chart_years if selected_chart_year == "All" else [selected_chart_year]
+        )
+        chart_axis = pd.DataFrame(
+            [
+                {
+                    "Year": year,
+                    "Week": week,
+                    "Game": f"{year} W{week:02d}",
+                }
+                for year in sorted(displayed_chart_years)
+                for week in range(1, 19)
+            ]
+        )
+        chart_game_order = chart_axis["Game"].tolist()
         st.html('<div class="history-section-title"><span>Weekly Scoring Trend</span><div></div></div>')
-        if positive_weekly_points.empty:
+        if not chart_years:
             st.caption("No completed weekly scoring history is available.")
         else:
             chart_data = positive_weekly_points.copy()
@@ -5312,15 +5318,18 @@ def render_player_dashboard(
                 chart_data = chart_data.loc[chart_data["Year"].eq(selected_chart_year)].copy()
             chart_data["Year"] = chart_data["Year"].astype(int)
             chart_data["Week"] = chart_data["Week"].astype(int)
-            chart_data["Game"] = chart_data.apply(
-                lambda row: f'{int(row["Year"])} W{int(row["Week"]):02d}', axis=1
+            chart_data = chart_axis.merge(
+                chart_data.drop(columns=["Game"], errors="ignore"),
+                on=["Year", "Week"],
+                how="left",
             )
             chart_data = chart_data.sort_values(["Year", "Week"]).reset_index(drop=True)
-            max_points = max(float(chart_data["Points"].max()) * 1.2, 1)
+            plotted_points = pd.to_numeric(chart_data["Points"], errors="coerce").dropna()
+            max_points = max(float(plotted_points.max()) * 1.2, 1) if not plotted_points.empty else 1
             base = alt.Chart(chart_data).encode(
                 x=alt.X(
                     "Game:N",
-                    sort=chart_data["Game"].tolist(),
+                    sort=chart_game_order,
                     title=None,
                     axis=alt.Axis(
                         labelAngle=-55,
@@ -5417,15 +5426,21 @@ def render_player_dashboard(
                 lambda row: f'{int(row["Year"])} W{int(row["Week"]):02d}', axis=1
             )
             player_ranks["RankLabel"] = position + player_ranks["WeeklyRank"].astype(int).astype(str)
-            if not player_ranks.empty:
-                max_rank = max(int(player_ranks["WeeklyRank"].max()), 1)
+            rank_data = chart_axis.merge(
+                player_ranks.drop(columns=["Game"], errors="ignore"),
+                on=["Year", "Week"],
+                how="left",
+            )
+            if not rank_data.empty:
+                plotted_ranks = pd.to_numeric(rank_data["WeeklyRank"], errors="coerce").dropna()
+                max_rank = max(int(plotted_ranks.max()), 1) if not plotted_ranks.empty else 1
                 rank_ceiling = max(5, ((max_rank + 4) // 5) * 5)
                 rank_domain = [rank_ceiling, 1]
                 rank_ticks = [1] + list(range(5, rank_ceiling + 1, 5))
-                rank_base = alt.Chart(player_ranks).encode(
+                rank_base = alt.Chart(rank_data).encode(
                     x=alt.X(
                         "Game:N",
-                        sort=player_ranks["Game"].tolist(),
+                        sort=chart_game_order,
                         title=None,
                         axis=alt.Axis(
                             labelAngle=-55,
