@@ -2432,6 +2432,13 @@ div[data-testid="stButton"] button {
   text-transform: uppercase;
   color: #8a96b0;
 }
+.player-value-ranks {
+  margin-top: 5px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 14px;
+  font-weight: 900;
+  color: #64748b;
+}
 .history-section-title {
   display: flex;
   align-items: center;
@@ -4575,6 +4582,33 @@ def history_metrics(items: list[tuple[str, str]], accent: str = "#c8102e") -> No
     st.html(f'<div class="history-metrics" style="--metric-count:{len(items)};">{cards}</div>')
 
 
+def player_value_metrics(dynasty: dict[str, object], last_finish: str) -> None:
+    items = [
+        (
+            f'{float(dynasty["one_qb"]):,.0f}',
+            f'{dynasty["one_qb_rank"]} · {dynasty["one_qb_overall"]}',
+            "Current Flex Value",
+        ),
+        (
+            f'{float(dynasty["superflex"]):,.0f}',
+            f'{dynasty["superflex_rank"]} · {dynasty["superflex_overall"]}',
+            "Current Superflex Value",
+        ),
+        (last_finish, "", "Last Season Finish"),
+    ]
+    cards = "".join(
+        f"""
+<div class="history-metric" style="--accent:#7dd3fc;">
+  <div class="history-metric-value">{esc(value)}</div>
+  {f'<div class="player-value-ranks">{esc(ranks)}</div>' if ranks else ''}
+  <div class="history-metric-label">{esc(label)}</div>
+</div>
+"""
+        for value, ranks, label in items
+    )
+    st.html(f'<div class="history-metrics" style="--metric-count:3;">{cards}</div>')
+
+
 def history_program_table(aggregate: pd.DataFrame, schools: pd.DataFrame, limit: Optional[int] = None) -> None:
     if aggregate.empty:
         return
@@ -5006,13 +5040,20 @@ def player_dynasty_snapshot(player: str) -> dict[str, object]:
     values["_player_key"] = values["player"].map(dynasty_player_key)
     match = values.loc[values["_player_key"].eq(dynasty_player_key(player))]
     if match.empty:
-        return {"position": "", "team": "", "one_qb": 0, "superflex": 0, "one_qb_rank": "-", "superflex_rank": "-"}
+        return {
+            "position": "", "team": "", "one_qb": 0, "superflex": 0,
+            "one_qb_rank": "-", "superflex_rank": "-",
+            "one_qb_overall": "-", "superflex_overall": "-",
+        }
     row = match.iloc[0]
     position = clean_text(row.get("pos"))
     positional = values.loc[values["pos"].astype(str).eq(position)].copy()
     positional["one_qb_rank"] = pd.to_numeric(positional["value_1qb"], errors="coerce").rank(ascending=False, method="min")
     positional["superflex_rank"] = pd.to_numeric(positional["value_2qb"], errors="coerce").rank(ascending=False, method="min")
+    values["one_qb_overall"] = pd.to_numeric(values["value_1qb"], errors="coerce").rank(ascending=False, method="min")
+    values["superflex_overall"] = pd.to_numeric(values["value_2qb"], errors="coerce").rank(ascending=False, method="min")
     ranked = positional.loc[positional["_player_key"].eq(dynasty_player_key(player))].iloc[0]
+    overall = values.loc[values["_player_key"].eq(dynasty_player_key(player))].iloc[0]
     return {
         "position": position,
         "team": clean_text(row.get("team")),
@@ -5020,6 +5061,8 @@ def player_dynasty_snapshot(player: str) -> dict[str, object]:
         "superflex": float(pd.to_numeric(row.get("value_2qb"), errors="coerce") or 0),
         "one_qb_rank": f'{position}{int(ranked["one_qb_rank"])}',
         "superflex_rank": f'{position}{int(ranked["superflex_rank"])}',
+        "one_qb_overall": f'OVR {int(overall["one_qb_overall"])}',
+        "superflex_overall": f'OVR {int(overall["superflex_overall"])}',
     }
 
 
@@ -5155,14 +5198,7 @@ def render_player_dashboard(
         ],
         "#f2cf68",
     )
-    history_metrics(
-        [
-            (f'{dynasty["one_qb"]:,.0f} · {dynasty["one_qb_rank"]}', "Current Flex Value"),
-            (f'{dynasty["superflex"]:,.0f} · {dynasty["superflex_rank"]}', "Current Superflex Value"),
-            (last_season_player_finish(starters, player), "Last Season Finish"),
-        ],
-        "#7dd3fc",
-    )
+    player_value_metrics(dynasty, last_season_player_finish(starters, player))
 
     render_player_current_ownership(player, rosters, conferences)
 
@@ -5192,7 +5228,13 @@ def render_player_dashboard(
                     else "-"
                 )
                 draft_type = clean_text(pick.get("Type"))
-                draft_type = "Redraft" if match_key(draft_type) == "rookie" else draft_type
+                draft_type = (
+                    "Start-Up"
+                    if match_key(draft_type) in {"startup", "start-up", "start up"}
+                    else "Rookie"
+                    if match_key(draft_type) == "rookie"
+                    else draft_type
+                )
                 tiles.append(
                     f"""
 <div class="player-draft-tile" style="--team-color:{esc(color)};">
@@ -5252,7 +5294,7 @@ def render_player_dashboard(
             )
             points_chart = (
                 (line + points)
-                .properties(height=245, background="#f8fafc")
+                .properties(height=320, background="#f8fafc")
                 .configure_view(stroke=None)
                 .configure_axis(
                     labelFont="Rajdhani",
@@ -5280,30 +5322,56 @@ def render_player_dashboard(
             player_ranks["Week"] = player_ranks["Week"].astype(int)
             player_ranks = player_ranks.sort_values(["Year", "Week"]).reset_index(drop=True)
             player_ranks["GameOrder"] = range(len(player_ranks))
+            player_ranks["Game"] = player_ranks.apply(
+                lambda row: f'{int(row["Year"])} W{int(row["Week"]):02d}', axis=1
+            )
             player_ranks["RankLabel"] = position + player_ranks["WeeklyRank"].astype(int).astype(str)
             if not player_ranks.empty:
                 max_rank = max(int(player_ranks["WeeklyRank"].max()), 1)
+                rank_domain = [max_rank + 2, 0]
                 rank_base = alt.Chart(player_ranks).encode(
                     x=alt.X(
-                        "GameOrder:Q",
+                        "Game:N",
+                        sort=player_ranks["Game"].tolist(),
                         title=None,
-                        axis=alt.Axis(labels=False, ticks=False, grid=False, domain=False),
+                        axis=alt.Axis(
+                            labelAngle=-55,
+                            labelColor="#64748b",
+                            labelFont="Rajdhani",
+                            labelFontSize=10,
+                            labelLimit=80,
+                            labelOverlap="greedy",
+                            tickColor="#cbd5e1",
+                            domainColor="#94a3b8",
+                            grid=False,
+                        ),
                     )
                 )
                 rank_line = rank_base.mark_line(
-                    color="#2563eb", strokeWidth=3.5, point=False
+                    color="#2563eb", strokeWidth=3, interpolate="monotone"
                 ).encode(
                     y=alt.Y(
                         "WeeklyRank:Q",
                         title=f"{position} Weekly Rank",
-                        scale=alt.Scale(domain=[max_rank + 1, 1]),
-                        axis=alt.Axis(gridColor="#edf0f7", domain=False, tickMinStep=1),
+                        scale=alt.Scale(domain=rank_domain),
+                        axis=alt.Axis(
+                            grid=True,
+                            gridColor="#dce3ed",
+                            gridOpacity=1,
+                            domain=True,
+                            domainColor="#94a3b8",
+                            tickColor="#94a3b8",
+                            tickMinStep=1,
+                            tickCount=min(max_rank + 1, 10),
+                            labelPadding=7,
+                            titlePadding=12,
+                        ),
                     )
                 )
                 rank_points = rank_base.mark_circle(
-                    size=82, color="#2563eb", stroke="#ffffff", strokeWidth=2
+                    size=105, color="#ffffff", stroke="#2563eb", strokeWidth=3
                 ).encode(
-                    y=alt.Y("WeeklyRank:Q", scale=alt.Scale(domain=[max_rank + 1, 1])),
+                    y=alt.Y("WeeklyRank:Q", scale=alt.Scale(domain=rank_domain)),
                     tooltip=[
                         alt.Tooltip("Year:O"),
                         alt.Tooltip("Week:O"),
@@ -5311,9 +5379,19 @@ def render_player_dashboard(
                         alt.Tooltip("Points:Q", format=".2f"),
                     ],
                 )
+                rank_labels = rank_base.mark_text(
+                    dy=-13,
+                    color="#111827",
+                    font="Barlow Condensed",
+                    fontSize=11,
+                    fontWeight="bold",
+                ).encode(
+                    y=alt.Y("WeeklyRank:Q", scale=alt.Scale(domain=rank_domain)),
+                    text="RankLabel:N",
+                )
                 rank_chart = (
-                    (rank_line + rank_points)
-                    .properties(height=245, background="#f8fafc")
+                    (rank_line + rank_points + rank_labels)
+                    .properties(height=370, background="#f8fafc")
                     .configure_view(stroke=None)
                     .configure_axis(
                         labelFont="Rajdhani",
@@ -5340,8 +5418,23 @@ def render_player_dashboard(
     headers = ["<th>Week</th>"] + [
         f'<th>{f"""<img class="conf-logo-history" src="{esc(conference_logo(conferences, conference))}" alt="{esc(conference)}" title="{esc(conference)}">""" if conference_logo(conferences, conference) else esc(conference)}</th>'
         for conference in LEAGUE_ROSTER_ORDER
-    ] + ["<th>Start %</th>", "<th>Points</th>"]
+    ] + ["<th>Start %</th>", "<th>Position Rank</th>", "<th>Overall Rank</th>", "<th>Points</th>"]
     rows = []
+    weekly_rank_source = all_weekly.loc[
+        all_weekly.apply(lambda row: (row["Year"], row["Week"]) in completed_pairs, axis=1)
+        & all_weekly["Points"].notna()
+    ].sort_values(["Year", "Week", "Player"]).drop_duplicates(
+        ["Year", "Week", "Player"], keep="last"
+    )
+    weekly_rank_source["OverallRank"] = weekly_rank_source.groupby(
+        ["Year", "Week"]
+    )["Points"].rank(ascending=False, method="min")
+    weekly_rank_source["PositionRank"] = weekly_rank_source.groupby(
+        ["Year", "Week", "Position"]
+    )["Points"].rank(ascending=False, method="min")
+    player_weekly_ranks = weekly_rank_source.loc[
+        weekly_rank_source["Player"].astype(str).eq(player)
+    ].set_index(["Year", "Week"])
     positive_points = weekly_points.loc[weekly_points["Points"].gt(0), "Points"]
     min_points = float(positive_points.min()) if not positive_points.empty else 0
     max_points = float(positive_points.max()) if not positive_points.empty else 1
@@ -5358,7 +5451,7 @@ def render_player_dashboard(
     player_years = sorted(history["Year"].dropna().astype(int).unique(), reverse=True)
     for year in player_years:
         rows.append(
-            f'<tr class="season-row"><th colspan="15">{year} Season</th></tr>'
+            f'<tr class="season-row"><th colspan="17">{year} Season</th></tr>'
         )
         year_history = history.loc[history["Year"].eq(year)].copy()
         denominator = ACTIVE_CONFERENCE_COUNT_BY_YEAR.get(year, year_history["Conference"].nunique())
@@ -5393,6 +5486,17 @@ def render_player_dashboard(
                 week_history["RosterSpot"].astype(str).eq("Starter"), "Conference"
             ].nunique()
             cells.append(f"<td>{starts / max(denominator, 1):.0%}</td>")
+            rank_key = (float(year), float(week))
+            if rank_key in player_weekly_ranks.index:
+                rank_row = player_weekly_ranks.loc[rank_key]
+                if isinstance(rank_row, pd.DataFrame):
+                    rank_row = rank_row.iloc[0]
+                rank_position = clean_text(rank_row.get("Position"), position)
+                cells.append(f'<td>{esc(rank_position)}{int(rank_row["PositionRank"])}</td>')
+                cells.append(f'<td>OVR {int(rank_row["OverallRank"])}</td>')
+            else:
+                cells.append("<td></td>")
+                cells.append("<td></td>")
             points = weekly_points.loc[
                 weekly_points["Year"].eq(year) & weekly_points["Week"].eq(week),
                 "Points",
