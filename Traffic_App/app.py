@@ -1,4 +1,4 @@
-"""Elysium Wealth Management traffic accident analytics application."""
+"""Astrix Law traffic accident analytics application."""
 
 from __future__ import annotations
 
@@ -19,13 +19,13 @@ from data import (
 )
 
 
-NAVY = "#213f57"
-AQUA = "#31D5D0"
-INK = "#172c3d"
+NAVY = "#2596BE"
+AQUA = "#FBAD41"
+INK = "#183443"
 MUTED = "#718697"
 
 st.set_page_config(
-    page_title="Traffic Accident Insights | Elysium Wealth Management",
+    page_title="Traffic Accident Insights | Astrix Law",
     page_icon=":material/car_crash:",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -51,17 +51,17 @@ def inject_css() -> None:
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&family=Rajdhani:wght@600;700&display=swap');
 
-:root { --aqua:#31D5D0; --navy:#213f57; --ink:#172c3d; --muted:#718697; --line:#dce6eb; --mist:#f4f8f9; }
+:root { --aqua:#FBAD41; --navy:#2596BE; --ink:#183443; --muted:#718697; --line:#dce6eb; --mist:#f4f8f9; }
 html, body, [class*="css"] { font-family:'Barlow',sans-serif; color:var(--ink); }
 .stApp {
-  background: radial-gradient(circle at 93% 3%,rgba(49,213,208,.13),transparent 25rem),#f4f8f9;
+  background: radial-gradient(circle at 93% 3%,rgba(251,173,65,.16),transparent 25rem),#f4f8f9;
 }
 .block-container { max-width:1580px!important; padding:5rem 2.2rem 4rem!important; }
 footer { visibility:hidden; }
 header[data-testid="stHeader"] {
-  background:linear-gradient(90deg,#19364c 0%,#213f57 58%,#29556e 100%)!important;
-  border-bottom:1px solid rgba(49,213,208,.42)!important;
-  box-shadow:0 3px 14px rgba(23,44,61,.18)!important;
+  background:linear-gradient(90deg,#176a88 0%,#2596BE 58%,#2eabcf 100%)!important;
+  border-bottom:1px solid rgba(251,173,65,.62)!important;
+  box-shadow:0 3px 14px rgba(24,52,67,.18)!important;
 }
 [data-testid="stToolbar"] {
   background:transparent!important;
@@ -95,7 +95,7 @@ header[data-testid="stHeader"] {
 [data-testid="stToolbar"] button:hover,
 [data-testid="stAppDeployButton"] button:hover,
 [data-testid="stMainMenu"] button:hover {
-  background:rgba(49,213,208,.18)!important;
+  background:rgba(251,173,65,.22)!important;
 }
 
 [data-testid="stSidebar"] { display:none!important; }
@@ -107,7 +107,7 @@ header[data-testid="stHeader"] {
 .top-brand-copy { border-left:1px solid var(--line); color:#8294a0; font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:800; letter-spacing:3px; padding-left:20px; text-transform:uppercase; }
 .st-key-navigation_row { border-bottom:2px solid var(--line); margin:8px 0 14px; padding-bottom:0; }
 .st-key-navigation_row button { background:transparent!important; border:0!important; border-bottom:4px solid transparent!important; border-radius:0!important; color:#96a5ae!important; font-family:'Barlow Condensed',sans-serif!important; font-size:16px!important; font-weight:800!important; letter-spacing:1.3px!important; padding:13px 14px 11px!important; text-transform:uppercase!important; width:100%!important; }
-.st-key-navigation_row button:hover { background:#edf8f8!important; color:var(--navy)!important; }
+.st-key-navigation_row button:hover { background:#eef8fc!important; color:var(--navy)!important; }
 .st-key-navigation_row .st-key-nav_active button { background:var(--navy)!important; border-bottom-color:var(--aqua)!important; color:#fff!important; box-shadow:0 4px 10px rgba(23,44,61,.13)!important; }
 .st-key-filter_strip { background:#fff; border-left:5px solid var(--aqua); border-radius:6px; box-shadow:0 2px 9px rgba(23,44,61,.06); margin:12px 0 20px; padding:12px 16px 4px; }
 .st-key-filter_strip div[data-testid="stWidgetLabel"] p { color:#708692!important; font-family:'Barlow Condensed',sans-serif!important; font-size:11px!important; font-weight:800!important; letter-spacing:1.7px!important; text-transform:uppercase!important; }
@@ -121,20 +121,20 @@ header[data-testid="stHeader"] {
 .st-key-filter_strip div[data-baseweb="select"] *,
 .st-key-filter_strip [data-baseweb="button-group"] button,
 .st-key-filter_strip [data-testid="stSlider"] * {
-  color:#172c3d!important;
-  -webkit-text-fill-color:#172c3d!important;
+  color:#183443!important;
+  -webkit-text-fill-color:#183443!important;
 }
-.st-key-filter_strip svg { color:#213f57!important; fill:#213f57!important; }
+.st-key-filter_strip svg { color:#2596BE!important; fill:#2596BE!important; }
 .st-key-filter_strip [data-baseweb="button-group"] button { font-family:'Barlow Condensed',sans-serif!important; font-size:11px!important; font-weight:800!important; }
 .st-key-filter_strip [data-baseweb="button-group"] button[aria-checked="true"],
 .st-key-filter_strip [data-baseweb="button-group"] button[aria-pressed="true"] {
-  color:#172c3d!important;
-  -webkit-text-fill-color:#172c3d!important;
+  color:#183443!important;
+  -webkit-text-fill-color:#183443!important;
 }
 .st-key-filter-strip [data-testid="stSlider"] { padding-top:0!important; }
 
 .masthead { display:flex; justify-content:space-between; align-items:flex-end; gap:24px; padding:30px 0 22px; border-bottom:2px solid var(--line); margin-bottom:20px; }
-.mast-kicker { font-family:'Barlow Condensed',sans-serif; color:#168f8c; font-weight:800; font-size:13px; letter-spacing:4px; text-transform:uppercase; }
+.mast-kicker { font-family:'Barlow Condensed',sans-serif; color:#d48719; font-weight:800; font-size:13px; letter-spacing:4px; text-transform:uppercase; }
 .mast-title { font-family:'Bebas Neue',sans-serif; color:var(--navy); font-size:clamp(58px,7vw,92px); letter-spacing:3px; line-height:.9; margin-top:8px; }
 .mast-copy { color:#617888; font-size:15px; font-weight:500; line-height:1.6; max-width:560px; padding-bottom:4px; }
 .period-chip { display:inline-flex; background:#fff; border:1px solid var(--line); border-radius:5px; color:var(--navy); font-family:'Rajdhani',sans-serif; font-size:14px; font-weight:800; letter-spacing:1px; padding:6px 10px; margin-top:10px; }
@@ -152,7 +152,7 @@ header[data-testid="stHeader"] {
 .section-sub { color:#7a8e9c; font-size:13px; font-weight:600; margin:-5px 0 13px; }
 
 .panel { background:#fff; border:1px solid var(--line); border-radius:8px; box-shadow:0 2px 10px rgba(23,44,61,.06); padding:20px; height:100%; }
-.panel-kicker { color:#168f8c; font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:800; letter-spacing:2.5px; text-transform:uppercase; }
+.panel-kicker { color:#d48719; font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:800; letter-spacing:2.5px; text-transform:uppercase; }
 .panel-title { color:var(--navy); font-family:'Bebas Neue',sans-serif; font-size:31px; letter-spacing:1.5px; line-height:1; margin:5px 0 18px; }
 
 .trend-chart { display:grid; grid-template-columns:repeat(var(--count),1fr); align-items:end; gap:15px; height:270px; padding:16px 8px 0; border-bottom:2px solid #d7e2e7; background:repeating-linear-gradient(to top,transparent 0,transparent 66px,#edf2f4 67px); }
@@ -193,8 +193,8 @@ header[data-testid="stHeader"] {
 .condition-matrix th:first-child { text-align:left; min-width:135px; }
 .condition-matrix td { border-radius:5px; height:67px; min-width:95px; padding:7px; text-align:center; vertical-align:middle; }
 .condition-matrix td.weather-label { background:#f5f8f9; color:var(--navy); font-family:'Barlow',sans-serif; font-size:12px; font-weight:700; text-align:left; }
-.condition-matrix td.matrix-cell { background:rgba(49,213,208,var(--heat)); border:1px solid rgba(33,63,87,.07); color:var(--ink); }
-.condition-matrix td.matrix-cell.hot { background:rgba(33,63,87,var(--heat)); color:#fff; }
+.condition-matrix td.matrix-cell { background:rgba(251,173,65,var(--heat)); border:1px solid rgba(37,150,190,.09); color:var(--ink); }
+.condition-matrix td.matrix-cell.hot { background:rgba(37,150,190,var(--heat)); color:#fff; }
 .matrix-count { font-family:'Rajdhani',sans-serif; font-size:17px; font-weight:800; line-height:1; }
 .matrix-share { font-family:'Barlow Condensed',sans-serif; font-size:10px; font-weight:700; letter-spacing:.5px; margin-top:4px; opacity:.72; text-transform:uppercase; }
 .matrix-total { background:#edf3f5; color:var(--navy); font-family:'Rajdhani',sans-serif; font-size:16px; font-weight:800; }
@@ -220,14 +220,14 @@ header[data-testid="stHeader"] {
 .st-key-severity_toggle_group div[data-testid="stToggle"] [role="switch"][aria-checked="true"] { background:var(--severity-color)!important; }
 .st-key-severity_fatal { --severity-color:#b4232d; }
 .st-key-severity_serious { --severity-color:#e68723; }
-.st-key-severity_minor { --severity-color:#31d5d0; }
-.st-key-severity_possible { --severity-color:#5bb1ad; }
-.st-key-severity_pdo { --severity-color:#213f57; }
+.st-key-severity_minor { --severity-color:#2596BE; }
+.st-key-severity_possible { --severity-color:#72c4df; }
+.st-key-severity_pdo { --severity-color:#176a88; }
 .severity-toggle-title { color:var(--navy); font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:800; letter-spacing:2px; margin:4px 0 8px; text-transform:uppercase; }
 
 .insight-strip { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:12px 0 4px; }
-.insight-card { background:linear-gradient(135deg,#213f57,#2a566f); border-radius:8px; color:#fff; padding:18px 19px; box-shadow:0 8px 20px rgba(23,44,61,.14); }
-.insight-card.aqua { background:linear-gradient(135deg,#188f8c,#31bdb8); }
+.insight-card { background:linear-gradient(135deg,#176a88,#2596BE); border-radius:8px; color:#fff; padding:18px 19px; box-shadow:0 8px 20px rgba(24,52,67,.14); }
+.insight-card.aqua { background:linear-gradient(135deg,#e69a2d,#FBAD41); color:#183443; }
 .insight-card.light { background:#fff; border:1px solid var(--line); color:var(--navy); box-shadow:0 2px 10px rgba(23,44,61,.06); }
 .insight-value { font-family:'Rajdhani',sans-serif; font-size:30px; font-weight:800; line-height:1; }
 .insight-label { font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:800; letter-spacing:1.7px; margin-top:7px; opacity:.78; text-transform:uppercase; }
@@ -421,7 +421,7 @@ utah_county_analytics = load_utah_county_analytics()
 st.html(
     """
     <div class="top-brand">
-      <img src="https://elysiumwealthmanagement.com/wp-content/uploads/2025/02/elysium-800x166.png" alt="Elysium Wealth Management">
+      <img src="https://cdn-ildnndp.nitrocdn.com/kosbpggAotWNlqIqrvBvwkQXzxUnyNvn/assets/images/optimized/rev-d311703/astrixlaw.com/wp-content/uploads/2025/04/Astrict-logo.png" alt="Astrix Law">
       <div class="top-brand-copy">Traffic Accident Intelligence</div>
     </div>
     """
@@ -558,17 +558,17 @@ crash_label_short = "crashes" if use_utah_all_crashes else "fatal crashes"
 st.html(
     f"""
     <div class="masthead">
-      <div><div class="mast-kicker">Elysium Wealth Management</div><div class="mast-title">Traffic Accident Insights</div></div>
-      <div class="mast-copy">A decision-ready view of fatal crash exposure and the commercial markets Elysium can serve.<br><span class="period-chip">{esc(selected_state)} · {period}</span></div>
+      <div><div class="mast-kicker">Astrix Law</div><div class="mast-title">Traffic Accident Insights</div></div>
+      <div class="mast-copy">A decision-ready view of crash exposure and the commercial markets Astrix Law can serve.<br><span class="period-chip">{esc(selected_state)} · {period}</span></div>
     </div>"""
 )
 
 metric_grid(
     [
         (crash_label, f"{len(state_crashes):,}", f"{selected_state} · {period}", AQUA),
-        ("Commercial-Involved", f"{commercial_crashes:,}", "Recorded motor-carrier identifier", "#6fa4bd"),
-        ("Target Businesses", f"{target_establishments:,}", "Four priority industries", "#168f8c"),
-        ("Highest Crash Rate", highest_rate_county, f"{latest_year} · population 10K+", "#e6a94d"),
+        ("Commercial-Involved", f"{commercial_crashes:,}", "Recorded motor-carrier identifier", "#72c4df"),
+        ("Target Businesses", f"{target_establishments:,}", "Four priority industries", "#2596BE"),
+        ("Highest Crash Rate", highest_rate_county, f"{latest_year} · population 10K+", "#FBAD41"),
     ]
 )
 
@@ -705,11 +705,11 @@ else:
             {
                 "Fatal": [180, 35, 45, 190],
                 "Suspected Serious Injury": [230, 135, 35, 180],
-                "Suspected Minor Injury": [49, 213, 208, 165],
-                "Possible Injury": [91, 177, 173, 150],
-                "No Injury/PDO": [33, 63, 87, 95],
+                "Suspected Minor Injury": [37, 150, 190, 165],
+                "Possible Injury": [114, 196, 223, 150],
+                "No Injury/PDO": [23, 106, 136, 95],
             }
-        ).apply(lambda value: value if isinstance(value, list) else [33, 63, 87, 110])
+        ).apply(lambda value: value if isinstance(value, list) else [23, 106, 136, 110])
         center_lat = float(map_data["latitude"].median())
         center_lon = float(map_data["longitude"].median())
         layer = pdk.Layer(
@@ -736,7 +736,7 @@ else:
                     "Collision: {collision}<br/>Vehicles: {vehicles}"
                 ),
                 "style": {
-                    "backgroundColor": "#213f57",
+                    "backgroundColor": "#176a88",
                     "color": "white",
                     "fontFamily": "Barlow, sans-serif",
                 },
@@ -748,9 +748,9 @@ else:
             <div class="chart-legend">
               <span><i class="legend-dot" style="background:#b4232d"></i>Fatal</span>
               <span><i class="legend-dot" style="background:#e68723"></i>Suspected serious injury</span>
-              <span><i class="legend-dot" style="background:#31d5d0"></i>Suspected minor injury</span>
-              <span><i class="legend-dot" style="background:#5bb1ad"></i>Possible injury</span>
-              <span><i class="legend-dot" style="background:#213f57"></i>No injury / PDO</span>
+              <span><i class="legend-dot" style="background:#2596BE"></i>Suspected minor injury</span>
+              <span><i class="legend-dot" style="background:#72c4df"></i>Possible injury</span>
+              <span><i class="legend-dot" style="background:#176a88"></i>No injury / PDO</span>
             </div>
             <div class="note-box">Hover over a crash point for street, severity, date, collision type, and vehicle count.
             The map displays a reproducible sample of up to 25,000 selected points for performance.</div>

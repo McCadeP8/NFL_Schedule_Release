@@ -1,7 +1,7 @@
-# Elysium Traffic Accident Insights
+# Astrix Law Traffic Accident Insights
 
 A professional Streamlit application for exploring car accident frequency, severity,
-risk factors, and geographic patterns for Elysium Wealth Management.
+risk factors, and geographic patterns for Astrix Law.
 
 ## Project Structure
 
@@ -70,7 +70,7 @@ placed at `data/accidents.csv`.
 
 ## Brand
 
-- Company: Elysium Wealth Management
-- Primary navy: `#213F57`
-- Accent aqua: `#31D5D0`
+- Company: Astrix Law
+- Primary blue: `#2596BE`
+- Secondary gold: `#FBAD41`
 - Neutral: `#FFFFFF`
