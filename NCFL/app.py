@@ -5101,7 +5101,13 @@ def last_season_player_finish(starters: pd.DataFrame, player: str) -> str:
 
 def current_season_player_rank(starters: pd.DataFrame, player: str) -> str:
     if starters.empty:
-        return "#1 · 0"
+        return "- · 0"
+    player_history = starters.loc[starters["Player"].astype(str).eq(player)]
+    fallback_position = (
+        clean_text(player_history.iloc[-1].get("Position"))
+        if not player_history.empty
+        else "-"
+    )
     season = starters.copy()
     season["Year"] = pd.to_numeric(season["Year"], errors="coerce")
     season["Week"] = pd.to_numeric(season["Week"], errors="coerce")
@@ -5113,13 +5119,13 @@ def current_season_player_rank(starters: pd.DataFrame, player: str) -> str:
     totals = season.groupby(["Player", "Position"], as_index=False)["Points"].sum()
     player_row = totals.loc[totals["Player"].astype(str).eq(player)]
     if player_row.empty:
-        return "#1 · 0"
+        return f"{fallback_position}1 · 0"
     position = clean_text(player_row.iloc[0]["Position"])
     position_totals = totals.loc[totals["Position"].astype(str).eq(position)].copy()
     position_totals["Rank"] = position_totals["Points"].rank(ascending=False, method="min")
     rank = int(position_totals.loc[position_totals["Player"].astype(str).eq(player), "Rank"].iloc[0])
     points = float(player_row.iloc[0]["Points"])
-    return f"#{rank} · {points:,.2f}".rstrip("0").rstrip(".")
+    return f"{position}{rank} · {points:,.2f}".rstrip("0").rstrip(".")
 
 
 def render_player_current_ownership(
@@ -5423,7 +5429,32 @@ def render_player_dashboard(
                             domainColor="#94a3b8",
                             grid=False,
                         ),
-                    )
+                    ),
+                    y=alt.Y(
+                        "WeeklyRank:Q",
+                        title=f"{position} Weekly Rank",
+                        scale=alt.Scale(domain=rank_domain),
+                        axis=alt.Axis(
+                            grid=True,
+                            gridColor="#cbd5e1",
+                            gridOpacity=1,
+                            gridWidth=1,
+                            domain=True,
+                            domainColor="#64748b",
+                            domainWidth=1.5,
+                            tickColor="#64748b",
+                            tickWidth=1.5,
+                            labels=True,
+                            labelColor="#334155",
+                            labelFontSize=12,
+                            labelFontWeight="bold",
+                            orient="left",
+                            values=rank_ticks,
+                            format="d",
+                            labelPadding=7,
+                            titlePadding=12,
+                        ),
+                    ),
                 )
                 rank_line = rank_base.mark_line(
                     color="#2563eb",
@@ -5431,31 +5462,10 @@ def render_player_dashboard(
                     interpolate="monotone",
                     strokeCap="round",
                     strokeJoin="round",
-                ).encode(
-                    y=alt.Y(
-                        "WeeklyRank:Q",
-                        title=f"{position} Weekly Rank",
-                        scale=alt.Scale(domain=rank_domain),
-                        axis=alt.Axis(
-                            grid=True,
-                            gridColor="#dce3ed",
-                            gridOpacity=1,
-                            domain=True,
-                            domainColor="#94a3b8",
-                            tickColor="#94a3b8",
-                            labels=True,
-                            orient="left",
-                            values=rank_ticks,
-                            format="d",
-                            labelPadding=7,
-                            titlePadding=12,
-                        ),
-                    )
                 )
                 rank_points = rank_base.mark_circle(
                     size=105, color="#ffffff", stroke="#2563eb", strokeWidth=3
                 ).encode(
-                    y=alt.Y("WeeklyRank:Q", scale=alt.Scale(domain=rank_domain), axis=None),
                     tooltip=[
                         alt.Tooltip("Year:O"),
                         alt.Tooltip("Week:O"),
@@ -5470,7 +5480,6 @@ def render_player_dashboard(
                     fontSize=11,
                     fontWeight="bold",
                 ).encode(
-                    y=alt.Y("WeeklyRank:Q", scale=alt.Scale(domain=rank_domain), axis=None),
                     text="RankLabel:N",
                 )
                 rank_chart = (
