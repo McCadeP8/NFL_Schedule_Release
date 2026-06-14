@@ -40,6 +40,7 @@ LEAGUE_ROSTER_ORDER = [
     "F12",
 ]
 SUPERFLEX_CONFERENCES = {"Big 12", "B1G", "SEC", "Pac-12", "ACC", "G6"}
+ACTIVE_CONFERENCE_COUNT_BY_YEAR = {2022: 3, 2023: 4, 2024: 6, 2025: 6, 2026: 12}
 DYNASTY_PLAYER_VALUES_URL = "https://raw.githubusercontent.com/dynastyprocess/data/master/files/values-players.csv"
 DYNASTY_PICK_VALUES_URL = "https://raw.githubusercontent.com/dynastyprocess/data/master/files/values-picks.csv"
 DYNASTY_PLAYER_ALIASES = {
@@ -2664,6 +2665,19 @@ div[data-testid="stButton"] button {
 .player-status {
   font-size: 15px;
 }
+.player-history-matrix .conf-logo-history {
+  width: 42px;
+  height: 32px;
+  object-fit: contain;
+}
+.player-chart-shell {
+  padding: 4px 10px 10px;
+  background: #ffffff;
+  border: 1px solid #e2e6ef;
+  border-top: 5px solid var(--accent);
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(15,23,42,0.07);
+}
 @media (max-width: 760px) {
   .player-profile-hero {
     grid-template-columns: 90px minmax(0, 1fr);
@@ -5113,6 +5127,18 @@ def render_player_dashboard(
     history["Points"] = pd.to_numeric(history.get("Points"), errors="coerce")
     history["Year"] = pd.to_numeric(history.get("Year"), errors="coerce")
     history["Week"] = pd.to_numeric(history.get("Week"), errors="coerce")
+    all_weekly = starters.copy()
+    all_weekly["Points"] = pd.to_numeric(all_weekly.get("Points"), errors="coerce")
+    all_weekly["Year"] = pd.to_numeric(all_weekly.get("Year"), errors="coerce")
+    all_weekly["Week"] = pd.to_numeric(all_weekly.get("Week"), errors="coerce")
+    completed_pairs = set(
+        all_weekly.loc[all_weekly["Points"].fillna(0).ne(0), ["Year", "Week"]]
+        .drop_duplicates()
+        .itertuples(index=False, name=None)
+    )
+    history = history.loc[
+        history.apply(lambda row: (row["Year"], row["Week"]) in completed_pairs, axis=1)
+    ].copy()
     weekly_points = (
         history.dropna(subset=["Year", "Week", "Points"])
         .sort_values(["Year", "Week", "Conference", "Team"])
@@ -5195,19 +5221,41 @@ def render_player_dashboard(
             chart_data = chart_data.sort_values(["Year", "Week"]).reset_index(drop=True)
             chart_data["GameOrder"] = range(len(chart_data))
             max_points = max(float(chart_data["Points"].max()) * 1.2, 1)
-            line = (
-                alt.Chart(chart_data)
-                .mark_line(color="#c8102e", strokeWidth=3)
+            base = alt.Chart(chart_data).encode(
+                x=alt.X(
+                    "GameOrder:Q",
+                    title=None,
+                    axis=alt.Axis(labels=False, ticks=False, grid=False, domain=False),
+                ),
+            )
+            area = (
+                base.mark_area(
+                    line={"color": "#c8102e", "strokeWidth": 3},
+                    color=alt.Gradient(
+                        gradient="linear",
+                        stops=[
+                            alt.GradientStop(color="#c8102e", offset=0),
+                            alt.GradientStop(color="#ffffff", offset=1),
+                        ],
+                        x1=1,
+                        x2=1,
+                        y1=0,
+                        y2=1,
+                    ),
+                    opacity=0.24,
+                )
                 .encode(
-                    x=alt.X("GameOrder:Q", title=None, axis=alt.Axis(labels=False, ticks=False)),
-                    y=alt.Y("Points:Q", title="Fantasy Points", scale=alt.Scale(domain=[0, max_points])),
+                    y=alt.Y(
+                        "Points:Q",
+                        title="Fantasy Points",
+                        scale=alt.Scale(domain=[0, max_points]),
+                        axis=alt.Axis(gridColor="#edf0f7", domain=False, tickColor="#cbd5e1"),
+                    ),
                 )
             )
             points = (
-                alt.Chart(chart_data)
-                .mark_circle(size=72, color="#111827", stroke="#ffffff", strokeWidth=2)
+                base.mark_circle(size=78, color="#111827", stroke="#ffffff", strokeWidth=2)
                 .encode(
-                    x="GameOrder:Q",
                     y=alt.Y("Points:Q", scale=alt.Scale(domain=[0, max_points])),
                     tooltip=[
                         alt.Tooltip("Year:O"),
@@ -5216,13 +5264,73 @@ def render_player_dashboard(
                     ],
                 )
             )
-            st.altair_chart((line + points).properties(height=340), use_container_width=True)
+            points_chart = (area + points).properties(height=245).configure_view(stroke=None).configure_axis(
+                labelFont="Rajdhani", titleFont="Barlow Condensed", labelColor="#64748b", titleColor="#334155"
+            )
+            st.html('<div class="player-chart-shell" style="--accent:#c8102e;">')
+            st.altair_chart(points_chart, use_container_width=True)
+            st.html("</div>")
+
+            rank_source = all_weekly.loc[
+                all_weekly.apply(lambda row: (row["Year"], row["Week"]) in completed_pairs, axis=1)
+                & all_weekly["Position"].astype(str).eq(position)
+                & all_weekly["Points"].notna()
+            ].sort_values(["Year", "Week", "Player"]).drop_duplicates(
+                ["Year", "Week", "Player"], keep="last"
+            )
+            rank_source["WeeklyRank"] = rank_source.groupby(["Year", "Week"])["Points"].rank(
+                ascending=False, method="min"
+            )
+            player_ranks = rank_source.loc[rank_source["Player"].astype(str).eq(player)].copy()
+            player_ranks["Year"] = player_ranks["Year"].astype(int)
+            player_ranks["Week"] = player_ranks["Week"].astype(int)
+            player_ranks = player_ranks.sort_values(["Year", "Week"]).reset_index(drop=True)
+            player_ranks["GameOrder"] = range(len(player_ranks))
+            player_ranks["RankLabel"] = position + player_ranks["WeeklyRank"].astype(int).astype(str)
+            if not player_ranks.empty:
+                max_rank = max(int(player_ranks["WeeklyRank"].max()), 1)
+                rank_base = alt.Chart(player_ranks).encode(
+                    x=alt.X(
+                        "GameOrder:Q",
+                        title=None,
+                        axis=alt.Axis(labels=False, ticks=False, grid=False, domain=False),
+                    )
+                )
+                rank_line = rank_base.mark_line(
+                    color="#111827", strokeWidth=3, point=False
+                ).encode(
+                    y=alt.Y(
+                        "WeeklyRank:Q",
+                        title=f"{position} Weekly Rank",
+                        scale=alt.Scale(domain=[max_rank + 1, 1]),
+                        axis=alt.Axis(gridColor="#edf0f7", domain=False, tickMinStep=1),
+                    )
+                )
+                rank_points = rank_base.mark_circle(
+                    size=78, color="#f2cf68", stroke="#111827", strokeWidth=2
+                ).encode(
+                    y=alt.Y("WeeklyRank:Q", scale=alt.Scale(domain=[max_rank + 1, 1])),
+                    tooltip=[
+                        alt.Tooltip("Year:O"),
+                        alt.Tooltip("Week:O"),
+                        alt.Tooltip("RankLabel:N", title="Weekly Rank"),
+                        alt.Tooltip("Points:Q", format=".2f"),
+                    ],
+                )
+                rank_chart = (rank_line + rank_points).properties(height=245).configure_view(
+                    stroke=None
+                ).configure_axis(
+                    labelFont="Rajdhani", titleFont="Barlow Condensed", labelColor="#64748b", titleColor="#334155"
+                )
+                st.html('<div class="history-section-title"><span>Weekly Position Rank</span><div></div></div>')
+                st.html('<div class="player-chart-shell" style="--accent:#f2cf68;">')
+                st.altair_chart(rank_chart, use_container_width=True)
+                st.html("</div>")
 
     st.html('<div class="history-section-title"><span>League History</span><div></div></div>')
     if history.empty:
         st.caption("No historical league roster records are available.")
         return
-    st.caption("✅ Starter · ☑ Bench · 🏥 Injured Reserve · 🚕 Taxi · — Not on roster")
     status_symbols = {
         "Starter": ("✅", "Starter"),
         "Bench": ("☑", "Bench"),
@@ -5230,15 +5338,39 @@ def render_player_dashboard(
         "Taxi": ("🚕", "Taxi"),
     }
     headers = ["<th>Week</th>"] + [
-        f'<th>{esc(conference)}</th>' for conference in LEAGUE_ROSTER_ORDER
-    ] + ["<th>Points</th>"]
+        f'<th>{f"""<img class="conf-logo-history" src="{esc(conference_logo(conferences, conference))}" alt="{esc(conference)}" title="{esc(conference)}">""" if conference_logo(conferences, conference) else esc(conference)}</th>'
+        for conference in LEAGUE_ROSTER_ORDER
+    ] + ["<th>Start %</th>", "<th>Points</th>"]
     rows = []
-    for year in sorted(history["Year"].dropna().astype(int).unique(), reverse=True):
+    positive_points = weekly_points.loc[weekly_points["Points"].gt(0), "Points"]
+    min_points = float(positive_points.min()) if not positive_points.empty else 0
+    max_points = float(positive_points.max()) if not positive_points.empty else 1
+    def points_heat(value: float) -> str:
+        if value == 0:
+            return "#eef2f7"
+        ratio = (value - min_points) / max(max_points - min_points, 1)
+        if ratio < 0.5:
+            red, green, blue = 254, int(226 + (ratio * 2 * 23)), int(226 - (ratio * 2 * 31))
+        else:
+            shifted = (ratio - 0.5) * 2
+            red, green, blue = int(254 - shifted * 34), int(249 + shifted * 3), int(195 - shifted * 12)
+        return f"rgb({red},{green},{blue})"
+    player_years = sorted(history["Year"].dropna().astype(int).unique(), reverse=True)
+    for year in player_years:
         rows.append(
-            f'<tr class="season-row"><th colspan="14">{year} Season</th></tr>'
+            f'<tr class="season-row"><th colspan="15">{year} Season</th></tr>'
         )
         year_history = history.loc[history["Year"].eq(year)].copy()
-        for week in sorted(year_history["Week"].dropna().astype(int).unique()):
+        denominator = ACTIVE_CONFERENCE_COUNT_BY_YEAR.get(year, year_history["Conference"].nunique())
+        completed_year_weeks = sorted(
+            {
+                int(week)
+                for completed_year, week in completed_pairs
+                if int(completed_year) == year
+            },
+            reverse=True,
+        )
+        for week in completed_year_weeks:
             week_history = year_history.loc[year_history["Week"].eq(week)]
             cells = [f"<td>Week {week}</td>"]
             for conference in LEAGUE_ROSTER_ORDER:
@@ -5257,11 +5389,21 @@ def render_player_dashboard(
                 cells.append(
                     f'<td><span class="player-status" title="{esc(label)}">{symbol}</span></td>'
                 )
+            starts = week_history.loc[
+                week_history["RosterSpot"].astype(str).eq("Starter"), "Conference"
+            ].nunique()
+            cells.append(f"<td>{starts / max(denominator, 1):.0%}</td>")
             points = weekly_points.loc[
                 weekly_points["Year"].eq(year) & weekly_points["Week"].eq(week),
                 "Points",
             ]
-            cells.append(f'<td>{float(points.iloc[0]):,.2f}</td>' if not points.empty else "<td></td>")
+            if points.empty:
+                cells.append("<td></td>")
+            else:
+                point_value = float(points.iloc[0])
+                cells.append(
+                    f'<td style="background:{points_heat(point_value)};font-weight:900;">{point_value:,.2f}</td>'
+                )
             rows.append(f"<tr>{''.join(cells)}</tr>")
     st.html(
         f'<div class="history-table-wrap"><table class="history-table player-history-matrix">'
