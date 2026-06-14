@@ -7,6 +7,7 @@ import unicodedata
 from datetime import datetime
 from typing import Optional
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 
@@ -2596,6 +2597,73 @@ div[data-testid="stButton"] button {
   height: 52px;
   object-fit: contain;
 }
+.player-draft-stack {
+  display: grid;
+  gap: 8px;
+}
+.player-draft-tile {
+  display: grid;
+  grid-template-columns: 42px 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  min-height: 68px;
+  padding: 8px 10px;
+  background: #ffffff;
+  border: 1px solid #e2e6ef;
+  border-left: 6px solid var(--team-color);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(15,23,42,0.06);
+}
+.player-draft-tile img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+.player-draft-pick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #eef2f7;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 13px;
+  font-weight: 900;
+  color: #111827;
+}
+.player-draft-year {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 25px;
+  line-height: 1;
+  color: #111827;
+}
+.player-draft-meta {
+  margin-top: 2px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 11px;
+  font-weight: 900;
+  color: #64748b;
+  text-transform: uppercase;
+}
+.player-history-matrix {
+  min-width: 1280px;
+}
+.player-history-matrix th,
+.player-history-matrix td {
+  text-align: center !important;
+  white-space: nowrap;
+}
+.player-history-matrix .season-row th {
+  padding: 9px 12px;
+  background: #111827;
+  color: #ffffff;
+  font-size: 17px;
+  text-align: left !important;
+}
+.player-status {
+  font-size: 15px;
+}
 @media (max-width: 760px) {
   .player-profile-hero {
     grid-template-columns: 90px minmax(0, 1fr);
@@ -4950,9 +5018,10 @@ def last_season_player_finish(starters: pd.DataFrame, player: str) -> str:
     history["Points"] = pd.to_numeric(history["Points"], errors="coerce")
     history = history.loc[
         history["Year"].lt(current_roster_season())
-        & history["RosterSpot"].astype(str).eq("Starter")
         & history["Points"].notna()
-    ].drop_duplicates(["Year", "Week", "Player"], keep="last")
+    ].sort_values(["Year", "Week", "Player"]).drop_duplicates(
+        ["Year", "Week", "Player"], keep="last"
+    )
     player_years = history.loc[history["Player"].astype(str).eq(player), "Year"].dropna()
     if player_years.empty:
         return "-"
@@ -4966,7 +5035,8 @@ def last_season_player_finish(starters: pd.DataFrame, player: str) -> str:
     position_totals = totals.loc[totals["Position"].astype(str).eq(position)].copy()
     position_totals["Rank"] = position_totals["Points"].rank(ascending=False, method="min")
     rank = int(position_totals.loc[position_totals["Player"].eq(player), "Rank"].iloc[0])
-    return f"{year} · {position}{rank}"
+    points = float(player_row.iloc[0]["Points"])
+    return f"{position}{rank} · {points:,.2f}"
 
 
 def render_player_current_ownership(
@@ -4975,8 +5045,17 @@ def render_player_current_ownership(
     conferences: pd.DataFrame,
 ) -> None:
     owned = rosters.loc[rosters["player_name"].astype(str).eq(player)].copy()
-    headers = []
-    cells = []
+    headers = ['<th class="player-col">Player</th>']
+    cells = [
+        f"""
+<td class="player-col">
+  <div class="league-player">
+    <img src="{esc(player_picture(player))}" alt="{esc(player)}" onerror="{player_picture_fallback()}">
+    <span>{esc(player)}</span>
+  </div>
+</td>
+"""
+    ]
     for conference in LEAGUE_ROSTER_ORDER:
         conf_logo = conference_logo(conferences, conference)
         headers.append(
@@ -4990,11 +5069,16 @@ def render_player_current_ownership(
         team_logo = clean_text(row.get("team_logo"))
         team = clean_text(row.get("team_name"))
         cells.append(
-            f'<td>{f"""<img class="ownership-team-logo" src="{esc(team_logo)}" alt="{esc(team)}" title="{esc(team)}">""" if team_logo else esc(team)}</td>'
+            f'<td class="team-logo-cell">{f"""<img src="{esc(team_logo)}" alt="{esc(team)}" title="{esc(team)}">""" if team_logo else esc(team)}</td>'
         )
+    taken_count = owned["league_name"].nunique()
+    headers.append('<th class="taken-col">#</th>')
+    cells.append(
+        f'<td class="taken-col"><span class="taken-pill" style="background:{taken_color(taken_count, 12)};">{taken_count}</span></td>'
+    )
     st.html(
         f'<div class="history-section-title"><span>Current League Ownership</span><div></div></div>'
-        f'<div class="history-table-wrap"><table class="history-table player-ownership-table">'
+        f'<div class="roster-scroll"><table class="roster-table league-matrix player-ownership-table">'
         f'<thead><tr>{"".join(headers)}</tr></thead><tbody><tr>{"".join(cells)}</tr></tbody></table></div>'
     )
 
@@ -5005,6 +5089,7 @@ def render_player_dashboard(
     starters: pd.DataFrame,
     drafts: pd.DataFrame,
     conferences: pd.DataFrame,
+    schools: pd.DataFrame,
 ) -> None:
     current = rosters.loc[rosters["player_name"].astype(str).eq(player)].copy()
     history = starters.loc[starters["Player"].astype(str).eq(player)].copy()
@@ -5026,7 +5111,15 @@ def render_player_dashboard(
     )
 
     history["Points"] = pd.to_numeric(history.get("Points"), errors="coerce")
-    actual_points = history["Points"].dropna()
+    history["Year"] = pd.to_numeric(history.get("Year"), errors="coerce")
+    history["Week"] = pd.to_numeric(history.get("Week"), errors="coerce")
+    weekly_points = (
+        history.dropna(subset=["Year", "Week", "Points"])
+        .sort_values(["Year", "Week", "Conference", "Team"])
+        .drop_duplicates(["Year", "Week", "Player"], keep="last")
+        .copy()
+    )
+    actual_points = weekly_points["Points"]
     history_metrics(
         [
             (f"{current['league_name'].nunique()}", "Current Conferences"),
@@ -5038,7 +5131,7 @@ def render_player_dashboard(
     )
     history_metrics(
         [
-            (f'{dynasty["one_qb"]:,.0f} · {dynasty["one_qb_rank"]}', "Current 1QB Value"),
+            (f'{dynasty["one_qb"]:,.0f} · {dynasty["one_qb_rank"]}', "Current Flex Value"),
             (f'{dynasty["superflex"]:,.0f} · {dynasty["superflex_rank"]}', "Current Superflex Value"),
             (last_season_player_finish(starters, player), "Last Season Finish"),
         ],
@@ -5047,75 +5140,133 @@ def render_player_dashboard(
 
     render_player_current_ownership(player, rosters, conferences)
 
-    st.html('<div class="history-section-title"><span>Draft History</span><div></div></div>')
-    if draft_history.empty:
-        st.caption("This player has not appeared in a recorded league draft.")
-    else:
-        draft_table = draft_history.copy()
-        draft_table["Pick"] = draft_table.apply(
-            lambda row: f'{int(row["Round"])}.{int(row["Pick"])}'
-            if not pd.isna(row.get("Round")) and not pd.isna(row.get("Pick"))
-            else "-",
-            axis=1,
-        )
-        st.dataframe(
-            draft_table[["Year", "Conference", "Type", "Pick", "Team"]].sort_values(
-                ["Year", "Conference", "Pick"], ascending=[False, True, True]
-            ),
-            hide_index=True,
-            height="content",
-            use_container_width=True,
-        )
+    draft_column, chart_column = st.columns([1, 3], gap="large")
+    with draft_column:
+        st.html('<div class="history-section-title"><span>Draft History</span><div></div></div>')
+        if draft_history.empty:
+            st.caption("This player has not appeared in a recorded league draft.")
+        else:
+            teams = team_lookup(schools)
+            tiles = []
+            draft_history = draft_history.copy()
+            draft_history["Year"] = pd.to_numeric(draft_history["Year"], errors="coerce")
+            draft_history["Round"] = pd.to_numeric(draft_history["Round"], errors="coerce")
+            draft_history["Pick"] = pd.to_numeric(draft_history["Pick"], errors="coerce")
+            draft_history = draft_history.sort_values(
+                ["Year", "Type", "Round", "Pick"], ascending=[False, True, True, True]
+            )
+            for _, pick in draft_history.iterrows():
+                team = clean_text(pick.get("Team"))
+                info = teams.get(team, {})
+                team_logo = clean_text(info.get("logo"))
+                color = clean_text(info.get("color"), "#1a2030")
+                pick_label = (
+                    f'{int(pick["Round"])}.{int(pick["Pick"])}'
+                    if not pd.isna(pick["Round"]) and not pd.isna(pick["Pick"])
+                    else "-"
+                )
+                draft_type = clean_text(pick.get("Type"))
+                draft_type = "Redraft" if match_key(draft_type) == "rookie" else draft_type
+                tiles.append(
+                    f"""
+<div class="player-draft-tile" style="--team-color:{esc(color)};">
+  <span class="player-draft-pick">{esc(pick_label)}</span>
+  {f'<img src="{esc(team_logo)}" alt="{esc(team)}" title="{esc(team)}">' if team_logo else '<span></span>'}
+  <div>
+    <div class="player-draft-year">{int(pick["Year"]) if not pd.isna(pick["Year"]) else "-"}</div>
+    <div class="player-draft-meta">{esc(draft_type)} · {esc(pick.get("Conference"))}</div>
+  </div>
+</div>
+"""
+                )
+            st.html(f'<div class="player-draft-stack">{"".join(tiles)}</div>')
 
-    st.html('<div class="history-section-title"><span>Weekly Scoring Trend</span><div></div></div>')
-    weekly_points = history.dropna(subset=["Points"]).drop_duplicates(
-        ["Year", "Week", "Player"], keep="last"
-    ).copy()
-    if weekly_points.empty:
-        st.caption("No completed weekly scoring history is available.")
-    else:
-        weekly_points["Year"] = pd.to_numeric(weekly_points["Year"], errors="coerce").astype(int)
-        weekly_points["Week"] = pd.to_numeric(weekly_points["Week"], errors="coerce").astype(int)
-        weekly_points["Game"] = weekly_points.apply(
-            lambda row: f'{int(row["Year"])} W{int(row["Week"]):02d}', axis=1
-        )
-        st.line_chart(
-            weekly_points.sort_values(["Year", "Week"]).set_index("Game")[["Points"]],
-            height=300,
-        )
+    with chart_column:
+        st.html('<div class="history-section-title"><span>Weekly Scoring Trend</span><div></div></div>')
+        if weekly_points.empty:
+            st.caption("No completed weekly scoring history is available.")
+        else:
+            chart_data = weekly_points.copy()
+            chart_data["Year"] = chart_data["Year"].astype(int)
+            chart_data["Week"] = chart_data["Week"].astype(int)
+            chart_data["Game"] = chart_data.apply(
+                lambda row: f'{int(row["Year"])} W{int(row["Week"]):02d}', axis=1
+            )
+            chart_data = chart_data.sort_values(["Year", "Week"]).reset_index(drop=True)
+            chart_data["GameOrder"] = range(len(chart_data))
+            max_points = max(float(chart_data["Points"].max()) * 1.2, 1)
+            line = (
+                alt.Chart(chart_data)
+                .mark_line(color="#c8102e", strokeWidth=3)
+                .encode(
+                    x=alt.X("GameOrder:Q", title=None, axis=alt.Axis(labels=False, ticks=False)),
+                    y=alt.Y("Points:Q", title="Fantasy Points", scale=alt.Scale(domain=[0, max_points])),
+                )
+            )
+            points = (
+                alt.Chart(chart_data)
+                .mark_circle(size=72, color="#111827", stroke="#ffffff", strokeWidth=2)
+                .encode(
+                    x="GameOrder:Q",
+                    y=alt.Y("Points:Q", scale=alt.Scale(domain=[0, max_points])),
+                    tooltip=[
+                        alt.Tooltip("Year:O"),
+                        alt.Tooltip("Week:O"),
+                        alt.Tooltip("Points:Q", format=".2f"),
+                    ],
+                )
+            )
+            st.altair_chart((line + points).properties(height=340), use_container_width=True)
 
     st.html('<div class="history-section-title"><span>League History</span><div></div></div>')
     if history.empty:
         st.caption("No historical league roster records are available.")
         return
-    history["Year"] = pd.to_numeric(history["Year"], errors="coerce")
-    history["Week"] = pd.to_numeric(history["Week"], errors="coerce")
+    st.caption("✅ Starter · ☑ Bench · 🏥 Injured Reserve · 🚕 Taxi · — Not on roster")
+    status_symbols = {
+        "Starter": ("✅", "Starter"),
+        "Bench": ("☑", "Bench"),
+        "Reserve": ("🏥", "Injured Reserve"),
+        "Taxi": ("🚕", "Taxi"),
+    }
+    headers = ["<th>Week</th>"] + [
+        f'<th>{esc(conference)}</th>' for conference in LEAGUE_ROSTER_ORDER
+    ] + ["<th>Points</th>"]
+    rows = []
     for year in sorted(history["Year"].dropna().astype(int).unique(), reverse=True):
-        st.html(
-            f'<div class="history-section-title" style="margin-top:14px;"><span style="font-size:30px;">{year} Season</span><div></div></div>'
+        rows.append(
+            f'<tr class="season-row"><th colspan="14">{year} Season</th></tr>'
         )
         year_history = history.loc[history["Year"].eq(year)].copy()
-        year_history = year_history.rename(
-            columns={
-                "Week": "Week",
-                "Conference": "Conference",
-                "Team": "Fantasy Team",
-                "RosterSpot": "Roster Status",
-                "Position": "Position",
-                "Points": "Points",
-            }
-        )
-        st.dataframe(
-            year_history[
-                ["Week", "Conference", "Fantasy Team", "Roster Status", "Position", "Points"]
-            ].sort_values(["Week", "Conference", "Fantasy Team"]),
-            hide_index=True,
-            height="content",
-            use_container_width=True,
-            column_config={
-                "Points": st.column_config.NumberColumn(format="%.2f"),
-            },
-        )
+        for week in sorted(year_history["Week"].dropna().astype(int).unique()):
+            week_history = year_history.loc[year_history["Week"].eq(week)]
+            cells = [f"<td>Week {week}</td>"]
+            for conference in LEAGUE_ROSTER_ORDER:
+                conf_rows = week_history.loc[
+                    week_history["Conference"].astype(str).eq(conference)
+                ]
+                if conf_rows.empty:
+                    cells.append('<td><span class="player-status" title="Not on roster">—</span></td>')
+                    continue
+                statuses = conf_rows["RosterSpot"].dropna().astype(str).tolist()
+                status = next(
+                    (candidate for candidate in ["Starter", "Bench", "Reserve", "Taxi"] if candidate in statuses),
+                    "",
+                )
+                symbol, label = status_symbols.get(status, ("—", "Not on roster"))
+                cells.append(
+                    f'<td><span class="player-status" title="{esc(label)}">{symbol}</span></td>'
+                )
+            points = weekly_points.loc[
+                weekly_points["Year"].eq(year) & weekly_points["Week"].eq(week),
+                "Points",
+            ]
+            cells.append(f'<td>{float(points.iloc[0]):,.2f}</td>' if not points.empty else "<td></td>")
+            rows.append(f"<tr>{''.join(cells)}</tr>")
+    st.html(
+        f'<div class="history-table-wrap"><table class="history-table player-history-matrix">'
+        f'<thead><tr>{"".join(headers)}</tr></thead><tbody>{"".join(rows)}</tbody></table></div>'
+    )
 
 
 def render_rules() -> None:
@@ -6921,6 +7072,7 @@ with players_tab:
             full_starters,
             full_drafts,
             conferences,
+            schools,
         )
 
 with rules_tab:
