@@ -1524,6 +1524,10 @@ div[data-testid="stButton"] button {
   border-collapse: collapse;
   width: 100%;
   min-width: 1180px;
+  table-layout: fixed;
+}
+.standings-table col.standings-team-column {
+  width: 300px;
 }
 .standings-table th {
   background: #f8fafc;
@@ -1541,7 +1545,7 @@ div[data-testid="stButton"] button {
 }
 .standings-table th.team-col {
   text-align: left;
-  min-width: 260px;
+  width: 300px;
 }
 .standings-table td {
   border-bottom: 1px solid #edf0f7;
@@ -1563,6 +1567,10 @@ div[data-testid="stButton"] button {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
+}
+.standings-team > div {
+  min-width: 0;
 }
 .standings-team img {
   width: 42px;
@@ -1591,6 +1599,9 @@ div[data-testid="stButton"] button {
   text-transform: uppercase;
   color: #1a2030;
   line-height: 1.05;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .standings-team-sub {
   font-family: 'Rajdhani', sans-serif;
@@ -2505,6 +2516,9 @@ div[data-testid="stButton"] button {
   font-size: 11px;
   font-weight: 700;
   color: #9aa5be;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .champion-star {
   display: inline-flex;
@@ -4256,6 +4270,10 @@ def render_standings_section(
   </div>''' if show_conference_title else ''}
   <div class="standings-scroll">
     <table class="standings-table">
+      <colgroup>
+        <col class="standings-team-column">
+        <col span="6">
+      </colgroup>
       <thead>
         <tr>
           <th class="team-col">Team</th>
@@ -5351,6 +5369,7 @@ def render_player_dashboard(
                     interpolate="monotone",
                     strokeCap="round",
                     strokeJoin="round",
+                    invalid=None,
                 )
                 .encode(
                     y=alt.Y(
@@ -5486,6 +5505,7 @@ def render_player_dashboard(
                     interpolate="monotone",
                     strokeCap="round",
                     strokeJoin="round",
+                    invalid=None,
                 )
                 rank_points = rank_base.mark_circle(
                     size=105, color="#ffffff", stroke="#2563eb", strokeWidth=3
