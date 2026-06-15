@@ -1540,7 +1540,7 @@ div[data-testid="stButton"] button {
   table-layout: fixed;
 }
 .standings-table col.standings-team-column {
-  width: 300px;
+  width: 380px;
 }
 .standings-table th {
   background: #f8fafc;
@@ -1558,7 +1558,7 @@ div[data-testid="stButton"] button {
 }
 .standings-table th.team-col {
   text-align: left;
-  width: 300px;
+  width: 380px;
 }
 .standings-table td {
   border-bottom: 1px solid #edf0f7;
