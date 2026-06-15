@@ -5,6 +5,7 @@ import hashlib
 import re
 import unicodedata
 from datetime import datetime
+from functools import wraps
 from typing import Optional
 
 import altair as alt
@@ -76,6 +77,18 @@ def clean_text(value: object, fallback: str = "") -> str:
 
 def esc(value: object, fallback: str = "") -> str:
     return html.escape(clean_text(value, fallback))
+
+
+def loading_spinner(message: str):
+    def decorator(function):
+        @wraps(function)
+        def wrapped(*args, **kwargs):
+            with st.spinner(message, show_time=True):
+                return function(*args, **kwargs)
+
+        return wrapped
+
+    return decorator
 
 
 def first_value(frame: pd.DataFrame, column: str, fallback: str = "") -> str:
@@ -2877,7 +2890,7 @@ def load_dynasty_asset_values() -> tuple[pd.DataFrame, pd.DataFrame]:
     return players, picks
 
 
-@st.cache_data(show_spinner=False, max_entries=8)
+@st.cache_data(show_spinner="Calculating dynasty coaches poll...", max_entries=8)
 def build_dynasty_coaches_poll(
     rosters: pd.DataFrame,
     draft_picks: pd.DataFrame,
@@ -2979,7 +2992,7 @@ def build_dynasty_coaches_poll(
     return team_values[columns].sort_values(["Rank", "Team"]).reset_index(drop=True)
 
 
-@st.cache_data(show_spinner=False, max_entries=8)
+@st.cache_data(show_spinner="Auditing dynasty player values...", max_entries=8)
 def unmatched_dynasty_players(rosters: pd.DataFrame) -> pd.DataFrame:
     columns = ["Team", "Conference", "Player", "Position", "Roster Spot"]
     if rosters.empty:
@@ -3009,7 +3022,7 @@ def unmatched_dynasty_players(rosters: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-@st.cache_data(show_spinner=False, max_entries=16)
+@st.cache_data(show_spinner="Indexing team information...", max_entries=16)
 def team_lookup(schools: pd.DataFrame) -> dict[str, dict[str, str]]:
     lookup = {}
     for _, row in schools.iterrows():
@@ -3028,7 +3041,7 @@ def team_lookup(schools: pd.DataFrame) -> dict[str, dict[str, str]]:
     return lookup
 
 
-@st.cache_data(show_spinner=False, max_entries=32)
+@st.cache_data(show_spinner="Indexing weekly scores...", max_entries=32)
 def score_lookup(scores: pd.DataFrame) -> dict[tuple[str, int], float]:
     lookup = {}
     if scores.empty:
@@ -3415,7 +3428,7 @@ def starter_points_for_team_week(starters: pd.DataFrame, team: str, week: int) -
     return float(points)
 
 
-@st.cache_data(show_spinner=False, max_entries=16)
+@st.cache_data(show_spinner="Calculating starter scores...", max_entries=16)
 def starter_score_lookup(starters: pd.DataFrame) -> dict[tuple[str, int], float]:
     if starters.empty or not {"Team", "Week", "Points"}.issubset(starters.columns):
         return {}
@@ -3449,7 +3462,7 @@ def starter_score_lookup(starters: pd.DataFrame) -> dict[tuple[str, int], float]
     return lookup
 
 
-@st.cache_data(show_spinner=False, max_entries=8)
+@st.cache_data(show_spinner="Applying season ownership...", max_entries=8)
 def apply_season_owners(schools: pd.DataFrame, season: int) -> pd.DataFrame:
     schools = schools.copy()
     expected = f"{season}owner"
@@ -3725,6 +3738,7 @@ def render_box_score_dialog(
     )
 
 
+@loading_spinner("Loading schedule and matchup details...")
 def render_schedule_cards(
     games: pd.DataFrame,
     scores: pd.DataFrame,
@@ -3860,14 +3874,14 @@ def week_label(week: int) -> str:
     return f"Week {week}"
 
 
-@st.cache_data(show_spinner=False, max_entries=32)
+@st.cache_data(show_spinner="Filtering season data...", max_entries=32)
 def filter_by_season(df: pd.DataFrame, season: int) -> pd.DataFrame:
     if df.empty or "Year" not in df.columns:
         return df.copy()
     return df.loc[pd.to_numeric(df["Year"], errors="coerce").eq(season)].copy()
 
 
-@st.cache_data(show_spinner=False, max_entries=16)
+@st.cache_data(show_spinner="Aggregating weekly scores...", max_entries=16)
 def aggregate_scores_from_starters(starters: pd.DataFrame, fallback_scores: pd.DataFrame) -> pd.DataFrame:
     if starters.empty or not {"Team", "Week", "Points"}.issubset(starters.columns):
         return fallback_scores.copy()
@@ -3924,6 +3938,7 @@ def filter_conference_schedule(
     ].copy()
 
 
+@loading_spinner("Building conference schedule matrix...")
 def render_conference_schedule_matrix(
     conference_schedule: pd.DataFrame,
     scores: pd.DataFrame,
@@ -4067,7 +4082,7 @@ def apply_game_result(row: dict[str, object], points: float, opponent_points: fl
         row[f"{prefix}_ties"] += 1
 
 
-@st.cache_data(show_spinner=False, max_entries=32)
+@st.cache_data(show_spinner="Building league standings...", max_entries=32)
 def build_standings(schedule: pd.DataFrame, scores: pd.DataFrame, schools: pd.DataFrame) -> pd.DataFrame:
     teams = team_lookup(schools)
     standings = {
@@ -4293,6 +4308,7 @@ def render_standings_section(
     )
 
 
+@loading_spinner("Loading league standings...")
 def render_league_standings(
     schedule: pd.DataFrame,
     scores: pd.DataFrame,
@@ -4326,6 +4342,7 @@ def render_league_standings(
         )
 
 
+@loading_spinner("Loading conference standings...")
 def render_conference_standings(
     schedule: pd.DataFrame,
     scores: pd.DataFrame,
@@ -4409,7 +4426,7 @@ def team_record_through_week(
     return f"{overall} ({conference})"
 
 
-@st.cache_data(show_spinner=False, max_entries=8)
+@st.cache_data(show_spinner="Building historical results...", max_entries=8)
 def build_history_ledger(
     schedule: pd.DataFrame,
     scores: pd.DataFrame,
@@ -4945,6 +4962,7 @@ def team_starter_history(starters: pd.DataFrame, ledger: pd.DataFrame, team: str
     st.html(f'<div class="history-section-title"><span>All-Time Starter Production</span><div></div></div><div class="history-table-wrap"><table class="history-table"><thead><tr><th>Rank</th><th>Player</th><th>Starts</th><th>Start %</th><th>Points While Starting</th><th>Avg Start</th><th>Best Start</th></tr></thead><tbody>{body}</tbody></table></div>')
 
 
+@loading_spinner("Loading league history...")
 def render_league_history(ledger: pd.DataFrame, schools: pd.DataFrame, bowls: pd.DataFrame) -> None:
     history_hero(
         "League History",
@@ -4966,6 +4984,7 @@ def render_league_history(ledger: pd.DataFrame, schools: pd.DataFrame, bowls: pd
     history_record_book(ledger, schools)
 
 
+@loading_spinner("Loading conference history...")
 def render_conference_history(
     ledger: pd.DataFrame,
     schools: pd.DataFrame,
@@ -5000,6 +5019,7 @@ def render_conference_history(
     conference_history_matrix(ledger, schools, conference)
 
 
+@loading_spinner("Loading team history...")
 def render_team_history(
     ledger: pd.DataFrame,
     schools: pd.DataFrame,
@@ -5189,6 +5209,7 @@ def render_player_current_ownership(
     )
 
 
+@loading_spinner("Loading player history and charts...")
 def render_player_dashboard(
     player: str,
     rosters: pd.DataFrame,
@@ -5463,9 +5484,9 @@ def render_player_dashboard(
                 plotted_ranks = pd.to_numeric(rank_data["WeeklyRank"], errors="coerce").dropna()
                 plotted_rank_data = rank_data.dropna(subset=["WeeklyRank"]).copy()
                 max_rank = max(int(plotted_ranks.max()), 1) if not plotted_ranks.empty else 1
-                rank_ceiling = max(5, ((max_rank + 4) // 5) * 5)
+                rank_ceiling = max(10, ((max_rank + 9) // 10) * 10)
                 rank_domain = [rank_ceiling, 1]
-                rank_ticks = [1] + list(range(5, rank_ceiling + 1, 5))
+                rank_ticks = [1] + list(range(10, rank_ceiling + 1, 10))
                 rank_base = alt.Chart(plotted_rank_data).encode(
                     x=alt.X(
                         "Game:N",
@@ -5670,6 +5691,7 @@ def render_player_dashboard(
     )
 
 
+@loading_spinner("Loading league rules...")
 def render_rules() -> None:
     st.html(
         """
@@ -5837,7 +5859,7 @@ def render_rules() -> None:
     )
 
 
-@st.cache_data(show_spinner=False, max_entries=32)
+@st.cache_data(show_spinner="Calculating rankings through selected week...", max_entries=32)
 def through_week(schedule: pd.DataFrame, scores: pd.DataFrame, week: int) -> tuple[pd.DataFrame, pd.DataFrame]:
     schedule_part = schedule.loc[schedule["Week"].le(week)].copy()
     scores_part = scores.loc[scores["Week"].le(week)].copy()
@@ -6057,6 +6079,7 @@ def poll_rows_html(
     return "".join(rows)
 
 
+@loading_spinner("Calculating and loading rankings...")
 def render_rankings(
     rankings: pd.DataFrame,
     schedule: pd.DataFrame,
@@ -6243,6 +6266,7 @@ def render_rankings(
             )
 
 
+@loading_spinner("Loading conference draft board...")
 def render_draft_board(
     drafts: pd.DataFrame,
     schools: pd.DataFrame,
@@ -6360,6 +6384,7 @@ def render_draft_board(
     st.html("".join(sections))
 
 
+@loading_spinner("Loading league draft board...")
 def render_league_draft_board(
     drafts: pd.DataFrame,
     schools: pd.DataFrame,
@@ -6497,6 +6522,7 @@ def render_league_draft_board(
     )
 
 
+@loading_spinner("Loading conference rosters...")
 def render_roster_matrix(rosters: pd.DataFrame) -> None:
     teams = (
         rosters[
@@ -6675,6 +6701,7 @@ def render_conference_draft_pick_matrix(
     )
 
 
+@loading_spinner("Loading league rosters...")
 def render_league_roster_matrix(
     rosters: pd.DataFrame,
     conferences: pd.DataFrame,
@@ -6828,7 +6855,7 @@ def current_roster_season() -> int:
     return today.year if today.month >= 3 else today.year - 1
 
 
-@st.cache_data(show_spinner=False, max_entries=8)
+@st.cache_data(show_spinner="Building historical roster snapshot...", max_entries=8)
 def historical_roster_snapshot(
     starters: pd.DataFrame,
     schools: pd.DataFrame,
@@ -6947,6 +6974,7 @@ def render_team_hero(rosters: pd.DataFrame, team_name: str, record: str = "") ->
     )
 
 
+@loading_spinner("Loading team roster...")
 def render_team_roster(
     rosters: pd.DataFrame,
     team_name: str,
@@ -7161,7 +7189,8 @@ render_data_controls()
 inject_css()
 selected_season = masthead()
 
-branding_data = load_branding_data(DATA_CACHE_VERSION)
+with st.spinner("Loading league datasets...", show_time=True):
+    branding_data = load_branding_data(DATA_CACHE_VERSION)
 if len(branding_data) == 9:
     schools, conferences, schedule, scores, rankings, drafts, starters, bowls, player_pictures = branding_data
 elif len(branding_data) == 8:
@@ -7181,27 +7210,28 @@ PLAYER_PICTURE_LOOKUP = {
     for _, row in player_pictures.iterrows()
     if player_picture_key(row.get("Player")) and clean_text(row.get("Picture"))
 }
-full_schedule = schedule.copy()
-full_rankings = rankings.copy()
-full_starters = starters.copy()
-full_drafts = drafts.copy()
-full_scores = aggregate_scores_from_starters(starters, scores)
-schools = apply_season_owners(schools, selected_season)
-schedule = filter_by_season(schedule, selected_season)
-scores = filter_by_season(scores, selected_season)
-rankings = filter_by_season(rankings, selected_season)
-drafts = filter_by_season(drafts, selected_season)
-starters = filter_by_season(starters, selected_season)
-scores = aggregate_scores_from_starters(starters, scores)
-all_rosters = load_all_rosters(schools)
-future_draft_picks = load_future_draft_picks()
-is_current_roster_season = selected_season == current_roster_season()
-roster_snapshot = (
-    all_rosters
-    if is_current_roster_season
-    else historical_roster_snapshot(starters, schools, selected_season)
-)
-history_ledger = build_history_ledger(full_schedule, full_scores, schools, full_rankings)
+with st.spinner(f"Preparing the {selected_season} season...", show_time=True):
+    full_schedule = schedule.copy()
+    full_rankings = rankings.copy()
+    full_starters = starters.copy()
+    full_drafts = drafts.copy()
+    full_scores = aggregate_scores_from_starters(starters, scores)
+    schools = apply_season_owners(schools, selected_season)
+    schedule = filter_by_season(schedule, selected_season)
+    scores = filter_by_season(scores, selected_season)
+    rankings = filter_by_season(rankings, selected_season)
+    drafts = filter_by_season(drafts, selected_season)
+    starters = filter_by_season(starters, selected_season)
+    scores = aggregate_scores_from_starters(starters, scores)
+    all_rosters = load_all_rosters(schools)
+    future_draft_picks = load_future_draft_picks()
+    is_current_roster_season = selected_season == current_roster_season()
+    roster_snapshot = (
+        all_rosters
+        if is_current_roster_season
+        else historical_roster_snapshot(starters, schools, selected_season)
+    )
+    history_ledger = build_history_ledger(full_schedule, full_scores, schools, full_rankings)
 
 league_tab, conference_tab, team_tab, players_tab, rules_tab = st.tabs(
     ["🏆 League", "🏟️ Conference", "🎓 Team", "🏈 Players", "📘 Rules"]
