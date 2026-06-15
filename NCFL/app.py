@@ -5371,14 +5371,7 @@ def render_player_dashboard(
                     "Game:N",
                     sort=chart_game_order,
                     title=None,
-                    axis=None,
-                ),
-            )
-            scoring_axis = alt.Chart(chart_axis).mark_point(opacity=0).encode(
-                x=alt.X(
-                    "Game:N",
-                    sort=chart_game_order,
-                    title=None,
+                    scale=alt.Scale(domain=chart_game_order),
                     axis=alt.Axis(
                         labelAngle=-55,
                         labelColor="#64748b",
@@ -5391,7 +5384,6 @@ def render_player_dashboard(
                         grid=False,
                     ),
                 ),
-                y=alt.value(0),
             )
             line = (
                 base.mark_line(
@@ -5437,7 +5429,7 @@ def render_player_dashboard(
                 )
             )
             points_chart = (
-                (scoring_axis + line + points + point_labels)
+                (line + points + point_labels)
                 .properties(height=336, background="#f8fafc")
                 .configure_view(stroke=None)
                 .configure_axis(
@@ -5492,7 +5484,18 @@ def render_player_dashboard(
                         "Game:N",
                         sort=chart_game_order,
                         title=None,
-                        axis=None,
+                        scale=alt.Scale(domain=chart_game_order),
+                        axis=alt.Axis(
+                            labelAngle=-55,
+                            labelColor="#64748b",
+                            labelFont="Rajdhani",
+                            labelFontSize=10,
+                            labelLimit=80,
+                            labelOverlap="greedy",
+                            tickColor="#cbd5e1",
+                            domainColor="#94a3b8",
+                            grid=False,
+                        ),
                     ),
                     y=alt.Y(
                         "WeeklyRank:Q",
@@ -5519,25 +5522,6 @@ def render_player_dashboard(
                             titlePadding=12,
                         ),
                     ),
-                )
-                rank_axis = alt.Chart(chart_axis).mark_point(opacity=0).encode(
-                    x=alt.X(
-                        "Game:N",
-                        sort=chart_game_order,
-                        title=None,
-                        axis=alt.Axis(
-                            labelAngle=-55,
-                            labelColor="#64748b",
-                            labelFont="Rajdhani",
-                            labelFontSize=10,
-                            labelLimit=80,
-                            labelOverlap="greedy",
-                            tickColor="#cbd5e1",
-                            domainColor="#94a3b8",
-                            grid=False,
-                        ),
-                    ),
-                    y=alt.value(0),
                 )
                 rank_line = rank_base.mark_line(
                     color="#2563eb",
@@ -5566,7 +5550,7 @@ def render_player_dashboard(
                     text="RankLabel:N",
                 )
                 rank_chart = (
-                    (rank_axis + rank_line + rank_points + rank_labels)
+                    (rank_line + rank_points + rank_labels)
                     .properties(height=389, background="#f8fafc")
                     .configure_view(stroke=None)
                     .configure_axis(
