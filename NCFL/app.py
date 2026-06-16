@@ -5253,12 +5253,6 @@ def team_history_yearbook(full_ledger: pd.DataFrame, schools: pd.DataFrame, team
                 f'{esc(game["Notes"])}: {game["Result"]} vs {esc(game["Opponent"])}, {game["Points"]:.2f}-{game["OpponentPoints"]:.2f}'
                 for _, game in bowl.sort_values("Week").iterrows()
             )
-        rivalries = season.loc[season["Rivalry"].map(clean_text).ne("")]
-        if not rivalries.empty:
-            highlights.extend(
-                f'{render_rivalry_pill(clean_text(game["Rivalry"]))}: {game["Result"]} vs {esc(game["Opponent"])}, {game["Points"]:.2f}-{game["OpponentPoints"]:.2f}'
-                for _, game in rivalries.sort_values("Week").iterrows()
-            )
         bowl_text = "<br>".join(highlights)
         year_totals = full_ledger.loc[full_ledger["Year"].eq(year)].groupby("Team", as_index=False).agg(
             PF=("Points", "sum"),
@@ -5276,7 +5270,7 @@ def team_history_yearbook(full_ledger: pd.DataFrame, schools: pd.DataFrame, team
         rows.append(
             f"""<tr><td>{int(year)}</td><td>{esc(historical_owner(schools, team, int(year)), "-")}</td><td>{record_html(overall_w, overall_l, overall_t, pct(overall_w, overall_l, overall_t))}</td><td>{record_html(conf_w, conf_l, conf_t, pct(conf_w, conf_l, conf_t))}</td><td>{season["Points"].sum():,.2f}{f' ({pf_rank})' if pf_rank is not None else ''}</td><td>{season["OpponentPoints"].sum():,.2f}{f' ({pa_rank})' if pa_rank is not None else ''}</td><td>{int((season["OpponentRank"].between(1,25) & season["Result"].eq("W")).sum())}</td><td style="text-align:left;">{bowl_text}</td></tr>"""
         )
-    st.html(f'<div class="history-section-title"><span>Program Yearbook</span><div></div></div><div class="history-table-wrap"><table class="history-table"><thead><tr><th>Season</th><th>Owner</th><th>Record</th><th>Conf Record</th><th>PF</th><th>PA</th><th>Top-25 Wins</th><th>Bowl/Rivalry Results</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div>')
+    st.html(f'<div class="history-section-title"><span>Program Yearbook</span><div></div></div><div class="history-table-wrap"><table class="history-table"><thead><tr><th>Season</th><th>Owner</th><th>Record</th><th>Conf Record</th><th>PF</th><th>PA</th><th>Top-25 Wins</th><th>Bowl Result</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div>')
 
 
 def team_opponent_series(ledger: pd.DataFrame, schools: pd.DataFrame, team: str) -> None:
