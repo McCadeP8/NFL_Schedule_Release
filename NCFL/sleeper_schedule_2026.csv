@@ -1,0 +1,1297 @@
+Week,TeamA,TeamB
+1,Air Force,San Diego State
+1,Appalachian State,Southern Mississippi
+1,Arizona,Washington
+1,Army,Wisconsin
+1,Auburn,Boston College
+1,BYU,TCU
+1,Baylor,Kansas
+1,Boise State,San Jose State
+1,Bowling Green,Central Michigan
+1,Buffalo,Ball State
+1,Charlotte,Tulsa
+1,Cincinnati,Houston
+1,Clemson,Wake Forest
+1,Colorado State,New Mexico
+1,Delaware,Liberty
+1,Duke,Notre Dame
+1,Eastern Carolina,Temple
+1,Eastern Michigan,Akron
+1,Florida,Kentucky
+1,Florida Atlantic,UAB
+1,Florida International,Middle Tennessee
+1,Fresno State,Wyoming
+1,Georgia,Tennessee
+1,Georgia State,Texas State
+1,Georgia Tech,Louisville
+1,Hawaii,Nevada
+1,Indiana,Michigan
+1,Iowa State,Kansas State
+1,Jacksonville State,Missouri State
+1,James Madison,Troy
+1,Kennesaw State,Sam Houston State
+1,Kent State,Toledo
+1,LSU,Arkansas
+1,Louisiana,Arkansas State
+1,Louisiana Tech,Western Kentucky
+1,Marshall,Georgia Southern
+1,Miami (OH),Western Michigan
+1,Michigan State,Nebraska
+1,Minnesota,Illinois
+1,Missouri,Northwestern
+1,NC State,Syracuse
+1,New Mexico State,UTEP
+1,North Alabama,Montana
+1,North Dakota State,Montana State
+1,North Texas,Tulane
+1,Ohio,Northern Illinois
+1,Oklahoma,Navy
+1,Oklahoma State,UCF
+1,Old Dominion,Coastal Carolina
+1,Ole Miss,Southern Methodist
+1,Oregon,Arizona State
+1,Penn State,Iowa
+1,Pitt,Florida State
+1,Purdue,Maryland
+1,Rice,Memphis
+1,Rutgers,Ohio State
+1,South Alabama,Louisiana Monroe
+1,South Florida,UTSA
+1,Stanford,Colorado
+1,Texas,South Carolina
+1,Texas A&M,Mississippi State
+1,UC Davis,Sacramento State
+1,UCLA,Oregon State
+1,UConn,South Dakota State
+1,UMass,Tarleton St.
+1,UNC,Miami (FL)
+1,USC,Utah
+1,Utah State,UNLV
+1,Vanderbilt,Alabama
+1,Virginia Tech,Virginia
+1,Washington State,Cal
+1,West Virginia,Texas Tech
+2,Air Force,Fresno State
+2,Alabama,South Carolina
+2,Appalachian State,Louisiana Monroe
+2,Arizona,Colorado
+2,Arizona State,Utah
+2,Army,Notre Dame
+2,Auburn,Northwestern
+2,Ball State,Akron
+2,Baylor,TCU
+2,Boise State,Hawaii
+2,Bowling Green,Toledo
+2,Buffalo,Eastern Michigan
+2,Charlotte,Rice
+2,Clemson,Miami (FL)
+2,Coastal Carolina,Troy
+2,Delaware,Louisiana Tech
+2,Duke,Wisconsin
+2,Eastern Carolina,Florida Atlantic
+2,Florida,Tennessee
+2,Florida International,New Mexico State
+2,Georgia State,Georgia Southern
+2,Georgia Tech,Virginia
+2,Illinois,Iowa
+2,Indiana,Maryland
+2,Jacksonville State,Sam Houston State
+2,Kansas,BYU
+2,Kansas State,UCF
+2,Kennesaw State,Missouri State
+2,Kent State,Central Michigan
+2,Kentucky,Georgia
+2,LSU,Mississippi State
+2,Liberty,Western Kentucky
+2,Marshall,Texas State
+2,Memphis,Tulsa
+2,Miami (OH),Northern Illinois
+2,Michigan State,Ohio State
+2,Middle Tennessee,UTEP
+2,Minnesota,Penn State
+2,Missouri,Boston College
+2,Montana State,North Alabama
+2,NC State,Florida State
+2,North Dakota State,Montana
+2,North Texas,UTSA
+2,Ohio,Western Michigan
+2,Oklahoma State,Iowa State
+2,Old Dominion,James Madison
+2,Ole Miss,Oklahoma
+2,Oregon State,Cal
+2,Pitt,Syracuse
+2,Purdue,Michigan
+2,Rutgers,Nebraska
+2,Sacramento State,Arkansas State
+2,San Jose State,Nevada
+2,South Alabama,Southern Mississippi
+2,South Florida,Tulane
+2,Southern Methodist,Navy
+2,Stanford,Washington
+2,Temple,UAB
+2,Texas,Vanderbilt
+2,Texas A&M,Arkansas
+2,Texas Tech,Houston
+2,UC Davis,Louisiana
+2,UCLA,Washington State
+2,UConn,Tarleton St.
+2,UMass,South Dakota State
+2,UNC,Wake Forest
+2,UNLV,New Mexico
+2,USC,Oregon
+2,Utah State,Colorado State
+2,Virginia Tech,Louisville
+2,West Virginia,Cincinnati
+2,Wyoming,San Diego State
+3,Air Force,Wyoming
+3,Appalachian State,South Alabama
+3,Arkansas,Mississippi State
+3,Army,Duke
+3,Auburn,Missouri
+3,Baylor,BYU
+3,Boise State,Nevada
+3,Boston College,Northwestern
+3,Bowling Green,Kent State
+3,Buffalo,Akron
+3,Charlotte,Memphis
+3,Clemson,UNC
+3,Coastal Carolina,James Madison
+3,Colorado,Washington
+3,Colorado State,UNLV
+3,Delaware,Western Kentucky
+3,Eastern Carolina,UAB
+3,Eastern Michigan,Ball State
+3,Florida,Georgia
+3,Florida Atlantic,Temple
+3,Florida International,UTEP
+3,Fresno State,San Diego State
+3,Georgia Southern,Texas State
+3,Georgia State,Marshall
+3,Hawaii,San Jose State
+3,Indiana,Purdue
+3,Iowa State,UCF
+3,Jacksonville State,Kennesaw State
+3,Kansas,TCU
+3,Kentucky,Tennessee
+3,Liberty,Louisiana Tech
+3,Louisville,Virginia
+3,Miami (FL),Wake Forest
+3,Miami (OH),Ohio
+3,Michigan,Maryland
+3,Michigan State,Rutgers
+3,Middle Tennessee,New Mexico State
+3,Minnesota,Iowa
+3,Missouri State,Sam Houston State
+3,Montana State,Montana
+3,NC State,Pitt
+3,Nebraska,Ohio State
+3,North Dakota State,North Alabama
+3,North Texas,South Florida
+3,Northern Illinois,Western Michigan
+3,Notre Dame,Wisconsin
+3,Oklahoma,Southern Methodist
+3,Oklahoma State,Kansas State
+3,Old Dominion,Troy
+3,Ole Miss,Navy
+3,Oregon,Utah
+3,Penn State,Illinois
+3,Rice,Tulsa
+3,Sacramento State,Louisiana
+3,South Dakota State,Tarleton St.
+3,Southern Mississippi,Louisiana Monroe
+3,Stanford,Arizona
+3,Syracuse,Florida State
+3,Texas,Alabama
+3,Texas A&M,LSU
+3,Texas Tech,Cincinnati
+3,Toledo,Central Michigan
+3,Tulane,UTSA
+3,UC Davis,Arkansas State
+3,UCLA,Cal
+3,UConn,UMass
+3,USC,Arizona State
+3,Utah State,New Mexico
+3,Vanderbilt,South Carolina
+3,Virginia Tech,Georgia Tech
+3,Washington State,Oregon State
+3,West Virginia,Houston
+4,Air Force,UNLV
+4,Akron,Northern Illinois
+4,Alabama,Tennessee
+4,Appalachian State,Georgia Southern
+4,Arizona,Utah
+4,Army,Auburn
+4,BYU,UCF
+4,Ball State,Toledo
+4,Baylor,Houston
+4,Boise State,Wyoming
+4,Boston College,Wisconsin
+4,Bowling Green,Miami (OH)
+4,Buffalo,Kent State
+4,Central Michigan,Western Michigan
+4,Charlotte,Tulane
+4,Clemson,Louisville
+4,Coastal Carolina,Texas State
+4,Colorado,Washington State
+4,Delaware,Jacksonville State
+4,Eastern Carolina,Memphis
+4,Eastern Michigan,Ohio
+4,Florida,Mississippi State
+4,Florida Atlantic,UTSA
+4,Florida International,Sam Houston State
+4,Fresno State,San Jose State
+4,Georgia,Vanderbilt
+4,Hawaii,Colorado State
+4,Indiana,Nebraska
+4,Iowa,Ohio State
+4,James Madison,Louisiana Monroe
+4,Kansas,Cincinnati
+4,Kennesaw State,Middle Tennessee
+4,LSU,South Carolina
+4,Liberty,Missouri State
+4,Louisiana Tech,New Mexico State
+4,Marshall,Southern Mississippi
+4,Miami (FL),Florida State
+4,Michigan State,Michigan
+4,Minnesota,Maryland
+4,Montana,Tarleton St.
+4,Montana State,Louisiana
+4,Navy,Northwestern
+4,New Mexico,Nevada
+4,North Dakota State,Arkansas State
+4,North Texas,Tulsa
+4,Notre Dame,Southern Methodist
+4,Oklahoma,Missouri
+4,Oklahoma State,TCU
+4,Old Dominion,Georgia State
+4,Ole Miss,Duke
+4,Oregon,Oregon State
+4,Purdue,Illinois
+4,Rutgers,Penn State
+4,Sacramento State,UConn
+4,South Alabama,Troy
+4,South Florida,UAB
+4,Stanford,Cal
+4,Syracuse,Virginia
+4,Temple,Rice
+4,Texas,Arkansas
+4,Texas A&M,Kentucky
+4,Texas Tech,Iowa State
+4,UC Davis,South Dakota State
+4,UCLA,Arizona State
+4,UMass,North Alabama
+4,UNC,Pitt
+4,USC,Washington
+4,UTEP,Western Kentucky
+4,Utah State,San Diego State
+4,Virginia Tech,NC State
+4,Wake Forest,Georgia Tech
+4,West Virginia,Kansas State
+5,Air Force,Utah State
+5,Akron,Ohio
+5,Appalachian State,Marshall
+5,Arizona State,Oregon State
+5,Arkansas,South Carolina
+5,Army,Boston College
+5,Auburn,Wisconsin
+5,Ball State,Kent State
+5,Baylor,Cincinnati
+5,Boise State,Fresno State
+5,Bowling Green,Western Michigan
+5,Buffalo,Toledo
+5,Charlotte,North Texas
+5,Clemson,Georgia Tech
+5,Coastal Carolina,Georgia State
+5,Colorado,Cal
+5,Colorado State,Nevada
+5,Delaware,Missouri State
+5,Duke,Southern Methodist
+5,Eastern Carolina,Rice
+5,Eastern Michigan,Northern Illinois
+5,Florida Atlantic,South Florida
+5,Florida International,Kennesaw State
+5,Georgia,Alabama
+5,Hawaii,New Mexico
+5,Illinois,Maryland
+5,Jacksonville State,Liberty
+5,Kansas,Houston
+5,Kentucky,Mississippi State
+5,Louisiana Tech,UTEP
+5,Miami (FL),Pitt
+5,Miami (OH),Central Michigan
+5,Michigan,Nebraska
+5,Michigan State,Indiana
+5,Middle Tennessee,Sam Houston State
+5,Minnesota,Purdue
+5,Missouri,Navy
+5,Montana State,Arkansas State
+5,NC State,Virginia
+5,New Mexico State,Western Kentucky
+5,North Alabama,Tarleton St.
+5,North Dakota State,Louisiana
+5,Oklahoma,Northwestern
+5,Oklahoma State,BYU
+5,Old Dominion,Texas State
+5,Ole Miss,Notre Dame
+5,Oregon,UCLA
+5,Penn State,Ohio State
+5,Rutgers,Iowa
+5,Sacramento State,South Dakota State
+5,San Diego State,UNLV
+5,South Alabama,James Madison
+5,Southern Mississippi,Georgia Southern
+5,Stanford,Washington State
+5,TCU,UCF
+5,Temple,Memphis
+5,Texas,LSU
+5,Texas A&M,Florida
+5,Texas Tech,Kansas State
+5,Troy,Louisiana Monroe
+5,Tulane,Tulsa
+5,UAB,UTSA
+5,UC Davis,UConn
+5,UMass,Montana
+5,UNC,Florida State
+5,USC,Arizona
+5,Vanderbilt,Tennessee
+5,Virginia Tech,Syracuse
+5,Wake Forest,Louisville
+5,Washington,Utah
+5,West Virginia,Iowa State
+5,Wyoming,San Jose State
+6,Air Force,San Jose State
+6,Akron,Toledo
+6,Appalachian State,James Madison
+6,Arizona,UCLA
+6,Arizona State,Washington State
+6,Army,Southern Methodist
+6,Auburn,Navy
+6,BYU,Kansas State
+6,Baylor,Texas Tech
+6,Boise State,San Diego State
+6,Bowling Green,Northern Illinois
+6,Buffalo,Western Michigan
+6,Central Michigan,Ohio
+6,Charlotte,Temple
+6,Clemson,Florida State
+6,Coastal Carolina,Marshall
+6,Colorado,Utah
+6,Delaware,Florida International
+6,Duke,Missouri
+6,Eastern Carolina,Tulsa
+6,Eastern Michigan,Kent State
+6,Florida,South Carolina
+6,Florida Atlantic,North Texas
+6,Fresno State,New Mexico
+6,Georgia State,Louisiana Monroe
+6,Georgia Tech,Syracuse
+6,Indiana,Rutgers
+6,Jacksonville State,Louisiana Tech
+6,Kennesaw State,UTEP
+6,Kentucky,Texas
+6,LSU,Alabama
+6,Liberty,Middle Tennessee
+6,Memphis,UTSA
+6,Miami (OH),Ball State
+6,Michigan,Ohio State
+6,Michigan State,Illinois
+6,Minnesota,Nebraska
+6,Mississippi State,Tennessee
+6,Missouri State,Western Kentucky
+6,Montana,Arkansas State
+6,Montana State,South Dakota State
+6,NC State,Louisville
+6,New Mexico State,Sam Houston State
+6,North Alabama,Louisiana
+6,North Dakota State,UConn
+6,Notre Dame,Northwestern
+6,Oklahoma,Boston College
+6,Oklahoma State,Houston
+6,Old Dominion,Georgia Southern
+6,Ole Miss,Wisconsin
+6,Oregon,Cal
+6,Oregon State,Washington
+6,Penn State,Maryland
+6,Purdue,Iowa
+6,Rice,South Florida
+6,Sacramento State,Tarleton St.
+6,South Alabama,Texas State
+6,TCU,Iowa State
+6,Texas A&M,Georgia
+6,Troy,Southern Mississippi
+6,Tulane,UAB
+6,UC Davis,UMass
+6,UCF,Cincinnati
+6,UNC,Virginia
+6,UNLV,Nevada
+6,USC,Stanford
+6,Utah State,Hawaii
+6,Vanderbilt,Arkansas
+6,Virginia Tech,Miami (FL)
+6,Wake Forest,Pitt
+6,West Virginia,Kansas
+6,Wyoming,Colorado State
+7,Air Force,Boise State
+7,Akron,Kent State
+7,Appalachian State,Troy
+7,Arizona,Oregon State
+7,Arizona State,Cal
+7,Arkansas,Alabama
+7,Army,Ole Miss
+7,Auburn,Oklahoma
+7,BYU,Iowa State
+7,Ball State,Western Michigan
+7,Baylor,West Virginia
+7,Boston College,Navy
+7,Bowling Green,Ohio
+7,Buffalo,Miami (OH)
+7,Central Michigan,Northern Illinois
+7,Charlotte,Eastern Carolina
+7,Clemson,Pitt
+7,Coastal Carolina,Georgia Southern
+7,Delaware,Middle Tennessee
+7,Duke,Northwestern
+7,Eastern Michigan,Toledo
+7,Florida,Texas
+7,Florida Atlantic,Tulane
+7,Florida International,Liberty
+7,Fresno State,Colorado State
+7,Georgia,Mississippi State
+7,Hawaii,UNLV
+7,Illinois,Nebraska
+7,Indiana,Ohio State
+7,Iowa,Maryland
+7,Jacksonville State,Western Kentucky
+7,James Madison,Southern Mississippi
+7,Kansas,Texas Tech
+7,Kennesaw State,New Mexico State
+7,Kentucky,South Carolina
+7,LSU,Vanderbilt
+7,Louisiana Monroe,Texas State
+7,Louisiana Tech,Missouri State
+7,Louisville,Syracuse
+7,Miami (FL),Virginia
+7,Minnesota,Michigan State
+7,Missouri,Notre Dame
+7,Montana,Louisiana
+7,NC State,Georgia Tech
+7,North Alabama,Arkansas State
+7,North Dakota State,South Dakota State
+7,North Texas,UAB
+7,Oklahoma State,Cincinnati
+7,Old Dominion,Marshall
+7,Oregon,Washington State
+7,Penn State,Purdue
+7,Rice,UTSA
+7,Rutgers,Michigan
+7,Sacramento State,UMass
+7,Sam Houston State,UTEP
+7,San Jose State,San Diego State
+7,South Alabama,Georgia State
+7,South Florida,Memphis
+7,Southern Methodist,Wisconsin
+7,Stanford,Utah
+7,TCU,Kansas State
+7,Temple,Tulsa
+7,Texas A&M,Tennessee
+7,UC Davis,Tarleton St.
+7,UCF,Houston
+7,UCLA,Washington
+7,UConn,Montana State
+7,USC,Colorado
+7,Utah State,Nevada
+7,Virginia Tech,UNC
+7,Wake Forest,Florida State
+7,Wyoming,New Mexico
+8,Air Force,Nevada
+8,Appalachian State,Georgia State
+8,Arizona,Washington State
+8,Arizona State,Colorado
+8,Army,Northwestern
+8,Auburn,Southern Methodist
+8,Baylor,Oklahoma State
+8,Boise State,Colorado State
+8,Bowling Green,Ball State
+8,Buffalo,Central Michigan
+8,Charlotte,South Florida
+8,Clemson,NC State
+8,Delaware,Sam Houston State
+8,Duke,Oklahoma
+8,Eastern Carolina,North Texas
+8,Eastern Michigan,Western Michigan
+8,Florida,Alabama
+8,Florida Atlantic,Memphis
+8,Florida International,Louisiana Tech
+8,Fresno State,UNLV
+8,Georgia,Arkansas
+8,Hawaii,San Diego State
+8,Iowa State,Houston
+8,Jacksonville State,New Mexico State
+8,James Madison,Georgia Southern
+8,Kansas,UCF
+8,Kansas State,Cincinnati
+8,Kennesaw State,Liberty
+8,Kent State,Ohio
+8,Kentucky,Vanderbilt
+8,LSU,Tennessee
+8,Miami (FL),Louisville
+8,Miami (OH),Akron
+8,Michigan,Illinois
+8,Michigan State,Iowa
+8,Middle Tennessee,Western Kentucky
+8,Minnesota,Indiana
+8,Mississippi State,South Carolina
+8,Missouri,Wisconsin
+8,Missouri State,UTEP
+8,Montana State,UMass
+8,North Dakota State,Tarleton St.
+8,Notre Dame,Navy
+8,Old Dominion,Louisiana Monroe
+8,Ole Miss,Boston College
+8,Penn State,Nebraska
+8,Pitt,Virginia
+8,Purdue,Ohio State
+8,Rice,UAB
+8,Rutgers,Maryland
+8,Sacramento State,Montana
+8,San Jose State,New Mexico
+8,South Alabama,Coastal Carolina
+8,South Dakota State,Louisiana
+8,Southern Mississippi,Texas State
+8,Stanford,Oregon
+8,Temple,Tulane
+8,Texas A&M,Texas
+8,Texas Tech,TCU
+8,Toledo,Northern Illinois
+8,Troy,Marshall
+8,Tulsa,UTSA
+8,UC Davis,North Alabama
+8,UCLA,Utah
+8,UConn,Arkansas State
+8,UNC,Georgia Tech
+8,USC,Oregon State
+8,Utah State,Wyoming
+8,Virginia Tech,Florida State
+8,Wake Forest,Syracuse
+8,Washington,Cal
+8,West Virginia,BYU
+9,Air Force,Hawaii
+9,Akron,Western Michigan
+9,Appalachian State,Texas State
+9,Arizona,Cal
+9,Arkansas,Tennessee
+9,Army,Missouri
+9,Auburn,Ole Miss
+9,Ball State,Central Michigan
+9,Baylor,UCF
+9,Boise State,New Mexico
+9,Boston College,Southern Methodist
+9,Buffalo,Bowling Green
+9,Charlotte,UTSA
+9,Clemson,Syracuse
+9,Coastal Carolina,Louisiana Monroe
+9,Delaware,Kennesaw State
+9,Duke,Navy
+9,Eastern Carolina,Tulane
+9,Florida,Vanderbilt
+9,Florida Atlantic,Rice
+9,Florida International,Western Kentucky
+9,Georgia,LSU
+9,Georgia State,Southern Mississippi
+9,Indiana,Illinois
+9,Iowa,Nebraska
+9,Iowa State,Cincinnati
+9,Jacksonville State,UTEP
+9,James Madison,Marshall
+9,Kansas,Oklahoma State
+9,Kansas State,Houston
+9,Kent State,Northern Illinois
+9,Kentucky,Alabama
+9,Liberty,Sam Houston State
+9,Louisiana Tech,Middle Tennessee
+9,Maryland,Ohio State
+9,Memphis,UAB
+9,Miami (FL),Georgia Tech
+9,Miami (OH),Eastern Michigan
+9,Michigan State,Penn State
+9,Minnesota,Michigan
+9,Missouri State,New Mexico State
+9,Montana State,Tarleton St.
+9,NC State,Wake Forest
+9,North Dakota State,UMass
+9,Oklahoma,Notre Dame
+9,Old Dominion,South Alabama
+9,Oregon,Colorado
+9,Oregon State,Utah
+9,Rutgers,Purdue
+9,Sacramento State,North Alabama
+9,San Diego State,Nevada
+9,San Jose State,Colorado State
+9,South Dakota State,Arkansas State
+9,South Florida,Tulsa
+9,Stanford,Arizona State
+9,Temple,North Texas
+9,Texas,Mississippi State
+9,Texas A&M,South Carolina
+9,Texas Tech,BYU
+9,Toledo,Ohio
+9,Troy,Georgia Southern
+9,UC Davis,Montana
+9,UConn,Louisiana
+9,UNC,Louisville
+9,USC,UCLA
+9,Utah State,Fresno State
+9,Virginia,Florida State
+9,Virginia Tech,Pitt
+9,Washington State,Washington
+9,West Virginia,TCU
+9,Wisconsin,Northwestern
+9,Wyoming,UNLV
+10,Air Force,New Mexico
+10,Appalachian State,Old Dominion
+10,Arizona,Arizona State
+10,Army,Navy
+10,Auburn,Notre Dame
+10,BYU,Cincinnati
+10,Ball State,Northern Illinois
+10,Baylor,Iowa State
+10,Boise State,Utah State
+10,Bowling Green,Akron
+10,Buffalo,Ohio
+10,Charlotte,UAB
+10,Coastal Carolina,Southern Mississippi
+10,Delaware,New Mexico State
+10,Duke,Boston College
+10,Eastern Carolina,UTSA
+10,Eastern Michigan,Central Michigan
+10,Florida,LSU
+10,Florida Atlantic,Tulsa
+10,Florida International,Jacksonville State
+10,Fresno State,Nevada
+10,Georgia,Texas
+10,Georgia Southern,Louisiana Monroe
+10,Georgia State,James Madison
+10,Hawaii,Wyoming
+10,Illinois,Ohio State
+10,Indiana,Penn State
+10,Kansas,Kansas State
+10,Kennesaw State,Western Kentucky
+10,Kent State,Western Michigan
+10,Kentucky,Arkansas
+10,Liberty,UTEP
+10,Louisiana Tech,Sam Houston State
+10,Louisville,Florida State
+10,Miami (FL),NC State
+10,Miami (OH),Toledo
+10,Michigan,Iowa
+10,Michigan State,Purdue
+10,Middle Tennessee,Missouri State
+10,Minnesota,Rutgers
+10,Mississippi State,Alabama
+10,Nebraska,Maryland
+10,North Alabama,South Dakota State
+10,North Texas,Memphis
+10,Oklahoma,Wisconsin
+10,Ole Miss,Missouri
+10,Oregon,Washington
+10,Pitt,Georgia Tech
+10,Rice,Tulane
+10,Sacramento State,North Dakota State
+10,San Diego State,Colorado State
+10,San Jose State,UNLV
+10,South Alabama,Marshall
+10,Southern Methodist,Northwestern
+10,Stanford,Oregon State
+10,TCU,Houston
+10,Tarleton St.,Arkansas State
+10,Temple,South Florida
+10,Tennessee,South Carolina
+10,Texas A&M,Vanderbilt
+10,Texas Tech,Oklahoma State
+10,Troy,Texas State
+10,UC Davis,Montana State
+10,UCLA,Colorado
+10,UConn,Montana
+10,UMass,Louisiana
+10,UNC,Syracuse
+10,USC,Cal
+10,Virginia Tech,Clemson
+10,Wake Forest,Virginia
+10,Washington State,Utah
+10,West Virginia,UCF
+11,Air Force,Colorado State
+11,Akron,Central Michigan
+11,Appalachian State,Coastal Carolina
+11,Arizona State,Washington
+11,Army,Oklahoma
+11,Auburn,Duke
+11,BYU,Houston
+11,Ball State,Ohio
+11,Baylor,Kansas State
+11,Boise State,UNLV
+11,Bowling Green,Eastern Michigan
+11,Buffalo,Northern Illinois
+11,Cal,Utah
+11,Charlotte,Florida Atlantic
+11,Clemson,Virginia
+11,Colorado,Oregon State
+11,Delaware,UTEP
+11,Eastern Carolina,South Florida
+11,Florida,Arkansas
+11,Florida International,Missouri State
+11,Fresno State,Hawaii
+11,Georgia,South Carolina
+11,Georgia State,Troy
+11,Georgia Tech,Florida State
+11,Indiana,Iowa
+11,Jacksonville State,Middle Tennessee
+11,James Madison,Texas State
+11,Kansas,Iowa State
+11,Kennesaw State,Louisiana Tech
+11,Kentucky,LSU
+11,Liberty,New Mexico State
+11,Louisiana,Tarleton St.
+11,Marshall,Louisiana Monroe
+11,Memphis,Tulane
+11,Miami (FL),Syracuse
+11,Miami (OH),Kent State
+11,Michigan State,Maryland
+11,Minnesota,Ohio State
+11,Missouri,Southern Methodist
+11,Navy,Wisconsin
+11,North Texas,Rice
+11,Notre Dame,Boston College
+11,Old Dominion,Southern Mississippi
+11,Ole Miss,Northwestern
+11,Oregon,Arizona
+11,Penn State,Michigan
+11,Pitt,Louisville
+11,Purdue,Nebraska
+11,Rutgers,Illinois
+11,Sacramento State,Montana State
+11,Sam Houston State,Western Kentucky
+11,San Diego State,New Mexico
+11,South Alabama,Georgia Southern
+11,South Dakota State,Montana
+11,Stanford,UCLA
+11,TCU,Cincinnati
+11,Temple,UTSA
+11,Texas,Tennessee
+11,Texas A&M,Alabama
+11,Texas Tech,UCF
+11,Toledo,Western Michigan
+11,Tulsa,UAB
+11,UC Davis,North Dakota State
+11,UConn,North Alabama
+11,UMass,Arkansas State
+11,UNC,NC State
+11,USC,Washington State
+11,Utah State,San Jose State
+11,Vanderbilt,Mississippi State
+11,Virginia Tech,Wake Forest
+11,West Virginia,Oklahoma State
+11,Wyoming,Nevada
+12,Air Force,San Diego State
+12,Appalachian State,Southern Mississippi
+12,Arizona,Washington
+12,Army,Wisconsin
+12,Auburn,Boston College
+12,BYU,TCU
+12,Baylor,Kansas
+12,Boise State,San Jose State
+12,Bowling Green,Central Michigan
+12,Buffalo,Ball State
+12,Charlotte,Tulsa
+12,Cincinnati,Houston
+12,Clemson,Wake Forest
+12,Colorado State,New Mexico
+12,Delaware,Liberty
+12,Duke,Notre Dame
+12,Eastern Carolina,Temple
+12,Eastern Michigan,Akron
+12,Florida,Kentucky
+12,Florida Atlantic,UAB
+12,Florida International,Middle Tennessee
+12,Fresno State,Wyoming
+12,Georgia,Tennessee
+12,Georgia State,Texas State
+12,Georgia Tech,Louisville
+12,Hawaii,Nevada
+12,Indiana,Michigan
+12,Iowa State,Kansas State
+12,Jacksonville State,Missouri State
+12,James Madison,Troy
+12,Kennesaw State,Sam Houston State
+12,Kent State,Toledo
+12,LSU,Arkansas
+12,Louisiana,Arkansas State
+12,Louisiana Tech,Western Kentucky
+12,Marshall,Georgia Southern
+12,Miami (OH),Western Michigan
+12,Michigan State,Nebraska
+12,Minnesota,Illinois
+12,Missouri,Northwestern
+12,NC State,Syracuse
+12,New Mexico State,UTEP
+12,North Alabama,Montana
+12,North Dakota State,Montana State
+12,North Texas,Tulane
+12,Ohio,Northern Illinois
+12,Oklahoma,Navy
+12,Oklahoma State,UCF
+12,Old Dominion,Coastal Carolina
+12,Ole Miss,Southern Methodist
+12,Oregon,Arizona State
+12,Penn State,Iowa
+12,Pitt,Florida State
+12,Purdue,Maryland
+12,Rice,Memphis
+12,Rutgers,Ohio State
+12,South Alabama,Louisiana Monroe
+12,South Florida,UTSA
+12,Stanford,Colorado
+12,Texas,South Carolina
+12,Texas A&M,Mississippi State
+12,UC Davis,Sacramento State
+12,UCLA,Oregon State
+12,UConn,South Dakota State
+12,UMass,Tarleton St.
+12,UNC,Miami (FL)
+12,USC,Utah
+12,Utah State,UNLV
+12,Vanderbilt,Alabama
+12,Virginia Tech,Virginia
+12,Washington State,Cal
+12,West Virginia,Texas Tech
+13,Air Force,Fresno State
+13,Alabama,South Carolina
+13,Appalachian State,Louisiana Monroe
+13,Arizona,Colorado
+13,Arizona State,Utah
+13,Army,Notre Dame
+13,Auburn,Northwestern
+13,Ball State,Akron
+13,Baylor,TCU
+13,Boise State,Hawaii
+13,Bowling Green,Toledo
+13,Buffalo,Eastern Michigan
+13,Charlotte,Rice
+13,Clemson,Miami (FL)
+13,Coastal Carolina,Troy
+13,Delaware,Louisiana Tech
+13,Duke,Wisconsin
+13,Eastern Carolina,Florida Atlantic
+13,Florida,Tennessee
+13,Florida International,New Mexico State
+13,Georgia State,Georgia Southern
+13,Georgia Tech,Virginia
+13,Illinois,Iowa
+13,Indiana,Maryland
+13,Jacksonville State,Sam Houston State
+13,Kansas,BYU
+13,Kansas State,UCF
+13,Kennesaw State,Missouri State
+13,Kent State,Central Michigan
+13,Kentucky,Georgia
+13,LSU,Mississippi State
+13,Liberty,Western Kentucky
+13,Marshall,Texas State
+13,Memphis,Tulsa
+13,Miami (OH),Northern Illinois
+13,Michigan State,Ohio State
+13,Middle Tennessee,UTEP
+13,Minnesota,Penn State
+13,Missouri,Boston College
+13,Montana State,North Alabama
+13,NC State,Florida State
+13,North Dakota State,Montana
+13,North Texas,UTSA
+13,Ohio,Western Michigan
+13,Oklahoma State,Iowa State
+13,Old Dominion,James Madison
+13,Ole Miss,Oklahoma
+13,Oregon State,Cal
+13,Pitt,Syracuse
+13,Purdue,Michigan
+13,Rutgers,Nebraska
+13,Sacramento State,Arkansas State
+13,San Jose State,Nevada
+13,South Alabama,Southern Mississippi
+13,South Florida,Tulane
+13,Southern Methodist,Navy
+13,Stanford,Washington
+13,Temple,UAB
+13,Texas,Vanderbilt
+13,Texas A&M,Arkansas
+13,Texas Tech,Houston
+13,UC Davis,Louisiana
+13,UCLA,Washington State
+13,UConn,Tarleton St.
+13,UMass,South Dakota State
+13,UNC,Wake Forest
+13,UNLV,New Mexico
+13,USC,Oregon
+13,Utah State,Colorado State
+13,Virginia Tech,Louisville
+13,West Virginia,Cincinnati
+13,Wyoming,San Diego State
+14,Air Force,Wyoming
+14,Appalachian State,South Alabama
+14,Arkansas,Mississippi State
+14,Army,Duke
+14,Auburn,Missouri
+14,Baylor,BYU
+14,Boise State,Nevada
+14,Boston College,Northwestern
+14,Bowling Green,Kent State
+14,Buffalo,Akron
+14,Charlotte,Memphis
+14,Clemson,UNC
+14,Coastal Carolina,James Madison
+14,Colorado,Washington
+14,Colorado State,UNLV
+14,Delaware,Western Kentucky
+14,Eastern Carolina,UAB
+14,Eastern Michigan,Ball State
+14,Florida,Georgia
+14,Florida Atlantic,Temple
+14,Florida International,UTEP
+14,Fresno State,San Diego State
+14,Georgia Southern,Texas State
+14,Georgia State,Marshall
+14,Hawaii,San Jose State
+14,Indiana,Purdue
+14,Iowa State,UCF
+14,Jacksonville State,Kennesaw State
+14,Kansas,TCU
+14,Kentucky,Tennessee
+14,Liberty,Louisiana Tech
+14,Louisville,Virginia
+14,Miami (FL),Wake Forest
+14,Miami (OH),Ohio
+14,Michigan,Maryland
+14,Michigan State,Rutgers
+14,Middle Tennessee,New Mexico State
+14,Minnesota,Iowa
+14,Missouri State,Sam Houston State
+14,Montana State,Montana
+14,NC State,Pitt
+14,Nebraska,Ohio State
+14,North Dakota State,North Alabama
+14,North Texas,South Florida
+14,Northern Illinois,Western Michigan
+14,Notre Dame,Wisconsin
+14,Oklahoma,Southern Methodist
+14,Oklahoma State,Kansas State
+14,Old Dominion,Troy
+14,Ole Miss,Navy
+14,Oregon,Utah
+14,Penn State,Illinois
+14,Rice,Tulsa
+14,Sacramento State,Louisiana
+14,South Dakota State,Tarleton St.
+14,Southern Mississippi,Louisiana Monroe
+14,Stanford,Arizona
+14,Syracuse,Florida State
+14,Texas,Alabama
+14,Texas A&M,LSU
+14,Texas Tech,Cincinnati
+14,Toledo,Central Michigan
+14,Tulane,UTSA
+14,UC Davis,Arkansas State
+14,UCLA,Cal
+14,UConn,UMass
+14,USC,Arizona State
+14,Utah State,New Mexico
+14,Vanderbilt,South Carolina
+14,Virginia Tech,Georgia Tech
+14,Washington State,Oregon State
+14,West Virginia,Houston
+15,Air Force,UNLV
+15,Akron,Northern Illinois
+15,Alabama,Tennessee
+15,Appalachian State,Georgia Southern
+15,Arizona,Utah
+15,Army,Auburn
+15,BYU,UCF
+15,Ball State,Toledo
+15,Baylor,Houston
+15,Boise State,Wyoming
+15,Boston College,Wisconsin
+15,Bowling Green,Miami (OH)
+15,Buffalo,Kent State
+15,Central Michigan,Western Michigan
+15,Charlotte,Tulane
+15,Clemson,Louisville
+15,Coastal Carolina,Texas State
+15,Colorado,Washington State
+15,Delaware,Jacksonville State
+15,Eastern Carolina,Memphis
+15,Eastern Michigan,Ohio
+15,Florida,Mississippi State
+15,Florida Atlantic,UTSA
+15,Florida International,Sam Houston State
+15,Fresno State,San Jose State
+15,Georgia,Vanderbilt
+15,Hawaii,Colorado State
+15,Indiana,Nebraska
+15,Iowa,Ohio State
+15,James Madison,Louisiana Monroe
+15,Kansas,Cincinnati
+15,Kennesaw State,Middle Tennessee
+15,LSU,South Carolina
+15,Liberty,Missouri State
+15,Louisiana Tech,New Mexico State
+15,Marshall,Southern Mississippi
+15,Miami (FL),Florida State
+15,Michigan State,Michigan
+15,Minnesota,Maryland
+15,Montana,Tarleton St.
+15,Montana State,Louisiana
+15,Navy,Northwestern
+15,New Mexico,Nevada
+15,North Dakota State,Arkansas State
+15,North Texas,Tulsa
+15,Notre Dame,Southern Methodist
+15,Oklahoma,Missouri
+15,Oklahoma State,TCU
+15,Old Dominion,Georgia State
+15,Ole Miss,Duke
+15,Oregon,Oregon State
+15,Purdue,Illinois
+15,Rutgers,Penn State
+15,Sacramento State,UConn
+15,South Alabama,Troy
+15,South Florida,UAB
+15,Stanford,Cal
+15,Syracuse,Virginia
+15,Temple,Rice
+15,Texas,Arkansas
+15,Texas A&M,Kentucky
+15,Texas Tech,Iowa State
+15,UC Davis,South Dakota State
+15,UCLA,Arizona State
+15,UMass,North Alabama
+15,UNC,Pitt
+15,USC,Washington
+15,UTEP,Western Kentucky
+15,Utah State,San Diego State
+15,Virginia Tech,NC State
+15,Wake Forest,Georgia Tech
+15,West Virginia,Kansas State
+16,Air Force,Utah State
+16,Akron,Ohio
+16,Appalachian State,Marshall
+16,Arizona State,Oregon State
+16,Arkansas,South Carolina
+16,Army,Boston College
+16,Auburn,Wisconsin
+16,Ball State,Kent State
+16,Baylor,Cincinnati
+16,Boise State,Fresno State
+16,Bowling Green,Western Michigan
+16,Buffalo,Toledo
+16,Charlotte,North Texas
+16,Clemson,Georgia Tech
+16,Coastal Carolina,Georgia State
+16,Colorado,Cal
+16,Colorado State,Nevada
+16,Delaware,Missouri State
+16,Duke,Southern Methodist
+16,Eastern Carolina,Rice
+16,Eastern Michigan,Northern Illinois
+16,Florida Atlantic,South Florida
+16,Florida International,Kennesaw State
+16,Georgia,Alabama
+16,Hawaii,New Mexico
+16,Illinois,Maryland
+16,Jacksonville State,Liberty
+16,Kansas,Houston
+16,Kentucky,Mississippi State
+16,Louisiana Tech,UTEP
+16,Miami (FL),Pitt
+16,Miami (OH),Central Michigan
+16,Michigan,Nebraska
+16,Michigan State,Indiana
+16,Middle Tennessee,Sam Houston State
+16,Minnesota,Purdue
+16,Missouri,Navy
+16,Montana State,Arkansas State
+16,NC State,Virginia
+16,New Mexico State,Western Kentucky
+16,North Alabama,Tarleton St.
+16,North Dakota State,Louisiana
+16,Oklahoma,Northwestern
+16,Oklahoma State,BYU
+16,Old Dominion,Texas State
+16,Ole Miss,Notre Dame
+16,Oregon,UCLA
+16,Penn State,Ohio State
+16,Rutgers,Iowa
+16,Sacramento State,South Dakota State
+16,San Diego State,UNLV
+16,South Alabama,James Madison
+16,Southern Mississippi,Georgia Southern
+16,Stanford,Washington State
+16,TCU,UCF
+16,Temple,Memphis
+16,Texas,LSU
+16,Texas A&M,Florida
+16,Texas Tech,Kansas State
+16,Troy,Louisiana Monroe
+16,Tulane,Tulsa
+16,UAB,UTSA
+16,UC Davis,UConn
+16,UMass,Montana
+16,UNC,Florida State
+16,USC,Arizona
+16,Vanderbilt,Tennessee
+16,Virginia Tech,Syracuse
+16,Wake Forest,Louisville
+16,Washington,Utah
+16,West Virginia,Iowa State
+16,Wyoming,San Jose State
+17,Air Force,San Jose State
+17,Akron,Toledo
+17,Appalachian State,James Madison
+17,Arizona,UCLA
+17,Arizona State,Washington State
+17,Army,Southern Methodist
+17,Auburn,Navy
+17,BYU,Kansas State
+17,Baylor,Texas Tech
+17,Boise State,San Diego State
+17,Bowling Green,Northern Illinois
+17,Buffalo,Western Michigan
+17,Central Michigan,Ohio
+17,Charlotte,Temple
+17,Clemson,Florida State
+17,Coastal Carolina,Marshall
+17,Colorado,Utah
+17,Delaware,Florida International
+17,Duke,Missouri
+17,Eastern Carolina,Tulsa
+17,Eastern Michigan,Kent State
+17,Florida,South Carolina
+17,Florida Atlantic,North Texas
+17,Fresno State,New Mexico
+17,Georgia State,Louisiana Monroe
+17,Georgia Tech,Syracuse
+17,Indiana,Rutgers
+17,Jacksonville State,Louisiana Tech
+17,Kennesaw State,UTEP
+17,Kentucky,Texas
+17,LSU,Alabama
+17,Liberty,Middle Tennessee
+17,Memphis,UTSA
+17,Miami (OH),Ball State
+17,Michigan,Ohio State
+17,Michigan State,Illinois
+17,Minnesota,Nebraska
+17,Mississippi State,Tennessee
+17,Missouri State,Western Kentucky
+17,Montana,Arkansas State
+17,Montana State,South Dakota State
+17,NC State,Louisville
+17,New Mexico State,Sam Houston State
+17,North Alabama,Louisiana
+17,North Dakota State,UConn
+17,Notre Dame,Northwestern
+17,Oklahoma,Boston College
+17,Oklahoma State,Houston
+17,Old Dominion,Georgia Southern
+17,Ole Miss,Wisconsin
+17,Oregon,Cal
+17,Oregon State,Washington
+17,Penn State,Maryland
+17,Purdue,Iowa
+17,Rice,South Florida
+17,Sacramento State,Tarleton St.
+17,South Alabama,Texas State
+17,TCU,Iowa State
+17,Texas A&M,Georgia
+17,Troy,Southern Mississippi
+17,Tulane,UAB
+17,UC Davis,UMass
+17,UCF,Cincinnati
+17,UNC,Virginia
+17,UNLV,Nevada
+17,USC,Stanford
+17,Utah State,Hawaii
+17,Vanderbilt,Arkansas
+17,Virginia Tech,Miami (FL)
+17,Wake Forest,Pitt
+17,West Virginia,Kansas
+17,Wyoming,Colorado State
+18,Air Force,Boise State
+18,Akron,Kent State
+18,Appalachian State,Troy
+18,Arizona,Oregon State
+18,Arizona State,Cal
+18,Arkansas,Alabama
+18,Army,Ole Miss
+18,Auburn,Oklahoma
+18,BYU,Iowa State
+18,Ball State,Western Michigan
+18,Baylor,West Virginia
+18,Boston College,Navy
+18,Bowling Green,Ohio
+18,Buffalo,Miami (OH)
+18,Central Michigan,Northern Illinois
+18,Charlotte,Eastern Carolina
+18,Clemson,Pitt
+18,Coastal Carolina,Georgia Southern
+18,Delaware,Middle Tennessee
+18,Duke,Northwestern
+18,Eastern Michigan,Toledo
+18,Florida,Texas
+18,Florida Atlantic,Tulane
+18,Florida International,Liberty
+18,Fresno State,Colorado State
+18,Georgia,Mississippi State
+18,Hawaii,UNLV
+18,Illinois,Nebraska
+18,Indiana,Ohio State
+18,Iowa,Maryland
+18,Jacksonville State,Western Kentucky
+18,James Madison,Southern Mississippi
+18,Kansas,Texas Tech
+18,Kennesaw State,New Mexico State
+18,Kentucky,South Carolina
+18,LSU,Vanderbilt
+18,Louisiana Monroe,Texas State
+18,Louisiana Tech,Missouri State
+18,Louisville,Syracuse
+18,Miami (FL),Virginia
+18,Minnesota,Michigan State
+18,Missouri,Notre Dame
+18,Montana,Louisiana
+18,NC State,Georgia Tech
+18,North Alabama,Arkansas State
+18,North Dakota State,South Dakota State
+18,North Texas,UAB
+18,Oklahoma State,Cincinnati
+18,Old Dominion,Marshall
+18,Oregon,Washington State
+18,Penn State,Purdue
+18,Rice,UTSA
+18,Rutgers,Michigan
+18,Sacramento State,UMass
+18,Sam Houston State,UTEP
+18,San Jose State,San Diego State
+18,South Alabama,Georgia State
+18,South Florida,Memphis
+18,Southern Methodist,Wisconsin
+18,Stanford,Utah
+18,TCU,Kansas State
+18,Temple,Tulsa
+18,Texas A&M,Tennessee
+18,UC Davis,Tarleton St.
+18,UCF,Houston
+18,UCLA,Washington
+18,UConn,Montana State
+18,USC,Colorado
+18,Utah State,Nevada
+18,Virginia Tech,UNC
+18,Wake Forest,Florida State
+18,Wyoming,New Mexico

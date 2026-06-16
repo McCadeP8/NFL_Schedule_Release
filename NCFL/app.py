@@ -1813,6 +1813,7 @@ div[data-testid="stButton"] button {
   grid-template-columns: minmax(0, 3fr) minmax(420px, 2fr);
   gap: 18px;
   align-items: start;
+  --poll-panel-height: 1840px;
 }
 .rankings-layout.ap-only {
   grid-template-columns: minmax(0, 1fr);
@@ -1823,6 +1824,9 @@ div[data-testid="stButton"] button {
   border-radius: 10px;
   box-shadow: 0 2px 12px rgba(15,23,42,0.08);
   overflow: hidden;
+  height: var(--poll-panel-height);
+  display: flex;
+  flex-direction: column;
 }
 .poll-header {
   display: flex;
@@ -1850,6 +1854,7 @@ div[data-testid="stButton"] button {
 }
 .poll-table-wrap {
   overflow-x: auto;
+  flex: 1;
 }
 .poll-table {
   border-collapse: collapse;
@@ -1993,6 +1998,7 @@ div[data-testid="stButton"] button {
   padding: 14px 18px 16px;
   background: #fbfcff;
   border-top: 1px solid #e2e6ef;
+  min-height: 96px;
 }
 .orv-title {
   font-family: 'Barlow Condensed', sans-serif;
@@ -2942,8 +2948,14 @@ def build_dynasty_coaches_poll(
     )
     team_values["UnmatchedPlayers"] = team_values["Players"] - team_values["MatchedPlayers"]
 
-    pick_values["round"] = pick_values["player"].astype(str).str.extract(r"Pick\s+(\d+)\.")[0]
-    pick_values["round"] = pd.to_numeric(pick_values["round"], errors="coerce")
+    pick_values["season"] = pd.to_numeric(
+        pick_values["player"].astype(str).str.extract(r"^(\d{4})")[0],
+        errors="coerce",
+    )
+    pick_values["round"] = pd.to_numeric(
+        pick_values["player"].astype(str).str.extract(r"(?:Pick\s+)?(\d+)(?:\.|st|nd|rd|th)")[0],
+        errors="coerce",
+    )
     for value_column, ecr_column in [("value_1qb", "ecr_1qb"), ("value_2qb", "ecr_2qb")]:
         reference = (
             player_values[[ecr_column, value_column]]
@@ -2963,22 +2975,38 @@ def build_dynasty_coaches_poll(
             if not pd.isna(ecr)
             else 0
         )
-    round_values = pick_values.groupby("round")[["value_1qb", "value_2qb"]].mean()
+    season_round_values = (
+        pick_values.dropna(subset=["season", "round"])
+        .groupby(["season", "round"])[["value_1qb", "value_2qb"]]
+        .mean()
+    )
+    current_round_values = (
+        pick_values.loc[pick_values["player"].astype(str).str.contains(r"\bPick\s+\d+\.", regex=True)]
+        .dropna(subset=["round"])
+        .groupby("round")[["value_1qb", "value_2qb"]]
+        .mean()
+    )
 
     pick_totals: dict[tuple[str, int], float] = {}
-    current_year = current_roster_season()
     if not draft_picks.empty:
         for _, pick in draft_picks.iterrows():
             conference = clean_text(pick.get("league_name"))
             owner_id = pd.to_numeric(pick.get("owner_roster_id"), errors="coerce")
             round_number = pd.to_numeric(pick.get("round"), errors="coerce")
             season = pd.to_numeric(pick.get("season"), errors="coerce")
-            if pd.isna(owner_id) or pd.isna(round_number) or round_number not in round_values.index:
+            if pd.isna(owner_id) or pd.isna(round_number):
                 continue
+            round_key = float(round_number)
+            season_key = float(season) if not pd.isna(season) else pd.NA
             value_column = "value_2qb" if conference in SUPERFLEX_CONFERENCES else "value_1qb"
-            discount = 0.85 ** max(int(season) - current_year - 1, 0) if not pd.isna(season) else 1
+            if not pd.isna(season_key) and (season_key, round_key) in season_round_values.index:
+                pick_value = float(season_round_values.loc[(season_key, round_key), value_column])
+            elif round_key in current_round_values.index:
+                pick_value = float(current_round_values.loc[round_key, value_column])
+            else:
+                continue
             key = (conference, int(owner_id))
-            pick_totals[key] = pick_totals.get(key, 0.0) + float(round_values.loc[round_number, value_column]) * discount
+            pick_totals[key] = pick_totals.get(key, 0.0) + pick_value
 
     team_values["DraftPickValue"] = team_values.apply(
         lambda row: pick_totals.get((row["Conference"], int(row["roster_id"])), 0.0),
@@ -3796,7 +3824,7 @@ def render_schedule_cards(
             card_slots.extend(columns[: len(rendered_games) - start])
 
     safe_rosters = rosters if rosters is not None else pd.DataFrame()
-    for slot_container, (_, game) in zip(card_slots, rendered_games):
+    for game_number, (slot_container, (game_index, game)) in enumerate(zip(card_slots, rendered_games)):
         week = int(game["Week"]) if not pd.isna(game.get("Week")) else 0
         team_a = clean_text(game.get("TeamA"))
         team_b = clean_text(game.get("TeamB"))
@@ -3834,7 +3862,10 @@ def render_schedule_cards(
             with button_col:
                 if st.button(
                     "View Box Score",
-                    key=f"{key_prefix}_box_score_{week}_{match_key(team_a)}_{match_key(team_b)}",
+                    key=(
+                        f"{key_prefix}_box_score_{week}_{game_index}_{game_number}_"
+                        f"{match_key(team_a)}_{match_key(team_b)}"
+                    ),
                     use_container_width=True,
                 ):
                     render_box_score_dialog(
@@ -4082,6 +4113,14 @@ def apply_game_result(row: dict[str, object], points: float, opponent_points: fl
         row[f"{prefix}_ties"] += 1
 
 
+def is_completed_score(score_a: Optional[float], score_b: Optional[float]) -> bool:
+    if score_a is None or score_b is None:
+        return False
+    if pd.isna(score_a) or pd.isna(score_b):
+        return False
+    return float(score_a) != 0 or float(score_b) != 0
+
+
 @st.cache_data(show_spinner="Building league standings...", max_entries=32)
 def build_standings(schedule: pd.DataFrame, scores: pd.DataFrame, schools: pd.DataFrame) -> pd.DataFrame:
     teams = team_lookup(schools)
@@ -4104,7 +4143,7 @@ def build_standings(schedule: pd.DataFrame, scores: pd.DataFrame, schools: pd.Da
 
         score_a = scores_by_team_week.get((match_key(team_a), week))
         score_b = scores_by_team_week.get((match_key(team_b), week))
-        if score_a is None or score_b is None:
+        if not is_completed_score(score_a, score_b):
             continue
 
         if team_a not in standings:
@@ -4156,7 +4195,7 @@ def h2h_score(
         week = int(week)
         score_a = scores_by_team_week.get((match_key(team_a), week))
         score_b = scores_by_team_week.get((match_key(team_b), week))
-        if score_a is None or score_b is None:
+        if not is_completed_score(score_a, score_b):
             continue
 
         team_score = score_a if team == team_a else score_b
@@ -6223,7 +6262,53 @@ def render_rankings(
             "UnmatchedPlayers": "Unmatched Players",
         }
     )
-    with st.expander("View Full 144-Team Coaches Poll"):
+    conference_poll = (
+        dynasty_poll.groupby("Conference", as_index=False)
+        .agg(
+            Teams=("Team", "count"),
+            PlayerValue=("PlayerValue", "sum"),
+            DraftPickValue=("DraftPickValue", "sum"),
+            TotalValue=("TotalValue", "sum"),
+            MatchedPlayers=("MatchedPlayers", "sum"),
+            UnmatchedPlayers=("UnmatchedPlayers", "sum"),
+        )
+        .sort_values("TotalValue", ascending=False)
+        .reset_index(drop=True)
+    )
+    conference_poll["Rank"] = range(1, len(conference_poll) + 1)
+    conference_poll = conference_poll[
+        [
+            "Rank", "Conference", "Teams", "TotalValue", "PlayerValue",
+            "DraftPickValue", "MatchedPlayers", "UnmatchedPlayers",
+        ]
+    ].rename(
+        columns={
+            "TotalValue": "Total Value",
+            "PlayerValue": "Player Value",
+            "DraftPickValue": "Draft Pick Value",
+            "MatchedPlayers": "Matched Players",
+            "UnmatchedPlayers": "Unmatched Players",
+        }
+    )
+
+    ranking_detail = st.selectbox(
+        "Dynasty Rankings Detail",
+        ["Conference Totals", "Full 144-Team Coaches Poll"],
+        key="dynasty_rankings_detail",
+    )
+    if ranking_detail == "Conference Totals":
+        st.dataframe(
+            conference_poll,
+            hide_index=True,
+            height="content",
+            use_container_width=True,
+            column_config={
+                "Total Value": st.column_config.NumberColumn(format="%,.0f"),
+                "Player Value": st.column_config.NumberColumn(format="%,.0f"),
+                "Draft Pick Value": st.column_config.NumberColumn(format="%,.0f"),
+            },
+        )
+    else:
         st.dataframe(
             full_poll,
             hide_index=True,
