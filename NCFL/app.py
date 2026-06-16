@@ -1813,7 +1813,7 @@ div[data-testid="stButton"] button {
   grid-template-columns: minmax(0, 3fr) minmax(420px, 2fr);
   gap: 18px;
   align-items: start;
-  --poll-panel-height: 1840px;
+  --poll-panel-height: 1900px;
 }
 .rankings-layout.ap-only {
   grid-template-columns: minmax(0, 1fr);
@@ -1854,12 +1854,14 @@ div[data-testid="stButton"] button {
 }
 .poll-table-wrap {
   overflow-x: auto;
+  overflow-y: hidden;
   flex: 1;
 }
 .poll-table {
   border-collapse: collapse;
   width: 100%;
   min-width: 920px;
+  table-layout: fixed;
 }
 .poll-table.coaches {
   min-width: 560px;
@@ -1899,6 +1901,7 @@ div[data-testid="stButton"] button {
   text-align: left;
   white-space: nowrap;
   height: 42px;
+  box-sizing: border-box;
 }
 .poll-table td {
   border-bottom: 1px solid #edf0f7;
@@ -1906,6 +1909,7 @@ div[data-testid="stButton"] button {
   padding: 9px 10px;
   vertical-align: middle;
   height: 64px;
+  box-sizing: border-box;
 }
 .poll-table tr {
   height: 64px;
@@ -1951,12 +1955,14 @@ div[data-testid="stButton"] button {
   text-transform: uppercase;
   color: #1a2030;
   line-height: 1.05;
+  white-space: nowrap;
 }
 .poll-team-sub {
   font-family: 'Rajdhani', sans-serif;
   font-size: 12px;
   font-weight: 700;
   color: #8a96b0;
+  white-space: nowrap;
 }
 .poll-metric {
   font-family: 'Rajdhani', sans-serif;
@@ -4888,15 +4894,20 @@ def history_champions(
         conference_header = "<th>Conference</th>" if show_conference else ""
         winner_header = "Champion" if title == "Conference Championships" else "Winner"
         sections.append(f'<div class="history-section-title"><span>{esc(title)}</span><div></div></div><div class="history-table-wrap"><table class="history-table"><thead><tr><th>Event</th>{conference_header}<th>{winner_header}</th><th>Score</th><th>Opponent</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div>')
-    st.html("".join(sections))
+    if sections:
+        st.html("".join(sections))
 
 
 def conference_history_matrix(ledger: pd.DataFrame, schools: pd.DataFrame, conference: str) -> None:
     games = ledger.loc[ledger["Conference"].eq(conference) & ledger["OpponentConference"].eq(conference)]
-    teams = sorted(set(games["Team"]))
+    lookup = team_lookup(schools)
+    teams = sorted(
+        team
+        for team, info in lookup.items()
+        if clean_text(info.get("conference")) == conference
+    )
     if not teams:
         return
-    lookup = team_lookup(schools)
     headers = "".join(
         f'<th>{f"""<img src="{esc(lookup.get(team, {}).get("logo"))}" alt="{esc(team)}" title="{esc(team)}" style="width:38px;height:38px;object-fit:contain;">""" if clean_text(lookup.get(team, {}).get("logo")) else esc(team)}</th>'
         for team in teams

@@ -34,25 +34,92 @@ script_dir <- if (length(script_arg) == 1) {
   getwd()
 }
 
-input_path <- if (length(args) >= 1) {
-  args[[1]]
-} else {
-  matching_files <- list.files(
-    script_dir,
-    pattern = "^2026 Rule Changes.*\\.(csv|xlsx|xls)$",
-    full.names = TRUE,
-    ignore.case = TRUE
-  )
+rule_change_file_pattern <- "^2026[[:space:]_+.-]*Rule[[:space:]_+.-]*Changes?.*\\.(csv|xlsx|xls|zip)$"
 
-  if (length(matching_files) == 0) {
+find_latest_rule_change_file <- function(search_dirs) {
+  search_dirs <- unique(normalizePath(search_dirs, winslash = "/", mustWork = FALSE))
+  search_dirs <- search_dirs[dir.exists(search_dirs)]
+
+  for (search_dir in search_dirs) {
+    matching_files <- list.files(
+      search_dir,
+      pattern = rule_change_file_pattern,
+      full.names = TRUE,
+      ignore.case = TRUE
+    )
+
+    if (length(matching_files) > 0) {
+      file_info <- file.info(matching_files)
+      return(matching_files[[which.max(file_info$mtime)]])
+    }
+  }
+
+  character()
+}
+
+resolve_rule_change_input <- function(input_path) {
+  input_extension <- tolower(tools::file_ext(input_path))
+
+  if (input_extension != "zip") {
+    return(input_path)
+  }
+
+  zip_contents <- utils::unzip(input_path, list = TRUE)
+  data_files <- zip_contents$Name[
+    grepl("\\.(csv|xlsx|xls)$", zip_contents$Name, ignore.case = TRUE)
+  ]
+
+  if (length(data_files) == 0) {
     stop(
-      "No 2026 Rule Changes CSV or Excel file was found beside this script.",
+      "The selected 2026 Rule Changes zip does not contain a CSV or Excel file: ",
+      input_path,
       call. = FALSE
     )
   }
 
-  matching_files[[which.max(file.info(matching_files)$mtime)]]
+  preferred_file <- data_files[
+    grepl(rule_change_file_pattern, basename(data_files), ignore.case = TRUE)
+  ]
+  zip_member <- if (length(preferred_file) > 0) preferred_file[[1]] else data_files[[1]]
+  extract_dir <- file.path(tempdir(), paste0("sbcrc_", as.integer(Sys.time())))
+  dir.create(extract_dir, recursive = TRUE, showWarnings = FALSE)
+
+  extracted_path <- utils::unzip(
+    input_path,
+    files = zip_member,
+    exdir = extract_dir,
+    junkpaths = TRUE,
+    overwrite = TRUE
+  )
+
+  message("Loaded rule-change data from zip member: ", zip_member)
+  extracted_path[[1]]
 }
+
+input_path <- if (length(args) >= 1) {
+  args[[1]]
+} else {
+  script_owner_home <- sub("^([A-Za-z]:/Users/[^/]+).*$", "\\1", normalizePath(script_dir, winslash = "/", mustWork = FALSE))
+  search_dirs <- c(
+    file.path(script_owner_home, "Downloads"),
+    file.path(Sys.getenv("USERPROFILE"), "Downloads"),
+    file.path(Sys.getenv("HOME"), "Downloads"),
+    script_dir
+  )
+  latest_rule_change_file <- find_latest_rule_change_file(search_dirs)
+
+  if (length(latest_rule_change_file) == 0) {
+    stop(
+      "No 2026 Rule Changes CSV, Excel, or zip file was found in Downloads or beside this script.",
+      call. = FALSE
+    )
+  }
+
+  latest_rule_change_file
+}
+
+input_path <- resolve_rule_change_input(input_path)
+message("Using rule-change input: ", normalizePath(input_path, winslash = "/", mustWork = FALSE))
 
 output_path <- if (length(args) >= 2) {
   args[[2]]
