@@ -1811,10 +1811,11 @@ div[data-testid="stButton"] button {
 }
 .rankings-layout {
   display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(420px, 2fr);
+  grid-template-columns: minmax(0, 3.25fr) minmax(420px, 2fr);
   gap: 18px;
   align-items: start;
-  --poll-panel-height: 1900px;
+  --poll-panel-height: 1960px;
+  --poll-row-height: 66px;
 }
 .rankings-layout.ap-only {
   grid-template-columns: minmax(0, 1fr);
@@ -1938,11 +1939,11 @@ div[data-testid="stButton"] button {
   border-right: 1px solid #edf0f7;
   padding: 9px 10px;
   vertical-align: middle;
-  height: 64px;
+  height: var(--poll-row-height);
   box-sizing: border-box;
 }
 .poll-table tr {
-  height: 64px;
+  height: var(--poll-row-height);
 }
 .poll-table tr:nth-child(even) td { background: #fbfcff; }
 .poll-rank {
@@ -6504,18 +6505,10 @@ def render_rankings(
         }
     )
 
-    ranking_detail = st.selectbox(
-        "Detail Table",
-        ["Conference Totals", "Full 144-Team Coaches Poll"],
-        key="dynasty_rankings_detail",
-        label_visibility="collapsed",
-    )
-    if ranking_detail == "Conference Totals":
-        with st.expander("Conference Totals", expanded=False):
-            st.html(rankings_detail_table_html(conference_poll))
-    else:
-        with st.expander("Full 144-Team Coaches Poll", expanded=False):
-            st.html(rankings_detail_table_html(full_poll))
+    with st.expander("Conference Totals", expanded=False):
+        st.html(rankings_detail_table_html(conference_poll))
+    with st.expander("Full 144-Team Coaches Poll", expanded=False):
+        st.html(rankings_detail_table_html(full_poll))
     unmatched = unmatched_dynasty_players(rosters)
     if not unmatched.empty:
         with st.expander(f"Review {len(unmatched):,} Unmatched Players"):
