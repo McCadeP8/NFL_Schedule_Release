@@ -1861,8 +1861,37 @@ div[data-testid="stButton"] button {
 .poll-table {
   border-collapse: collapse;
   width: 100%;
-  min-width: 920px;
+  min-width: 1080px;
   table-layout: fixed;
+}
+.poll-table.ap th:nth-child(1),
+.poll-table.ap td:nth-child(1) {
+  width: 54px;
+}
+.poll-table.ap th:nth-child(2),
+.poll-table.ap td:nth-child(2) {
+  width: 58px;
+  text-align: center;
+}
+.poll-table.ap th:nth-child(3),
+.poll-table.ap td:nth-child(3) {
+  width: 320px;
+}
+.poll-table.ap th:nth-child(4),
+.poll-table.ap td:nth-child(4),
+.poll-table.ap th:nth-child(5),
+.poll-table.ap td:nth-child(5),
+.poll-table.ap th:nth-child(6),
+.poll-table.ap td:nth-child(6),
+.poll-table.ap th:nth-child(7),
+.poll-table.ap td:nth-child(7),
+.poll-table.ap th:nth-child(8),
+.poll-table.ap td:nth-child(8) {
+  width: 92px;
+}
+.poll-table.ap th:nth-child(9),
+.poll-table.ap td:nth-child(9) {
+  width: 170px;
 }
 .poll-table.coaches {
   min-width: 560px;
@@ -2022,6 +2051,41 @@ div[data-testid="stButton"] button {
   font-weight: 700;
   line-height: 1.5;
   color: #1a2030;
+}
+.rankings-detail-table {
+  border-collapse: collapse;
+  width: 100%;
+  background: #111827;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  overflow: hidden;
+  font-family: 'Rajdhani', sans-serif;
+}
+.rankings-detail-table th {
+  background: #1f2937;
+  color: #ffffff;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid #334155;
+}
+.rankings-detail-table td {
+  color: #f8fafc;
+  padding: 9px 12px;
+  border-bottom: 1px solid #243044;
+  font-size: 15px;
+  font-weight: 800;
+}
+.rankings-detail-table tr:nth-child(even) td {
+  background: #172033;
+}
+.rankings-detail-table td.numeric,
+.rankings-detail-table th.numeric {
+  text-align: right;
 }
 .draft-hero {
   display: flex;
@@ -6221,6 +6285,36 @@ def poll_rows_html(
     return "".join(rows)
 
 
+def rankings_detail_table_html(frame: pd.DataFrame) -> str:
+    numeric_columns = {
+        "Rank", "Conf Rank", "Teams", "Total Value", "Player Value",
+        "Draft Pick Value", "Matched Players", "Unmatched Players",
+    }
+    headers = "".join(
+        f'<th class="{"numeric" if column in numeric_columns else ""}">{esc(column)}</th>'
+        for column in frame.columns
+    )
+    rows = []
+    for _, row in frame.iterrows():
+        cells = []
+        for column in frame.columns:
+            value = row[column]
+            if column in {"Total Value", "Player Value", "Draft Pick Value"} and not pd.isna(value):
+                label = f"{float(value):,.0f}"
+            elif column in numeric_columns and not pd.isna(value):
+                label = f"{int(value):,}"
+            else:
+                label = clean_text(value, "-")
+            cells.append(
+                f'<td class="{"numeric" if column in numeric_columns else ""}">{esc(label)}</td>'
+            )
+        rows.append(f"<tr>{''.join(cells)}</tr>")
+    return (
+        '<table class="rankings-detail-table">'
+        f"<thead><tr>{headers}</tr></thead><tbody>{''.join(rows)}</tbody></table>"
+    )
+
+
 @loading_spinner("Calculating and loading rankings...")
 def render_rankings(
     rankings: pd.DataFrame,
@@ -6339,7 +6433,7 @@ def render_rankings(
       </div>
     </div>
     <div class="poll-table-wrap">
-      <table class="poll-table">
+      <table class="poll-table ap">
         <thead>
           <tr>
             <th>Rk</th>
@@ -6411,34 +6505,17 @@ def render_rankings(
     )
 
     ranking_detail = st.selectbox(
-        "Dynasty Rankings Detail",
+        "Detail Table",
         ["Conference Totals", "Full 144-Team Coaches Poll"],
         key="dynasty_rankings_detail",
+        label_visibility="collapsed",
     )
     if ranking_detail == "Conference Totals":
-        st.dataframe(
-            conference_poll,
-            hide_index=True,
-            height="content",
-            use_container_width=True,
-            column_config={
-                "Total Value": st.column_config.NumberColumn(format="%,.0f"),
-                "Player Value": st.column_config.NumberColumn(format="%,.0f"),
-                "Draft Pick Value": st.column_config.NumberColumn(format="%,.0f"),
-            },
-        )
+        with st.expander("Conference Totals", expanded=False):
+            st.html(rankings_detail_table_html(conference_poll))
     else:
-        st.dataframe(
-            full_poll,
-            hide_index=True,
-            height="content",
-            use_container_width=True,
-            column_config={
-                "Total Value": st.column_config.NumberColumn(format="%,.0f"),
-                "Player Value": st.column_config.NumberColumn(format="%,.0f"),
-                "Draft Pick Value": st.column_config.NumberColumn(format="%,.0f"),
-            },
-        )
+        with st.expander("Full 144-Team Coaches Poll", expanded=False):
+            st.html(rankings_detail_table_html(full_poll))
     unmatched = unmatched_dynasty_players(rosters)
     if not unmatched.empty:
         with st.expander(f"Review {len(unmatched):,} Unmatched Players"):
@@ -6446,12 +6523,7 @@ def render_rankings(
                 "These rostered players receive zero dynasty value because their names "
                 "did not match the current DynastyProcess player file."
             )
-            st.dataframe(
-                unmatched,
-                hide_index=True,
-                height="content",
-                use_container_width=True,
-            )
+            st.html(rankings_detail_table_html(unmatched))
 
 
 @loading_spinner("Loading conference draft board...")
