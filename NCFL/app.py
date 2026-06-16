@@ -61,7 +61,8 @@ SCHEDULE_STATUS_COLORS = {
     "pending": "#8a96b0",
 }
 CACHE_TTL_SECONDS = 60 * 60 * 24
-DATA_CACHE_VERSION = "dynasty-aliases-v1"
+DATA_CACHE_VERSION = "ignore-zero-future-games-v1"
+STANDINGS_CACHE_VERSION = "ignore-zero-future-games-v1"
 
 
 def clean_text(value: object, fallback: str = "") -> str:
@@ -3076,7 +3077,8 @@ def team_lookup(schools: pd.DataFrame) -> dict[str, dict[str, str]]:
 
 
 @st.cache_data(show_spinner="Indexing weekly scores...", max_entries=32)
-def score_lookup(scores: pd.DataFrame) -> dict[tuple[str, int], float]:
+def score_lookup(scores: pd.DataFrame, cache_version: str = STANDINGS_CACHE_VERSION) -> dict[tuple[str, int], float]:
+    del cache_version
     lookup = {}
     if scores.empty:
         return lookup
@@ -3919,7 +3921,12 @@ def filter_by_season(df: pd.DataFrame, season: int) -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner="Aggregating weekly scores...", max_entries=16)
-def aggregate_scores_from_starters(starters: pd.DataFrame, fallback_scores: pd.DataFrame) -> pd.DataFrame:
+def aggregate_scores_from_starters(
+    starters: pd.DataFrame,
+    fallback_scores: pd.DataFrame,
+    cache_version: str = STANDINGS_CACHE_VERSION,
+) -> pd.DataFrame:
+    del cache_version
     if starters.empty or not {"Team", "Week", "Points"}.issubset(starters.columns):
         return fallback_scores.copy()
 
@@ -3955,7 +3962,9 @@ def aggregate_scores_from_starters(starters: pd.DataFrame, fallback_scores: pd.D
             .sum(min_count=1)
             .reset_index()
         )
-    return scores.dropna(subset=["Points"]).reset_index(drop=True)
+    scores = scores.dropna(subset=["Points"]).copy()
+    scores = scores.loc[pd.to_numeric(scores["Points"], errors="coerce").fillna(0).ne(0)]
+    return scores.reset_index(drop=True)
 
 
 def filter_conference_schedule(
@@ -4128,7 +4137,13 @@ def is_completed_score(score_a: Optional[float], score_b: Optional[float]) -> bo
 
 
 @st.cache_data(show_spinner="Building league standings...", max_entries=32)
-def build_standings(schedule: pd.DataFrame, scores: pd.DataFrame, schools: pd.DataFrame) -> pd.DataFrame:
+def build_standings(
+    schedule: pd.DataFrame,
+    scores: pd.DataFrame,
+    schools: pd.DataFrame,
+    cache_version: str = STANDINGS_CACHE_VERSION,
+) -> pd.DataFrame:
+    del cache_version
     teams = team_lookup(schools)
     standings = {
         team: empty_standing(team, info)
@@ -4979,6 +4994,98 @@ def team_opponent_series(ledger: pd.DataFrame, schools: pd.DataFrame, team: str)
     st.html(f'<div class="history-section-title"><span>Opponent Series</span><div></div></div><div class="history-table-wrap"><table class="history-table"><thead><tr><th>Opponent</th><th>Games</th><th>Record</th><th>PF</th><th>PA</th><th>Last Matchup</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div>')
 
 
+def team_opponent_series_with_next_game(
+    ledger: pd.DataFrame,
+    full_schedule: pd.DataFrame,
+    schools: pd.DataFrame,
+    team: str,
+) -> None:
+    games = ledger.loc[ledger["Team"].eq(team)].copy()
+    lookup = team_lookup(schools)
+    upcoming = full_schedule.loc[
+        full_schedule["TeamA"].eq(team) | full_schedule["TeamB"].eq(team)
+    ].copy()
+    if not upcoming.empty:
+        upcoming["Week"] = pd.to_numeric(upcoming["Week"], errors="coerce")
+        if "Year" in upcoming.columns:
+            upcoming["Year"] = pd.to_numeric(upcoming["Year"], errors="coerce")
+            played_pairs = set(
+                games[["Year", "Week", "Opponent"]]
+                .drop_duplicates()
+                .itertuples(index=False, name=None)
+            )
+            upcoming = upcoming.loc[
+                ~upcoming.apply(
+                    lambda row: (
+                        row.get("Year"),
+                        row.get("Week"),
+                        clean_text(row.get("TeamB"))
+                        if clean_text(row.get("TeamA")) == team
+                        else clean_text(row.get("TeamA")),
+                    )
+                    in played_pairs,
+                    axis=1,
+                )
+            ]
+
+    opponents = set(games["Opponent"].dropna().map(clean_text))
+    if not upcoming.empty:
+        opponents.update(
+            upcoming.apply(
+                lambda row: clean_text(row.get("TeamB"))
+                if clean_text(row.get("TeamA")) == team
+                else clean_text(row.get("TeamA")),
+                axis=1,
+            )
+        )
+
+    rows = []
+    for opponent in sorted(opponents):
+        if not opponent:
+            continue
+        series = games.loc[games["Opponent"].eq(opponent)]
+        logo = clean_text(lookup.get(opponent, {}).get("logo"))
+        next_games = upcoming.loc[
+            (upcoming["TeamA"].eq(team) & upcoming["TeamB"].eq(opponent))
+            | (upcoming["TeamB"].eq(team) & upcoming["TeamA"].eq(opponent))
+        ].sort_values(["Year", "Week"] if "Year" in upcoming.columns else ["Week"])
+        next_game = "-"
+        if not next_games.empty:
+            next_row = next_games.iloc[0]
+            year_label = (
+                f'{int(next_row["Year"])}, '
+                if "Year" in next_games.columns and not pd.isna(next_row.get("Year"))
+                else ""
+            )
+            next_game = f'{year_label}W{int(next_row["Week"])}'
+
+        if series.empty:
+            games_played = wins = losses = ties = 0
+            points_for = points_against = 0.0
+            last_matchup = "-"
+        else:
+            last = series.sort_values(["Year", "Week"]).iloc[-1]
+            games_played = len(series)
+            wins = int(series["Result"].eq("W").sum())
+            losses = int(series["Result"].eq("L").sum())
+            ties = int(series["Result"].eq("T").sum())
+            points_for = float(series["Points"].sum())
+            points_against = float(series["OpponentPoints"].sum())
+            last_matchup = (
+                f'{int(last["Year"])}, W{int(last["Week"])} - '
+                f'{last["Result"]} {last["Points"]:.2f}-{last["OpponentPoints"]:.2f}'
+            )
+        rows.append(
+            (
+                games_played,
+                next_game == "-",
+                f"""<tr><td><div class="history-team">{f'<img src="{esc(logo)}" alt="{esc(opponent)}">' if logo else ''}<div class="history-team-name">{esc(opponent)}</div></div></td><td>{games_played}</td><td>{record_text(wins, losses, ties)}</td><td>{points_for:,.2f}</td><td>{points_against:,.2f}</td><td>{esc(last_matchup)}</td><td>{esc(next_game)}</td></tr>""",
+            )
+        )
+    rows = [html for _, _, html in sorted(rows, key=lambda item: (-item[0], item[1], item[2]))]
+    st.html(f'<div class="history-section-title"><span>Opponent Series</span><div></div></div><div class="history-table-wrap"><table class="history-table"><thead><tr><th>Opponent</th><th>Games</th><th>Record</th><th>PF</th><th>PA</th><th>Last Matchup</th><th>Next Game</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div>')
+
+
 def team_starter_history(starters: pd.DataFrame, ledger: pd.DataFrame, team: str) -> None:
     if starters.empty:
         return
@@ -5072,6 +5179,7 @@ def render_conference_history(
 @loading_spinner("Loading team history...")
 def render_team_history(
     ledger: pd.DataFrame,
+    schedule: pd.DataFrame,
     schools: pd.DataFrame,
     starters: pd.DataFrame,
     team: str,
@@ -5100,7 +5208,7 @@ def render_team_history(
     )
 
     team_history_yearbook(ledger, schools, team)
-    team_opponent_series(games, schools, team)
+    team_opponent_series_with_next_game(games, schedule, schools, team)
     history_record_book(games, schools, "Team Record Book")
     team_starter_history(starters, ledger, team)
 
@@ -7565,7 +7673,7 @@ with team_tab:
             future_draft_picks if is_current_roster_season else None,
         )
     with team_history_tab:
-        render_team_history(history_ledger, schools, full_starters, selected_team)
+        render_team_history(history_ledger, full_schedule, schools, full_starters, selected_team)
 
 with players_tab:
     player_options = all_time_player_options(all_rosters, full_starters, full_drafts)
