@@ -61,7 +61,7 @@ SCHEDULE_STATUS_COLORS = {
     "pending": "#8a96b0",
 }
 CACHE_TTL_SECONDS = 60 * 60 * 24
-DATA_CACHE_VERSION = "ignore-zero-future-games-v1"
+DATA_CACHE_VERSION = "rivalry-schedule-v1"
 STANDINGS_CACHE_VERSION = "ignore-zero-future-games-v1"
 
 
@@ -878,6 +878,11 @@ label[data-testid="stWidgetLabel"] * {
   border-top: 5px solid #d4a72c;
   box-shadow: 0 7px 24px rgba(111, 78, 10, 0.20);
 }
+.schedule-card.rivalry-game:not(.bowl-game) {
+  border: 1px solid #c7d2fe;
+  border-top: 5px solid #4f46e5;
+  box-shadow: 0 7px 24px rgba(79, 70, 229, 0.16);
+}
 .schedule-card-top {
   display: flex;
   align-items: center;
@@ -896,6 +901,17 @@ label[data-testid="stWidgetLabel"] * {
 .schedule-card.bowl-game .game-badge {
   color: #17120a;
   background: #f2cf68;
+}
+.schedule-card.rivalry-game:not(.bowl-game) .schedule-card-top {
+  background: #111827;
+  border-bottom-color: #2b3445;
+}
+.schedule-card.rivalry-game:not(.bowl-game) .week-chip {
+  color: #c7d2fe;
+}
+.schedule-card.rivalry-game:not(.bowl-game) .game-badge {
+  background: #c7d2fe;
+  color: #111827;
 }
 .bowl-banner {
   display: flex;
@@ -932,6 +948,72 @@ label[data-testid="stWidgetLabel"] * {
   line-height: 1.05;
   letter-spacing: 0;
   text-transform: uppercase;
+}
+.rivalry-banner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 68px;
+  padding: 12px 16px;
+  overflow: hidden;
+  color: #ffffff;
+  background:
+    radial-gradient(circle at top left, rgba(242,207,104,0.30), transparent 34%),
+    linear-gradient(135deg, #111827, #312e81 55%, #4c1d95);
+  border-bottom: 1px solid rgba(255,255,255,0.18);
+  text-align: center;
+}
+.rivalry-banner::before,
+.rivalry-banner::after {
+  content: "";
+  position: absolute;
+  width: 82px;
+  height: 2px;
+  background: #f2cf68;
+  opacity: 0.75;
+}
+.rivalry-banner::before { left: 18px; }
+.rivalry-banner::after { right: 18px; }
+.rivalry-kicker {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: #f2cf68;
+}
+.rivalry-name {
+  margin-top: 2px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 25px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+.rivalry-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: 999px;
+  padding: 3px 10px 4px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  color: #312e81;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.schedule-rivalry-note {
+  padding: 8px 14px;
+  background: #fff7ed;
+  border-bottom: 1px solid #fed7aa;
+  text-align: center;
 }
 .week-chip {
   font-family: 'Barlow Condensed', sans-serif;
@@ -1103,6 +1185,47 @@ div[data-testid="stButton"] button {
   letter-spacing: 2.5px;
   text-transform: uppercase;
   color: #cbd5e1;
+}
+.boxscore-rivalry-masthead {
+  margin: 2px 0 18px;
+  padding: 18px 22px;
+  color: #ffffff;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(242,207,104,0.28), transparent 28%),
+    linear-gradient(135deg, #111827, #312e81 55%, #4c1d95);
+  border: 1px solid #c7d2fe;
+  border-top: 6px solid #4f46e5;
+  border-radius: 12px;
+  box-shadow: 0 9px 32px rgba(79, 70, 229, 0.23);
+  text-align: center;
+}
+.boxscore-rivalry-masthead.compact {
+  margin-top: -8px;
+  padding: 9px 16px;
+  background: #111827;
+  border-top-width: 0;
+  box-shadow: 0 4px 14px rgba(15,23,42,0.18);
+}
+.boxscore-rivalry-kicker {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #f2cf68;
+}
+.boxscore-rivalry-title {
+  margin-top: 3px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 42px;
+  line-height: 1;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.boxscore-rivalry-masthead.compact .boxscore-rivalry-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 20px;
+  letter-spacing: 1.4px;
 }
 .boxscore-matchup-top {
   display: grid;
@@ -1494,6 +1617,16 @@ div[data-testid="stButton"] button {
   width: 42px;
   height: 42px;
   object-fit: contain;
+}
+.schedule-matrix-rivalry {
+  display: block;
+  margin-top: 3px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: #312e81;
 }
 .schedule-bye {
   font-family: 'Rajdhani', sans-serif;
@@ -2611,6 +2744,12 @@ div[data-testid="stButton"] button {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.history-table .rivalry-pill {
+  margin-top: 4px;
+}
+.history-rivalry-sub {
+  margin-top: 4px;
+}
 .champion-star {
   display: inline-flex;
   align-items: center;
@@ -3269,6 +3408,35 @@ def bowl_for_notes(notes: object, bowls: Optional[pd.DataFrame]) -> dict[str, st
     return max(matches, key=lambda bowl: len(bowl["name"]), default=fallback)
 
 
+def rivalry_name(game: object) -> str:
+    if isinstance(game, pd.Series):
+        return clean_text(game.get("Rivalry")) or clean_text(game.get("Rivarly"))
+    if isinstance(game, dict):
+        return clean_text(game.get("Rivalry")) or clean_text(game.get("Rivarly"))
+    return ""
+
+
+def render_rivalry_pill(rivalry: str) -> str:
+    rivalry = clean_text(rivalry)
+    if not rivalry:
+        return ""
+    return f'<span class="rivalry-pill">Rivalry: {esc(rivalry)}</span>'
+
+
+def render_rivalry_banner(rivalry: str) -> str:
+    rivalry = clean_text(rivalry)
+    if not rivalry:
+        return ""
+    return f"""
+<div class="rivalry-banner">
+  <div>
+    <div class="rivalry-kicker">Rivalry Game</div>
+    <div class="rivalry-name">{esc(rivalry)}</div>
+  </div>
+</div>
+"""
+
+
 def render_bowl_banner(bowl: dict[str, str]) -> str:
     if not bowl:
         return ""
@@ -3307,6 +3475,18 @@ def render_boxscore_bowl_masthead(
     <div class="boxscore-bowl-meta">{year} Bowl Season &nbsp; | &nbsp; Week {week} Box Score</div>
   </div>
   <div></div>
+</div>
+"""
+
+
+def render_boxscore_rivalry_masthead(rivalry: str, compact: bool = False) -> str:
+    rivalry = clean_text(rivalry)
+    if not rivalry:
+        return ""
+    return f"""
+<div class="boxscore-rivalry-masthead{' compact' if compact else ''}">
+  <div class="boxscore-rivalry-kicker">Rivalry Game</div>
+  <div class="boxscore-rivalry-title">{esc(rivalry)}</div>
 </div>
 """
 
@@ -3745,6 +3925,7 @@ def render_box_score_dialog(
     team_a = clean_text(game.get("TeamA"))
     team_b = clean_text(game.get("TeamB"))
     bowl = bowl_for_notes(game.get("Notes"), bowls)
+    rivalry = rivalry_name(game)
     teams = team_lookup(schools)
     ranks = schedule_ap_top25(rankings, week)
     team_a_color = clean_text(teams.get(team_a, {}).get("color"), "#1a2030")
@@ -3808,6 +3989,7 @@ def render_box_score_dialog(
     st.html(
         f"""
 {render_boxscore_bowl_masthead(bowl, year, week)}
+{render_boxscore_rivalry_masthead(rivalry, compact=bool(bowl))}
 <div class="boxscore-matchup-card">
   <div class="boxscore-matchup-top">
     {boxscore_team_header(team_a, teams, ranks, team_a_record, "left")}
@@ -3903,6 +4085,7 @@ def render_schedule_cards(
         team_b = clean_text(game.get("TeamB"))
         notes = clean_text(game.get("Notes"))
         bowl = bowl_for_notes(notes, bowls)
+        rivalry = rivalry_name(game)
         is_conference = bool(game.get("Conference", False))
         score_a = starter_scores_by_team_week.get((match_key(team_a), week))
         score_b = starter_scores_by_team_week.get((match_key(team_b), week))
@@ -3910,7 +4093,7 @@ def render_schedule_cards(
             score_a = scores_by_team_week.get((match_key(team_a), week))
         if score_b is None:
             score_b = scores_by_team_week.get((match_key(team_b), week))
-        badge = "Bowl Game" if bowl else ("Conference" if is_conference else "Non-Conf")
+        badge = "Bowl Game" if bowl else ("Rivalry" if rivalry else ("Conference" if is_conference else "Non-Conf"))
         game_ranks = schedule_ap_top25(rankings, week)
         record_week = max(week - 1, 0)
         team_a_record = team_record_through_week(full_schedule, scores, schools, team_a, record_week)
@@ -3919,12 +4102,13 @@ def render_schedule_cards(
         with slot_container:
             st.html(
                 f"""
-<div class="schedule-card{' bowl-game' if bowl else ''}">
+<div class="schedule-card{' bowl-game' if bowl else ''}{' rivalry-game' if rivalry else ''}">
   <div class="schedule-card-top">
     <div class="week-chip">Week {week}</div>
     <div class="game-badge">{badge}</div>
   </div>
   {render_bowl_banner(bowl)}
+  {f'<div class="schedule-rivalry-note">{render_rivalry_pill(rivalry)}</div>' if bowl and rivalry else render_rivalry_banner(rivalry)}
   {render_matchup_team(team_a, week, score_a, score_b, teams, game_ranks, team_a_record)}
   {render_matchup_team(team_b, week, score_b, score_a, teams, game_ranks, team_b_record)}
   {f'<div class="schedule-notes">{esc(notes)}</div>' if notes and match_key(notes) != match_key(bowl.get("name")) else ''}
@@ -4105,6 +4289,9 @@ def render_conference_schedule_matrix(
                 content = f'<img src="{esc(opponent_logo)}" alt="{esc(opponent)}" title="{esc(opponent)}">'
             else:
                 content = f'<span class="conf-head-label">{esc(opponent)}</span>'
+            rivalry = rivalry_name(game_row)
+            if rivalry:
+                content = f'{content}<span class="schedule-matrix-rivalry">{esc(rivalry)}</span>'
 
             cells.append(f'<td class="schedule-opponent-cell {result}">{content}</td>')
 
@@ -4561,7 +4748,7 @@ def build_history_ledger(
     columns = [
         "Year", "Week", "Team", "Opponent", "Conference", "OpponentConference",
         "Points", "OpponentPoints", "Margin", "Result", "ConferenceGame",
-        "OpponentRank", "Notes",
+        "OpponentRank", "Notes", "Rivalry",
     ]
     if schedule.empty or scores.empty:
         return pd.DataFrame(columns=columns)
@@ -4625,6 +4812,7 @@ def build_history_ledger(
                     "ConferenceGame": bool(game.get("Conference", False)),
                     "OpponentRank": opponent_rank,
                     "Notes": clean_text(game.get("Notes")),
+                    "Rivalry": rivalry_name(game),
                 }
             )
     return pd.DataFrame(rows, columns=columns)
@@ -4816,12 +5004,14 @@ def history_signature_wins(ledger: pd.DataFrame, schools: pd.DataFrame, title: s
         team = clean_text(game["Team"])
         info = teams.get(team, {})
         logo = clean_text(info.get("logo"))
+        rivalry = clean_text(game.get("Rivalry"))
         cards.append(
             f"""
 <div class="history-card" style="--accent:{esc(info.get("color"), "#1a2030")};">
   <div class="history-card-top"><div class="history-card-eyebrow">{int(game["Year"])} · Week {int(game["Week"])} · Beat No. {int(game["OpponentRank"])}</div>{f'<img src="{esc(logo)}" alt="{esc(team)}">' if logo else ''}</div>
   <div class="history-card-score">{esc(team)}</div>
   <div class="history-card-detail">{float(game["Points"]):.2f}-{float(game["OpponentPoints"]):.2f} over {esc(game["Opponent"])}</div>
+  {f'<div class="history-rivalry-sub">{render_rivalry_pill(rivalry)}</div>' if rivalry else ''}
 </div>
 """
         )
@@ -4909,8 +5099,10 @@ def history_record_book(ledger: pd.DataFrame, schools: pd.DataFrame, title: str 
                 if section_label == "All-Time"
                 else f'Week {int(game["Week"])}'
             )
+            rivalry = clean_text(game.get("Rivalry"))
+            period_html = f'{esc(game_period)}{f"<br>{render_rivalry_pill(rivalry)}" if rivalry else ""}'
             rows.append(
-                f"""<tr><td>{esc(label)}</td>{f'<td><div class="history-team" style="justify-content:flex-end;">{f"""<div class="history-team-name">{esc(team)}</div><img src="{esc(logo)}" alt="{esc(team)}">""" if logo else f"""<div class="history-team-name">{esc(team)}</div>"""}</div></td>' if not team_specific else ''}<td>{score_html}</td><td><div class="history-team">{f'<img src="{esc(opponent_logo)}" alt="{esc(opponent)}">' if opponent_logo else ''}<div class="history-team-name">{esc(opponent)}</div></div></td><td>{esc(game_period)}</td></tr>"""
+                f"""<tr><td>{esc(label)}</td>{f'<td><div class="history-team" style="justify-content:flex-end;">{f"""<div class="history-team-name">{esc(team)}</div><img src="{esc(logo)}" alt="{esc(team)}">""" if logo else f"""<div class="history-team-name">{esc(team)}</div>"""}</div></td>' if not team_specific else ''}<td>{score_html}</td><td><div class="history-team">{f'<img src="{esc(opponent_logo)}" alt="{esc(opponent)}">' if opponent_logo else ''}<div class="history-team-name">{esc(opponent)}</div></div></td><td>{period_html}</td></tr>"""
             )
     team_header = "" if team_specific else "<th>Team</th>"
     st.html(f'<div class="history-section-title"><span>{esc(title)}</span><div></div></div><div class="history-table-wrap"><table class="history-table"><thead><tr><th>Record</th>{team_header}<th>Score</th><th>Opponent</th><th>Week</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div>')
@@ -4963,13 +5155,21 @@ def history_champions(
                 opponent_logo = clean_text(teams.get(opponent, {}).get("logo"))
                 event = bowl_for_notes(game["Notes"], bowls)
                 event_logo = clean_text(event.get("logo"))
+                rivalry = clean_text(game.get("Rivalry"))
+                event_html = (
+                    f'<img src="{esc(event_logo)}" alt="{esc(game["Notes"])}" title="{esc(game["Notes"])}" style="width:44px;height:36px;object-fit:contain;">'
+                    if event_logo
+                    else esc(game["Notes"])
+                )
+                if rivalry:
+                    event_html = f'{event_html}<br>{render_rivalry_pill(rivalry)}'
                 winner_star = (
                     f'<span class="champion-star {star_class}" title="Winner">&#9733;</span>'
                     if game["Result"] == "W"
                     else '<span style="width:24px;flex-shrink:0;"></span>'
                 )
                 rows.append(
-                    f"""<tr><td>{f'<img src="{esc(event_logo)}" alt="{esc(game["Notes"])}" title="{esc(game["Notes"])}" style="width:44px;height:36px;object-fit:contain;">' if event_logo else esc(game["Notes"])}</td>{f'<td>{esc(game["Conference"])}</td>' if show_conference else ''}<td><div class="history-team" style="justify-content:flex-end;">{winner_star}{f'<div class="history-team-name">{esc(team)}</div><img src="{esc(team_logo)}" alt="{esc(team)}">' if team_logo else f'<div class="history-team-name">{esc(team)}</div>'}</div></td><td>{float(game["Points"]):,.2f}-{float(game["OpponentPoints"]):,.2f}</td><td><div class="history-team">{f'<img src="{esc(opponent_logo)}" alt="{esc(opponent)}">' if opponent_logo else ''}<div class="history-team-name">{esc(opponent)}</div></div></td></tr>"""
+                    f"""<tr><td>{event_html}</td>{f'<td>{esc(game["Conference"])}</td>' if show_conference else ''}<td><div class="history-team" style="justify-content:flex-end;">{winner_star}{f'<div class="history-team-name">{esc(team)}</div><img src="{esc(team_logo)}" alt="{esc(team)}">' if team_logo else f'<div class="history-team-name">{esc(team)}</div>'}</div></td><td>{float(game["Points"]):,.2f}-{float(game["OpponentPoints"]):,.2f}</td><td><div class="history-team">{f'<img src="{esc(opponent_logo)}" alt="{esc(opponent)}">' if opponent_logo else ''}<div class="history-team-name">{esc(opponent)}</div></div></td></tr>"""
                 )
         conference_header = "<th>Conference</th>" if show_conference else ""
         winner_header = "Champion" if title == "Conference Championships" else "Winner"
@@ -5022,12 +5222,19 @@ def team_history_yearbook(full_ledger: pd.DataFrame, schools: pd.DataFrame, team
             season["Notes"].str.contains("bowl", case=False, na=False)
             & ~conference_championship_mask(season)
         ]
-        bowl_text = ""
+        highlights = []
         if not bowl.empty:
-            bowl_text = "<br>".join(
+            highlights.extend(
                 f'{esc(game["Notes"])}: {game["Result"]} vs {esc(game["Opponent"])}, {game["Points"]:.2f}-{game["OpponentPoints"]:.2f}'
                 for _, game in bowl.sort_values("Week").iterrows()
             )
+        rivalries = season.loc[season["Rivalry"].map(clean_text).ne("")]
+        if not rivalries.empty:
+            highlights.extend(
+                f'{render_rivalry_pill(clean_text(game["Rivalry"]))}: {game["Result"]} vs {esc(game["Opponent"])}, {game["Points"]:.2f}-{game["OpponentPoints"]:.2f}'
+                for _, game in rivalries.sort_values("Week").iterrows()
+            )
+        bowl_text = "<br>".join(highlights)
         year_totals = full_ledger.loc[full_ledger["Year"].eq(year)].groupby("Team", as_index=False).agg(
             PF=("Points", "sum"),
             PA=("OpponentPoints", "sum"),
@@ -5044,7 +5251,7 @@ def team_history_yearbook(full_ledger: pd.DataFrame, schools: pd.DataFrame, team
         rows.append(
             f"""<tr><td>{int(year)}</td><td>{esc(historical_owner(schools, team, int(year)), "-")}</td><td>{record_html(overall_w, overall_l, overall_t, pct(overall_w, overall_l, overall_t))}</td><td>{record_html(conf_w, conf_l, conf_t, pct(conf_w, conf_l, conf_t))}</td><td>{season["Points"].sum():,.2f}{f' ({pf_rank})' if pf_rank is not None else ''}</td><td>{season["OpponentPoints"].sum():,.2f}{f' ({pa_rank})' if pa_rank is not None else ''}</td><td>{int((season["OpponentRank"].between(1,25) & season["Result"].eq("W")).sum())}</td><td style="text-align:left;">{bowl_text}</td></tr>"""
         )
-    st.html(f'<div class="history-section-title"><span>Program Yearbook</span><div></div></div><div class="history-table-wrap"><table class="history-table"><thead><tr><th>Season</th><th>Owner</th><th>Record</th><th>Conf Record</th><th>PF</th><th>PA</th><th>Top-25 Wins</th><th>Bowl Result</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div>')
+    st.html(f'<div class="history-section-title"><span>Program Yearbook</span><div></div></div><div class="history-table-wrap"><table class="history-table"><thead><tr><th>Season</th><th>Owner</th><th>Record</th><th>Conf Record</th><th>PF</th><th>PA</th><th>Top-25 Wins</th><th>Bowl/Rivalry Results</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div>')
 
 
 def team_opponent_series(ledger: pd.DataFrame, schools: pd.DataFrame, team: str) -> None:
@@ -5054,7 +5261,14 @@ def team_opponent_series(ledger: pd.DataFrame, schools: pd.DataFrame, team: str)
     for opponent, series in games.groupby("Opponent"):
         last = series.sort_values(["Year", "Week"]).iloc[-1]
         logo = clean_text(lookup.get(opponent, {}).get("logo"))
-        rows.append((len(series), f"""<tr><td><div class="history-team">{f'<img src="{esc(logo)}" alt="{esc(opponent)}">' if logo else ''}<div class="history-team-name">{esc(opponent)}</div></div></td><td>{len(series)}</td><td>{record_text(int(series["Result"].eq("W").sum()), int(series["Result"].eq("L").sum()), int(series["Result"].eq("T").sum()))}</td><td>{series["Points"].sum():,.2f}</td><td>{series["OpponentPoints"].sum():,.2f}</td><td>{int(last["Year"])}, W{int(last["Week"])} · {last["Result"]} {last["Points"]:.2f}-{last["OpponentPoints"]:.2f}</td></tr>"""))
+        last_matchup = (
+            f'{int(last["Year"])}, W{int(last["Week"])} · '
+            f'{last["Result"]} {last["Points"]:.2f}-{last["OpponentPoints"]:.2f}'
+        )
+        rivalry = clean_text(last.get("Rivalry"))
+        if rivalry:
+            last_matchup = f'{last_matchup}<br>{render_rivalry_pill(rivalry)}'
+        rows.append((len(series), f"""<tr><td><div class="history-team">{f'<img src="{esc(logo)}" alt="{esc(opponent)}">' if logo else ''}<div class="history-team-name">{esc(opponent)}</div></div></td><td>{len(series)}</td><td>{record_text(int(series["Result"].eq("W").sum()), int(series["Result"].eq("L").sum()), int(series["Result"].eq("T").sum()))}</td><td>{series["Points"].sum():,.2f}</td><td>{series["OpponentPoints"].sum():,.2f}</td><td>{last_matchup}</td></tr>"""))
     rows = [html for _, html in sorted(rows, key=lambda item: -item[0])]
     st.html(f'<div class="history-section-title"><span>Opponent Series</span><div></div></div><div class="history-table-wrap"><table class="history-table"><thead><tr><th>Opponent</th><th>Games</th><th>Record</th><th>PF</th><th>PA</th><th>Last Matchup</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div>')
 
@@ -5123,6 +5337,9 @@ def team_opponent_series_with_next_game(
                 else ""
             )
             next_game = f'{year_label}W{int(next_row["Week"])}'
+            next_rivalry = rivalry_name(next_row)
+            if next_rivalry:
+                next_game = f'{next_game}<br>{render_rivalry_pill(next_rivalry)}'
 
         if series.empty:
             games_played = wins = losses = ties = 0
@@ -5140,11 +5357,14 @@ def team_opponent_series_with_next_game(
                 f'{int(last["Year"])}, W{int(last["Week"])} - '
                 f'{last["Result"]} {last["Points"]:.2f}-{last["OpponentPoints"]:.2f}'
             )
+            last_rivalry = clean_text(last.get("Rivalry"))
+            if last_rivalry:
+                last_matchup = f'{last_matchup}<br>{render_rivalry_pill(last_rivalry)}'
         rows.append(
             (
                 games_played,
                 next_game == "-",
-                f"""<tr><td><div class="history-team">{f'<img src="{esc(logo)}" alt="{esc(opponent)}">' if logo else ''}<div class="history-team-name">{esc(opponent)}</div></div></td><td>{games_played}</td><td>{record_text(wins, losses, ties)}</td><td>{points_for:,.2f}</td><td>{points_against:,.2f}</td><td>{esc(last_matchup)}</td><td>{esc(next_game)}</td></tr>""",
+                f"""<tr><td><div class="history-team">{f'<img src="{esc(logo)}" alt="{esc(opponent)}">' if logo else ''}<div class="history-team-name">{esc(opponent)}</div></div></td><td>{games_played}</td><td>{record_text(wins, losses, ties)}</td><td>{points_for:,.2f}</td><td>{points_against:,.2f}</td><td>{last_matchup}</td><td>{next_game}</td></tr>""",
             )
         )
     rows = [html for _, _, html in sorted(rows, key=lambda item: (-item[0], item[1], item[2]))]
@@ -6205,17 +6425,18 @@ def last_game_html(
     team_a = clean_text(game.get("TeamA"))
     team_b = clean_text(game.get("TeamB"))
     opponent = team_b if team_a == team else team_a
+    rivalry = rivalry_name(game)
     scores_by_team_week = score_lookup(scores)
     team_score = scores_by_team_week.get((match_key(team), week))
     opponent_score = scores_by_team_week.get((match_key(opponent), week))
     if team_score is None or opponent_score is None:
-        return f'<span class="last-game">vs {esc(opponent)}<span>Pending</span></span>'
+        return f'<span class="last-game">vs {esc(opponent)}<span>{esc(rivalry) if rivalry else "Pending"}</span></span>'
 
     result = "Win" if team_score > opponent_score else "Loss" if team_score < opponent_score else "Tie"
     return f"""
 <span class="last-game">
   {result} vs {esc(opponent)}
-  <span>{team_score:,.2f}-{opponent_score:,.2f}</span>
+  <span>{team_score:,.2f}-{opponent_score:,.2f}{f' | {esc(rivalry)}' if rivalry else ''}</span>
 </span>
 """
 

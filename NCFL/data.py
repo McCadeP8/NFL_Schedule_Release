@@ -70,6 +70,8 @@ COLUMN_ALIASES = {
     "team b": "TeamB",
     "teamb": "TeamB",
     "team_b": "TeamB",
+    "rivalry": "Rivalry",
+    "rivarly": "Rivalry",
 }
 
 SHEET_ID = "1qjPpIEGmhV8aF3CZ8hi-ijQlIP-_z6QYJzSArjJV9d8"
@@ -238,7 +240,7 @@ def _read_google_sheet(sheet_id: str, gid: Any) -> pd.DataFrame:
 
 def _empty_schedule() -> pd.DataFrame:
     return pd.DataFrame(
-        columns=["Year", "Week", "TeamA", "TeamB", "Conference", "Notes"]
+        columns=["Year", "Week", "TeamA", "TeamB", "Conference", "Notes", "Rivalry"]
     )
 
 
@@ -411,7 +413,7 @@ def get_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, 
         player_pictures = _safe_read_google_sheet(
             SCHOOLS_SHEET_ID, 1477564005, _empty_player_pictures()
         )
-    schedule = _ensure_columns(schedule, ["Year", "Week", "TeamA", "TeamB", "Conference", "Notes"])
+    schedule = _ensure_columns(schedule, ["Year", "Week", "TeamA", "TeamB", "Conference", "Notes", "Rivalry"])
     scores = _ensure_columns(scores, ["Year", "Team", "Week", "Points"])
     rankings = _ensure_columns(rankings, ["Year", "Week", "Type", "Rank", "Team"])
     drafts = _ensure_columns(drafts, ["Year", "Conference", "Type", "Round", "Pick", "Team", "Player"])
