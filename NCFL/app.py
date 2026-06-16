@@ -3131,7 +3131,7 @@ def latest_completed_week_index(
 
 
 def score_class(points: Optional[float], opponent_points: Optional[float]) -> str:
-    if points is None or opponent_points is None:
+    if not is_completed_score(points, opponent_points):
         return "pending"
     if points > opponent_points:
         return "win"
