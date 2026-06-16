@@ -2747,8 +2747,30 @@ div[data-testid="stButton"] button {
 .history-table .rivalry-pill {
   margin-top: 4px;
 }
+.history-table tr.rivalry-series-row td {
+  background: linear-gradient(90deg, rgba(238,242,255,0.96), #ffffff 48%);
+  border-top: 1px solid #c7d2fe;
+  border-bottom: 1px solid #c7d2fe;
+}
+.history-table tr.rivalry-series-row td:first-child {
+  border-left: 5px solid #4f46e5;
+}
 .history-rivalry-sub {
   margin-top: 4px;
+}
+.history-grid-rivalry {
+  display: inline-block;
+  margin-top: 4px;
+  border-radius: 999px;
+  padding: 2px 7px 3px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  color: #312e81;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
 }
 .champion-star {
   display: inline-flex;
@@ -5099,10 +5121,8 @@ def history_record_book(ledger: pd.DataFrame, schools: pd.DataFrame, title: str 
                 if section_label == "All-Time"
                 else f'Week {int(game["Week"])}'
             )
-            rivalry = clean_text(game.get("Rivalry"))
-            period_html = f'{esc(game_period)}{f"<br>{render_rivalry_pill(rivalry)}" if rivalry else ""}'
             rows.append(
-                f"""<tr><td>{esc(label)}</td>{f'<td><div class="history-team" style="justify-content:flex-end;">{f"""<div class="history-team-name">{esc(team)}</div><img src="{esc(logo)}" alt="{esc(team)}">""" if logo else f"""<div class="history-team-name">{esc(team)}</div>"""}</div></td>' if not team_specific else ''}<td>{score_html}</td><td><div class="history-team">{f'<img src="{esc(opponent_logo)}" alt="{esc(opponent)}">' if opponent_logo else ''}<div class="history-team-name">{esc(opponent)}</div></div></td><td>{period_html}</td></tr>"""
+                f"""<tr><td>{esc(label)}</td>{f'<td><div class="history-team" style="justify-content:flex-end;">{f"""<div class="history-team-name">{esc(team)}</div><img src="{esc(logo)}" alt="{esc(team)}">""" if logo else f"""<div class="history-team-name">{esc(team)}</div>"""}</div></td>' if not team_specific else ''}<td>{score_html}</td><td><div class="history-team">{f'<img src="{esc(opponent_logo)}" alt="{esc(opponent)}">' if opponent_logo else ''}<div class="history-team-name">{esc(opponent)}</div></div></td><td>{esc(game_period)}</td></tr>"""
             )
     team_header = "" if team_specific else "<th>Team</th>"
     st.html(f'<div class="history-section-title"><span>{esc(title)}</span><div></div></div><div class="history-table-wrap"><table class="history-table"><thead><tr><th>Record</th>{team_header}<th>Score</th><th>Opponent</th><th>Week</th></tr></thead><tbody>{"".join(rows)}</tbody></table></div>')
@@ -5204,7 +5224,12 @@ def conference_history_matrix(ledger: pd.DataFrame, schools: pd.DataFrame, confe
             losses = int(series["Result"].eq("L").sum())
             points = series["Points"].sum()
             opponent_points = series["OpponentPoints"].sum()
-            cells.append(f'<td style="text-align:center;"><strong style="font-size:16px;">{wins}-{losses}</strong><br><span style="font-size:13px;color:#64748b;">{points:,.1f}-{opponent_points:,.1f}</span></td>')
+            rivalry = ""
+            if not series.empty and "Rivalry" in series.columns:
+                rivalries = series["Rivalry"].map(clean_text)
+                rivalry = next((name for name in rivalries if name), "")
+            rivalry_html = f'<br><span class="history-grid-rivalry">{esc(rivalry)}</span>' if rivalry else ""
+            cells.append(f'<td style="text-align:center;"><strong style="font-size:16px;">{wins}-{losses}</strong><br><span style="font-size:13px;color:#64748b;">{points:,.1f}-{opponent_points:,.1f}</span>{rivalry_html}</td>')
         team_logo = clean_text(lookup.get(team, {}).get("logo"))
         rows.append(f'<tr><th style="text-align:center;">{f"""<img src="{esc(team_logo)}" alt="{esc(team)}" title="{esc(team)}" style="width:38px;height:38px;object-fit:contain;">""" if team_logo else esc(team)}</th>{"".join(cells)}</tr>')
     st.html(f'<div class="history-section-title"><span>All-Time Conference Matchups</span><div></div></div><div style="font-family:Rajdhani,sans-serif;font-size:14px;font-weight:800;color:#64748b;margin:-4px 0 9px;">Each cell is the row team’s record and points scored against the column opponent.</div><div class="history-table-wrap"><table class="history-table"><thead><tr><th>Row Team</th>{headers}</tr></thead><tbody>{"".join(rows)}</tbody></table></div>')
@@ -5329,6 +5354,7 @@ def team_opponent_series_with_next_game(
             | (upcoming["TeamB"].eq(team) & upcoming["TeamA"].eq(opponent))
         ].sort_values(["Year", "Week"] if "Year" in upcoming.columns else ["Week"])
         next_game = "-"
+        series_rivalry = ""
         if not next_games.empty:
             next_row = next_games.iloc[0]
             year_label = (
@@ -5339,7 +5365,7 @@ def team_opponent_series_with_next_game(
             next_game = f'{year_label}W{int(next_row["Week"])}'
             next_rivalry = rivalry_name(next_row)
             if next_rivalry:
-                next_game = f'{next_game}<br>{render_rivalry_pill(next_rivalry)}'
+                series_rivalry = next_rivalry
 
         if series.empty:
             games_played = wins = losses = ties = 0
@@ -5359,12 +5385,13 @@ def team_opponent_series_with_next_game(
             )
             last_rivalry = clean_text(last.get("Rivalry"))
             if last_rivalry:
-                last_matchup = f'{last_matchup}<br>{render_rivalry_pill(last_rivalry)}'
+                series_rivalry = series_rivalry or last_rivalry
+        opponent_html = f"""<div class="history-team">{f'<img src="{esc(logo)}" alt="{esc(opponent)}">' if logo else ''}<div><div class="history-team-name">{esc(opponent)}</div>{render_rivalry_pill(series_rivalry) if series_rivalry else ''}</div></div>"""
         rows.append(
             (
                 games_played,
                 next_game == "-",
-                f"""<tr><td><div class="history-team">{f'<img src="{esc(logo)}" alt="{esc(opponent)}">' if logo else ''}<div class="history-team-name">{esc(opponent)}</div></div></td><td>{games_played}</td><td>{record_text(wins, losses, ties)}</td><td>{points_for:,.2f}</td><td>{points_against:,.2f}</td><td>{last_matchup}</td><td>{next_game}</td></tr>""",
+                f"""<tr class="{'rivalry-series-row' if series_rivalry else ''}"><td>{opponent_html}</td><td>{games_played}</td><td>{record_text(wins, losses, ties)}</td><td>{points_for:,.2f}</td><td>{points_against:,.2f}</td><td>{last_matchup}</td><td>{next_game}</td></tr>""",
             )
         )
     rows = [html for _, _, html in sorted(rows, key=lambda item: (-item[0], item[1], item[2]))]
