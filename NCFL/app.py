@@ -5526,9 +5526,10 @@ def render_team_history(
     conference_titles = int(
         (conference_championship_mask(games) & games["Result"].eq("W")).sum()
     )
-    national_titles = int(
-        (national_championship_mask(games) & games["Result"].eq("W")).sum()
-    )
+    national_titles = games.loc[
+        national_championship_mask(games) & games["Result"].eq("W"),
+        "Year",
+    ].nunique()
     history_metrics(
         [
             (record_text(wins, losses, ties), "All-Time Record"),
