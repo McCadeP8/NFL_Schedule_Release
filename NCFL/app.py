@@ -547,7 +547,7 @@ label[data-testid="stWidgetLabel"] * {
   min-width: 0;
   width: 58px;
   max-width: 58px;
-  text-align: right;
+  text-align: center;
   font-family: 'Rajdhani', sans-serif;
   font-size: 14px;
   font-weight: 900;
@@ -7298,16 +7298,17 @@ def render_league_roster_matrix(
                 row[f"{display_conference}_team"] = first_value(match, "team_name", "")
             rows.append(row)
 
-        matrix = pd.DataFrame(rows).sort_values(
-            ["taken_count", "player_name"],
-            ascending=[False, True],
+        matrix = pd.DataFrame(rows)
+        matrix["_sflx_sort"] = pd.to_numeric(
+            matrix["SFLX"].astype(str).str.replace(",", "", regex=False),
+            errors="coerce",
+        ).fillna(-1)
+        matrix = matrix.sort_values(
+            ["taken_count", "_sflx_sort", "player_name"],
+            ascending=[False, False, True],
         )
 
-        headers = [
-            '<th class="player-col">Player</th>',
-            '<th class="value-col">FLX</th>',
-            '<th class="value-col">SFLX</th>',
-        ]
+        headers = ['<th class="player-col">Player</th>']
         for conference in conference_order:
             logo = conference_logos.get(conference, "")
             header_content = (
@@ -7322,7 +7323,13 @@ def render_league_roster_matrix(
 </th>
 """
             )
-        headers.append('<th class="taken-col">#</th>')
+        headers.extend(
+            [
+                '<th class="value-col">FLX</th>',
+                '<th class="value-col">SFLX</th>',
+                '<th class="taken-col">Count</th>',
+            ]
+        )
 
         body_rows = []
         for _, row in matrix.iterrows():
@@ -7334,8 +7341,6 @@ def render_league_roster_matrix(
     <span>{esc(row["player_name"])}</span>
   </div>
 </td>
-<td class="value-col">{esc(row["FLX"])}</td>
-<td class="value-col">{esc(row["SFLX"])}</td>
 """
             ]
             for conference in conference_order:
@@ -7348,6 +7353,8 @@ def render_league_roster_matrix(
                 else:
                     cells.append('<td class="team-logo-cell"></td>')
             taken_count = int(row["taken_count"])
+            cells.append(f'<td class="value-col">{esc(row["FLX"])}</td>')
+            cells.append(f'<td class="value-col">{esc(row["SFLX"])}</td>')
             cells.append(
                 f'<td class="taken-col"><span class="taken-pill" style="background:{taken_color(taken_count, len(conference_order))};">{taken_count}</span></td>'
             )
