@@ -1,10 +1,13 @@
 # Build a 30-team gt table from the Qualtrics rule-changes CSV.
 #
-# Run with the default CSV location:
-#   Rscript 2026_rule_changes_gt_table.R
+# Daily workflow:
+#   1. Export the latest Qualtrics responses as CSV.
+#   2. Rename it to 2026_rule_changes.csv and save it beside this script.
+#   3. Run:
+#      Rscript SBCRC.r
 #
-# Or supply a CSV path and optional HTML output path:
-#   Rscript 2026_rule_changes_gt_table.R "path/to/responses.csv" "path/to/table.html"
+# Or supply an input path and optional HTML output path:
+#   Rscript SBCRC.r "path/to/responses.csv" "path/to/table.html"
 
 required_packages <- c("dplyr", "gt", "tibble", "tidyr")
 missing_packages <- required_packages[
@@ -34,91 +37,21 @@ script_dir <- if (length(script_arg) == 1) {
   getwd()
 }
 
-rule_change_file_pattern <- "^2026[[:space:]_+.-]*Rule[[:space:]_+.-]*Changes?.*\\.(csv|xlsx|xls|zip)$"
-
-find_latest_rule_change_file <- function(search_dirs) {
-  search_dirs <- unique(normalizePath(search_dirs, winslash = "/", mustWork = FALSE))
-  search_dirs <- search_dirs[dir.exists(search_dirs)]
-
-  for (search_dir in search_dirs) {
-    matching_files <- list.files(
-      search_dir,
-      pattern = rule_change_file_pattern,
-      full.names = TRUE,
-      ignore.case = TRUE
-    )
-
-    if (length(matching_files) > 0) {
-      file_info <- file.info(matching_files)
-      return(matching_files[[which.max(file_info$mtime)]])
-    }
-  }
-
-  character()
-}
-
-resolve_rule_change_input <- function(input_path) {
-  input_extension <- tolower(tools::file_ext(input_path))
-
-  if (input_extension != "zip") {
-    return(input_path)
-  }
-
-  zip_contents <- utils::unzip(input_path, list = TRUE)
-  data_files <- zip_contents$Name[
-    grepl("\\.(csv|xlsx|xls)$", zip_contents$Name, ignore.case = TRUE)
-  ]
-
-  if (length(data_files) == 0) {
-    stop(
-      "The selected 2026 Rule Changes zip does not contain a CSV or Excel file: ",
-      input_path,
-      call. = FALSE
-    )
-  }
-
-  preferred_file <- data_files[
-    grepl(rule_change_file_pattern, basename(data_files), ignore.case = TRUE)
-  ]
-  zip_member <- if (length(preferred_file) > 0) preferred_file[[1]] else data_files[[1]]
-  extract_dir <- file.path(tempdir(), paste0("sbcrc_", as.integer(Sys.time())))
-  dir.create(extract_dir, recursive = TRUE, showWarnings = FALSE)
-
-  extracted_path <- utils::unzip(
-    input_path,
-    files = zip_member,
-    exdir = extract_dir,
-    junkpaths = TRUE,
-    overwrite = TRUE
-  )
-
-  message("Loaded rule-change data from zip member: ", zip_member)
-  extracted_path[[1]]
-}
-
 input_path <- if (length(args) >= 1) {
   args[[1]]
 } else {
-  script_owner_home <- sub("^([A-Za-z]:/Users/[^/]+).*$", "\\1", normalizePath(script_dir, winslash = "/", mustWork = FALSE))
-  search_dirs <- c(
-    file.path(script_owner_home, "Downloads"),
-    file.path(Sys.getenv("USERPROFILE"), "Downloads"),
-    file.path(Sys.getenv("HOME"), "Downloads"),
-    script_dir
-  )
-  latest_rule_change_file <- find_latest_rule_change_file(search_dirs)
-
-  if (length(latest_rule_change_file) == 0) {
-    stop(
-      "No 2026 Rule Changes CSV, Excel, or zip file was found in Downloads or beside this script.",
-      call. = FALSE
-    )
-  }
-
-  latest_rule_change_file
+  file.path(script_dir, "2026_rule_changes.csv")
 }
 
-input_path <- resolve_rule_change_input(input_path)
+if (!file.exists(input_path)) {
+  stop(
+    "Input file not found: ",
+    normalizePath(input_path, winslash = "/", mustWork = FALSE),
+    "\nRename the latest Qualtrics CSV to 2026_rule_changes.csv and save it beside SBCRC.r, or pass a CSV path as the first argument.",
+    call. = FALSE
+  )
+}
+
 message("Using rule-change input: ", normalizePath(input_path, winslash = "/", mustWork = FALSE))
 
 output_path <- if (length(args) >= 2) {
@@ -196,26 +129,60 @@ team_lookup$Logo <- c(
 
 question_columns <- paste0("Q", 7:12)
 
-input_extension <- tolower(tools::file_ext(input_path))
+if (tolower(tools::file_ext(input_path)) != "csv") {
+  stop("Input must be a CSV file.", call. = FALSE)
+}
 
-if (input_extension == "csv") {
-  if (!requireNamespace("readr", quietly = TRUE)) {
-    stop("Install the readr package to load CSV files.", call. = FALSE)
+if (!requireNamespace("readr", quietly = TRUE)) {
+  stop("Install the readr package to load CSV files.", call. = FALSE)
+}
+
+raw_responses <- readr::read_csv(
+  input_path,
+  show_col_types = FALSE,
+  na = c("", "NA")
+)
+
+parse_recorded_date <- function(recorded_date) {
+  if (inherits(recorded_date, "POSIXt")) {
+    return(as.POSIXct(recorded_date, tz = "America/Denver"))
   }
 
-  raw_responses <- readr::read_csv(
-    input_path,
-    show_col_types = FALSE,
-    na = c("", "NA")
+  if (inherits(recorded_date, "Date")) {
+    return(as.POSIXct(recorded_date, tz = "America/Denver"))
+  }
+
+  recorded_date <- trimws(as.character(recorded_date))
+  parsed_date <- as.POSIXct(
+    rep(NA_real_, length(recorded_date)),
+    origin = "1970-01-01",
+    tz = "America/Denver"
   )
-} else if (input_extension %in% c("xlsx", "xls")) {
-  if (!requireNamespace("readxl", quietly = TRUE)) {
-    stop("Install the readxl package to load Excel files.", call. = FALSE)
+
+  date_formats <- c(
+    "%Y-%m-%d %H:%M:%S",
+    "%Y-%m-%d %H:%M",
+    "%m/%d/%Y %H:%M:%S",
+    "%m/%d/%Y %H:%M",
+    "%m/%d/%y %H:%M:%S",
+    "%m/%d/%y %H:%M"
+  )
+
+  for (date_format in date_formats) {
+    still_missing <- is.na(parsed_date) & nzchar(recorded_date)
+
+    if (!any(still_missing)) {
+      break
+    }
+
+    parsed_date[still_missing] <- as.POSIXct(
+      recorded_date[still_missing],
+      format = date_format,
+      tz = "America/Denver"
+    )
   }
 
-  raw_responses <- readxl::read_excel(input_path, na = c("", "NA"))
-} else {
-  stop("Input must be a CSV, XLSX, or XLS file.", call. = FALSE)
+  parsed_date
 }
 
 required_columns <- c("RecordedDate", "Q1", question_columns)
@@ -251,11 +218,8 @@ question_labels <- stats::setNames(
 responses <- raw_responses |>
   dplyr::mutate(
     .source_row = dplyr::row_number(),
-    RecordedDate = as.POSIXct(
-      RecordedDate,
-      format = "%Y-%m-%d %H:%M:%S",
-      tz = "America/Denver"
-    )
+    RecordedDate = parse_recorded_date(RecordedDate),
+    Q1 = trimws(as.character(Q1))
   ) |>
   dplyr::filter(!is.na(RecordedDate), !is.na(Q1))
 
@@ -278,6 +242,14 @@ latest_responses <- responses |>
   dplyr::inner_join(team_lookup, by = "Q1") |>
   dplyr::arrange(dplyr::desc(RecordedDate), dplyr::desc(.source_row)) |>
   dplyr::distinct(Team, .keep_all = TRUE)
+
+missing_response_teams <- team_lookup |>
+  dplyr::anti_join(latest_responses, by = "Team") |>
+  dplyr::pull(Team)
+
+st_louis_response <- latest_responses |>
+  dplyr::filter(Team == "St. Louis 66ers") |>
+  dplyr::select(RecordedDate, dplyr::all_of(question_columns))
 
 # Adjust these labels here if the survey's numeric coding is different.
 answer_labels <- c("1" = "Yes", "2" = "No")
@@ -403,6 +375,17 @@ gt::gtsave(rule_changes_gt, filename = output_path)
 
 message("Saved gt table to: ", normalizePath(output_path, winslash = "/", mustWork = FALSE))
 message("Teams with a matched response: ", nrow(latest_responses), " of 30")
+if (nrow(st_louis_response) == 1) {
+  message(
+    "St. Louis matched response date: ",
+    format(st_louis_response$RecordedDate[[1]], "%Y-%m-%d %H:%M:%S %Z")
+  )
+} else {
+  message("St. Louis matched response date: not found")
+}
+if (length(missing_response_teams) > 0) {
+  message("Teams still missing a matched response: ", paste(missing_response_teams, collapse = ", "))
+}
 
 if (interactive()) {
   print(rule_changes_gt)

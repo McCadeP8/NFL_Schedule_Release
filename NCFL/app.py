@@ -543,6 +543,16 @@ label[data-testid="stWidgetLabel"] * {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.league-matrix .value-col {
+  min-width: 0;
+  width: 58px;
+  max-width: 58px;
+  text-align: right;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 14px;
+  font-weight: 900;
+  color: #334155;
+}
 .league-player {
   display: flex;
   align-items: center;
@@ -7230,6 +7240,21 @@ def render_league_roster_matrix(
     conferences: pd.DataFrame,
     preview_missing_conferences: bool = False,
 ) -> None:
+    player_values, _ = load_dynasty_asset_values()
+    player_values = player_values.copy()
+    player_values["_player_key"] = player_values["player"].map(dynasty_player_key)
+    player_values = player_values.drop_duplicates("_player_key", keep="first")
+    value_lookup = player_values.set_index("_player_key")
+
+    def player_value(player_name: str, column: str) -> str:
+        key = dynasty_player_key(player_name)
+        if not key or key not in value_lookup.index:
+            return "-"
+        value = pd.to_numeric(value_lookup.at[key, column], errors="coerce")
+        if pd.isna(value):
+            return "-"
+        return f"{float(value):,.0f}"
+
     active_conferences = set(rosters["league_name"])
     if preview_missing_conferences:
         conference_order = [
@@ -7264,6 +7289,8 @@ def render_league_roster_matrix(
                 "player_id": player_id,
                 "player_name": player_name,
                 "taken_count": player_rows["league_name"].nunique(),
+                "FLX": player_value(player_name, "value_1qb"),
+                "SFLX": player_value(player_name, "value_2qb"),
             }
             for display_conference, source_conference in conference_sources.items():
                 match = player_rows.loc[player_rows["league_name"].eq(source_conference)]
@@ -7276,7 +7303,11 @@ def render_league_roster_matrix(
             ascending=[False, True],
         )
 
-        headers = ['<th class="player-col">Player</th>']
+        headers = [
+            '<th class="player-col">Player</th>',
+            '<th class="value-col">FLX</th>',
+            '<th class="value-col">SFLX</th>',
+        ]
         for conference in conference_order:
             logo = conference_logos.get(conference, "")
             header_content = (
@@ -7303,6 +7334,8 @@ def render_league_roster_matrix(
     <span>{esc(row["player_name"])}</span>
   </div>
 </td>
+<td class="value-col">{esc(row["FLX"])}</td>
+<td class="value-col">{esc(row["SFLX"])}</td>
 """
             ]
             for conference in conference_order:
