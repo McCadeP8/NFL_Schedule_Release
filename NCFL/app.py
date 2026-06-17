@@ -3364,6 +3364,36 @@ def latest_completed_week_index(
     return weeks.index(default_week)
 
 
+def next_unplayed_schedule_week_index(
+    weeks: list[int],
+    schedule: pd.DataFrame,
+    scores: pd.DataFrame,
+) -> int:
+    if not weeks:
+        return 0
+    if schedule.empty or not {"Week", "TeamA", "TeamB"}.issubset(schedule.columns):
+        return 0
+
+    schedule_copy = schedule.copy()
+    schedule_copy["Week"] = pd.to_numeric(schedule_copy["Week"], errors="coerce")
+    scores_by_team_week = score_lookup(scores)
+
+    for week in sorted(weeks):
+        week_games = schedule_copy.loc[schedule_copy["Week"].eq(week)]
+        if week_games.empty:
+            continue
+
+        for _, game in week_games.iterrows():
+            team_a = clean_text(game.get("TeamA"))
+            team_b = clean_text(game.get("TeamB"))
+            score_a = scores_by_team_week.get((match_key(team_a), int(week)))
+            score_b = scores_by_team_week.get((match_key(team_b), int(week)))
+            if not is_completed_score(score_a, score_b):
+                return weeks.index(week)
+
+    return len(weeks) - 1
+
+
 def score_class(points: Optional[float], opponent_points: Optional[float]) -> str:
     if not is_completed_score(points, opponent_points):
         return "pending"
@@ -5175,14 +5205,11 @@ def history_champions(
                 opponent_logo = clean_text(teams.get(opponent, {}).get("logo"))
                 event = bowl_for_notes(game["Notes"], bowls)
                 event_logo = clean_text(event.get("logo"))
-                rivalry = clean_text(game.get("Rivalry"))
                 event_html = (
                     f'<img src="{esc(event_logo)}" alt="{esc(game["Notes"])}" title="{esc(game["Notes"])}" style="width:44px;height:36px;object-fit:contain;">'
                     if event_logo
                     else esc(game["Notes"])
                 )
-                if rivalry:
-                    event_html = f'{event_html}<br>{render_rivalry_pill(rivalry)}'
                 winner_star = (
                     f'<span class="champion-star {star_class}" title="Winner">&#9733;</span>'
                     if game["Result"] == "W"
@@ -7757,8 +7784,8 @@ with league_tab:
             selected_week = st.selectbox(
                 "Week",
                 weeks,
-                index=latest_completed_week_index(weeks, scores),
-                key="league_schedule_week",
+                index=next_unplayed_schedule_week_index(weeks, schedule, scores),
+                key="league_schedule_week_v2",
                 format_func=week_label,
             )
             week_games = schedule.loc[schedule["Week"].eq(selected_week)].copy()
@@ -7876,8 +7903,8 @@ with conference_tab:
             selected_week = st.selectbox(
                 "Week",
                 weeks,
-                index=latest_completed_week_index(weeks, scores),
-                key=f"conference_schedule_week_{selected_conference}",
+                index=next_unplayed_schedule_week_index(weeks, conference_schedule, scores),
+                key=f"conference_schedule_week_v2_{selected_conference}",
                 format_func=week_label,
             )
             week_games = conference_schedule.loc[
