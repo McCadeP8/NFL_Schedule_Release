@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 from typing import Any, Iterable
@@ -65,6 +66,25 @@ CONFERENCE_ALIASES = {
     "6IX": "G6",
     "The 12": "F12",
 }
+CONFERENCE_EXPORT_ALIASES = {
+    "G6": "6IX",
+    "F12": "The 12",
+}
+STARTER_COLUMNS = [
+    "Team",
+    "SleeperTeamName",
+    "RosterID",
+    "LeagueID",
+    "Position",
+    "Player",
+    "PlayerID",
+    "RosterSpot",
+    "Week",
+    "Year",
+    "Conference",
+    "Points",
+    "TeamPoints",
+]
 
 
 def _get_json(endpoint: str) -> Any:
@@ -75,6 +95,14 @@ def _get_json(endpoint: str) -> Any:
 
 def _clean_conference(conference: str) -> str:
     return CONFERENCE_ALIASES.get(conference, conference)
+
+
+def _export_conference(conference: str) -> str:
+    return CONFERENCE_EXPORT_ALIASES.get(conference, conference)
+
+
+def _requested_values(values: Iterable[Any] | None) -> set[str]:
+    return {str(value).strip().casefold() for value in values or [] if str(value).strip()}
 
 
 def _team_lookup(schools: pd.DataFrame, conference: str) -> dict[int, str]:
@@ -237,15 +265,30 @@ def _weekly_roster_rows_for_league(
 def get_weekly_starters(
     league_ids_by_year: dict[int, dict[str, str]] | None = None,
     weeks: Iterable[int] = range(1, 19),
+    years: Iterable[int] | None = None,
+    conferences: Iterable[str] | None = None,
 ) -> pd.DataFrame:
     """Load every weekly Sleeper matchup player, marking starters and bench."""
     league_ids_by_year = league_ids_by_year or LEAGUE_IDS_BY_YEAR
+    requested_years = {int(year) for year in years or []}
+    requested_conferences = _requested_values(
+        _export_conference(conference) for conference in conferences or []
+    )
+    weeks = [int(week) for week in weeks]
     players = get_players()
     schools, *_ = load_branding_data()
     rows = []
 
     for year, leagues in league_ids_by_year.items():
+        if requested_years and year not in requested_years:
+            continue
         for conference, league_id in leagues.items():
+            if requested_conferences and conference.casefold() not in requested_conferences:
+                continue
+            print(
+                f"Fetching {year} {conference} from Sleeper league {league_id} "
+                f"for weeks {min(weeks)}-{max(weeks)}..."
+            )
             rows.extend(
                 _weekly_roster_rows_for_league(
                     league_id=str(league_id),
@@ -257,22 +300,7 @@ def get_weekly_starters(
                 )
             )
 
-    columns = [
-        "Team",
-        "SleeperTeamName",
-        "RosterID",
-        "LeagueID",
-        "Position",
-        "Player",
-        "PlayerID",
-        "RosterSpot",
-        "Week",
-        "Year",
-        "Conference",
-        "Points",
-        "TeamPoints",
-    ]
-    return pd.DataFrame(rows, columns=columns).sort_values(
+    return pd.DataFrame(rows, columns=STARTER_COLUMNS).sort_values(
         ["Year", "Conference", "Week", "Team", "Position", "Player"],
         na_position="last",
     ).reset_index(drop=True)
@@ -596,10 +624,70 @@ def _write_export(frame: pd.DataFrame, filename: str, description: str) -> None:
     print(f"Wrote {len(frame):,} {description} to {output_path}")
 
 
-def run_export(export: str = "images") -> None:
+def _merge_weekly_starters(
+    new_rows: pd.DataFrame,
+    years: Iterable[int] | None = None,
+    conferences: Iterable[str] | None = None,
+    weeks: Iterable[int] | None = None,
+) -> pd.DataFrame:
+    output_path = EXPORT_DIRECTORY / "weekly_starters.csv"
+    if not output_path.exists():
+        return new_rows
+
+    existing = pd.read_csv(output_path)
+    for column in STARTER_COLUMNS:
+        if column not in existing.columns:
+            existing[column] = pd.NA
+        if column not in new_rows.columns:
+            new_rows[column] = pd.NA
+    existing = existing[STARTER_COLUMNS].copy()
+    new_rows = new_rows[STARTER_COLUMNS].copy()
+
+    if new_rows.empty:
+        return existing
+
+    replace_years = {int(year) for year in years or new_rows["Year"].dropna().astype(int).unique()}
+    replace_conferences = {
+        _export_conference(str(conference)).casefold()
+        for conference in (conferences or new_rows["Conference"].dropna().astype(str).unique())
+    }
+    replace_weeks = {int(week) for week in weeks or new_rows["Week"].dropna().astype(int).unique()}
+
+    existing["Year"] = pd.to_numeric(existing["Year"], errors="coerce")
+    existing["Week"] = pd.to_numeric(existing["Week"], errors="coerce")
+    keep_mask = ~(
+        existing["Year"].isin(replace_years)
+        & existing["Conference"].astype(str).str.casefold().isin(replace_conferences)
+        & existing["Week"].isin(replace_weeks)
+    )
+    merged = pd.concat([existing.loc[keep_mask], new_rows], ignore_index=True)
+    return merged.sort_values(
+        ["Year", "Conference", "Week", "Team", "Position", "Player"],
+        na_position="last",
+    ).reset_index(drop=True)
+
+
+def run_export(
+    export: str = "images",
+    years: Iterable[int] | None = None,
+    conferences: Iterable[str] | None = None,
+    weeks: Iterable[int] | None = None,
+    merge: bool = False,
+) -> None:
     """Write an NCFL export CSV beside data.py; defaults to player images."""
     if export == "starters":
-        starters = get_weekly_starters()
+        starters = get_weekly_starters(
+            years=years,
+            conferences=conferences,
+            weeks=weeks or range(1, 19),
+        )
+        if merge:
+            starters = _merge_weekly_starters(
+                starters,
+                years=years,
+                conferences=conferences,
+                weeks=weeks,
+            )
         print(starters.head())
         _write_export(starters, "weekly_starters.csv", "rows")
     elif export == "drafts":
@@ -619,12 +707,45 @@ def run_export(export: str = "images") -> None:
 
 
 if __name__ == "__main__":
-    requested_export = next(
-        (
-            argument
-            for argument in sys.argv[1:]
-            if argument in {"drafts", "starters", "players", "images"}
-        ),
-        "images",
+    parser = argparse.ArgumentParser(
+        description="Export NCFL helper CSVs used by the Streamlit app."
     )
-    run_export(requested_export)
+    parser.add_argument(
+        "export",
+        nargs="?",
+        default="images",
+        choices=["drafts", "starters", "players", "images"],
+    )
+    parser.add_argument(
+        "--year",
+        dest="years",
+        action="append",
+        type=int,
+        help="Only export this season. Can be repeated.",
+    )
+    parser.add_argument(
+        "--conference",
+        dest="conferences",
+        action="append",
+        help="Only export this conference, for example MW. Can be repeated.",
+    )
+    parser.add_argument(
+        "--week",
+        dest="weeks",
+        action="append",
+        type=int,
+        help="Only export this week. Can be repeated.",
+    )
+    parser.add_argument(
+        "--merge",
+        action="store_true",
+        help="For starters, replace the selected year/conference/week slice in weekly_starters.csv.",
+    )
+    args = parser.parse_args()
+    run_export(
+        args.export,
+        years=args.years,
+        conferences=args.conferences,
+        weeks=args.weeks,
+        merge=args.merge,
+    )
