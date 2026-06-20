@@ -61,7 +61,7 @@ SCHEDULE_STATUS_COLORS = {
     "pending": "#8a96b0",
 }
 CACHE_TTL_SECONDS = 60 * 60 * 24
-DATA_CACHE_VERSION = "rivalry-schedule-v1"
+DATA_CACHE_VERSION = "conference-sheet-logos-v1"
 STANDINGS_CACHE_VERSION = "ignore-zero-future-games-v1"
 
 
@@ -3330,7 +3330,7 @@ def score_lookup(scores: pd.DataFrame, cache_version: str = STANDINGS_CACHE_VERS
 
 def conference_logo(conferences: pd.DataFrame, conference: str) -> str:
     match = conferences.loc[conferences["Conference"].astype(str).eq(str(conference))]
-    return first_value(match, "Logo", LEAGUE_LOGO)
+    return first_value(match, "Logo", "")
 
 
 def conference_code(conferences: pd.DataFrame, conference: str) -> str:

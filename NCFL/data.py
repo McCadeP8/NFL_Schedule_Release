@@ -28,21 +28,6 @@ LEAGUES = {
     "F12": "1349457011871354880",
 }
 
-CONFERENCE_LOGOS = {
-    "ACC": "https://a.espncdn.com/i/teamlogos/ncaa_conf/500/acc.png",
-    "B1G": "https://a.espncdn.com/i/teamlogos/ncaa_conf/500/big_ten.png",
-    "Big 12": "https://a.espncdn.com/i/teamlogos/ncaa_conf/500/big_12.png",
-    "SEC": "https://a.espncdn.com/i/teamlogos/ncaa_conf/500/sec.png",
-    "Pac-12": "https://a.espncdn.com/i/teamlogos/ncaa_conf/500/pac_12.png",
-    "G6": "https://pbs.twimg.com/media/HKGr3--bcAAfQQ5?format=jpg&name=large",
-    "MW": "https://a.espncdn.com/i/teamlogos/ncaa_conf/500/mountain_west.png",
-    "AAC": "https://a.espncdn.com/i/teamlogos/ncaa_conf/500/american.png",
-    "MAC": "https://a.espncdn.com/i/teamlogos/ncaa_conf/500/mac.png",
-    "C-USA": "https://a.espncdn.com/i/teamlogos/ncaa_conf/500/conference_usa.png",
-    "SBC": "https://a.espncdn.com/i/teamlogos/ncaa_conf/500/sun_belt.png",
-    "F12": "https://pbs.twimg.com/media/HKGr3_FaIAEmdgB?format=jpg&name=large",
-}
-
 CONFERENCE_ALIASES = {
     "FCS": "F12",
     "6IX": "G6",
@@ -340,27 +325,6 @@ def _normalize_conference(value: object) -> str:
     return aliases.get(conference.casefold(), conference)
 
 
-def _is_image_url(value: object) -> bool:
-    url = str(value).strip().lower()
-    if not url or url == "nan":
-        return False
-    if "sports.core.api.espn.com" in url:
-        return False
-    return any(
-        token in url
-        for token in (
-            ".png",
-            ".jpg",
-            ".jpeg",
-            ".gif",
-            ".svg",
-            "format=jpg",
-            "format=png",
-            "pbs.twimg.com/media",
-        )
-    )
-
-
 def _parse_bool(value: object) -> bool:
     if isinstance(value, bool):
         return value
@@ -377,7 +341,7 @@ def _fallback_conferences(schools: pd.DataFrame) -> pd.DataFrame:
         {
             "Conference": conferences,
             "Code": conferences,
-            "Logo": [CONFERENCE_LOGOS.get(conference, "") for conference in conferences],
+            "Logo": ["" for _ in conferences],
         }
     )
 
@@ -434,12 +398,8 @@ def get_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, 
             conferences[column] = ""
     conferences["Conference"] = conferences["Conference"].map(_normalize_conference)
     conferences["Code"] = conferences["Code"].map(_normalize_conference)
-    conferences["Logo"] = conferences.apply(
-        lambda row: row["Logo"]
-        if _is_image_url(row["Logo"])
-        else CONFERENCE_LOGOS.get(str(row["Conference"]).strip())
-        or CONFERENCE_LOGOS.get(str(row["Code"]).strip(), ""),
-        axis=1,
+    conferences["Logo"] = conferences["Logo"].map(
+        lambda value: "" if pd.isna(value) else str(value).strip()
     )
 
     existing = set(conferences["Conference"].dropna().astype(str))
@@ -452,7 +412,7 @@ def get_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, 
                     {
                         "Conference": missing,
                         "Code": missing,
-                        "Logo": [CONFERENCE_LOGOS.get(conference, "") for conference in missing],
+                        "Logo": ["" for _ in missing],
                     }
                 ),
             ],
