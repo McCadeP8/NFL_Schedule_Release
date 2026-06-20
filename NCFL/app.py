@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import html
 import hashlib
 import re
@@ -10,6 +11,7 @@ from typing import Optional
 
 import altair as alt
 import pandas as pd
+import requests
 import streamlit as st
 
 from data import LEAGUES, POSITIONS, load_all_rosters as fetch_all_rosters
@@ -3328,9 +3330,31 @@ def score_lookup(scores: pd.DataFrame, cache_version: str = STANDINGS_CACHE_VERS
     return lookup
 
 
+@st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner=False, max_entries=64)
+def image_url_to_data_uri(url: str) -> str:
+    url = clean_text(url)
+    if not url or url.startswith("data:"):
+        return url
+    try:
+        response = requests.get(
+            url,
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=20,
+        )
+        response.raise_for_status()
+    except requests.RequestException:
+        return url
+
+    content_type = response.headers.get("content-type", "").split(";")[0].strip()
+    if not content_type.startswith("image/"):
+        return url
+    encoded = base64.b64encode(response.content).decode("ascii")
+    return f"data:{content_type};base64,{encoded}"
+
+
 def conference_logo(conferences: pd.DataFrame, conference: str) -> str:
     match = conferences.loc[conferences["Conference"].astype(str).eq(str(conference))]
-    return first_value(match, "Logo", "")
+    return image_url_to_data_uri(first_value(match, "Logo", ""))
 
 
 def conference_code(conferences: pd.DataFrame, conference: str) -> str:
