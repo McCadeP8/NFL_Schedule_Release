@@ -348,7 +348,7 @@ def _fallback_conferences(schools: pd.DataFrame) -> pd.DataFrame:
 
 def get_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     schools_url = "https://docs.google.com/spreadsheets/d/19bH4vYzaV7pbuQ2bcdz3HAaOWGb-BBJhQ9EgBp7YvoY/export?format=csv&gid=1436567589"
-    conferences_url = "https://docs.google.com/spreadsheets/d/1qjPpIEGmhV8aF3CZ8hi-ijQlIP-_z6QYJzSArjJV9d8/export?format=csv&gid=1436567589"
+    conferences_url = "https://docs.google.com/spreadsheets/d/19bH4vYzaV7pbuQ2bcdz3HAaOWGb-BBJhQ9EgBp7YvoY/export?format=csv&gid=1436567589"
     schedule_url = "https://docs.google.com/spreadsheets/d/19bH4vYzaV7pbuQ2bcdz3HAaOWGb-BBJhQ9EgBp7YvoY/export?format=csv&gid=1612692704"
     scores_url = "https://docs.google.com/spreadsheets/d/19bH4vYzaV7pbuQ2bcdz3HAaOWGb-BBJhQ9EgBp7YvoY/export?format=csv&gid=702965459"
     rankings_url = "https://docs.google.com/spreadsheets/d/19bH4vYzaV7pbuQ2bcdz3HAaOWGb-BBJhQ9EgBp7YvoY/export?format=csv&gid=1261881922"
@@ -390,7 +390,11 @@ def get_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, 
         if "Conference" not in conferences.columns:
             conferences = _fallback_conferences(schools)
     except requests.RequestException:
-        conferences = _fallback_conferences(schools)
+        conferences = _safe_read_google_sheet(
+            SCHOOLS_SHEET_ID,
+            1436567589,
+            _fallback_conferences(schools),
+        )
 
     conferences = conferences.copy()
     for column in ("Conference", "Code", "Logo"):
