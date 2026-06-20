@@ -61,7 +61,7 @@ SCHEDULE_STATUS_COLORS = {
     "pending": "#8a96b0",
 }
 CACHE_TTL_SECONDS = 60 * 60 * 24
-DATA_CACHE_VERSION = "conference-gid-1436567589-logos-v1"
+DATA_CACHE_VERSION = "conference-logo-frame-v1"
 STANDINGS_CACHE_VERSION = "ignore-zero-future-games-v1"
 
 
@@ -82,14 +82,24 @@ def esc(value: object, fallback: str = "") -> str:
 
 def img_tag(src: object, alt: object, class_name: str = "", title: object = "") -> str:
     src_text = clean_text(src)
-    if not src_text:
-        return ""
-    class_attr = f' class="{esc(class_name)}"' if class_name else ""
+    alt_text = clean_text(alt)
+    fallback_text = alt_text or "Logo"
+    classes = "logo-frame"
+    if class_name:
+        classes = f"{classes} {clean_text(class_name)}"
+    missing_class = " logo-missing" if not src_text else ""
     title_text = clean_text(title)
     title_attr = f' title="{esc(title_text)}"' if title_text else ""
+    image_html = (
+        f'<img src="{esc(src_text)}" alt="{esc(alt_text)}"{title_attr} '
+        'referrerpolicy="no-referrer" '
+        'onerror="this.style.display=\'none\';this.parentElement.classList.add(\'logo-missing\');">'
+        if src_text
+        else ""
+    )
     return (
-        f'<img{class_attr} src="{esc(src_text)}" alt="{esc(alt)}"{title_attr} '
-        'referrerpolicy="no-referrer" loading="lazy">'
+        f'<span class="{esc(classes)}{missing_class}"{title_attr}>'
+        f'{image_html}<span class="logo-fallback">{esc(fallback_text)}</span></span>'
     )
 
 
@@ -279,6 +289,49 @@ label[data-testid="stWidgetLabel"] * {
   color: #111827 !important;
   opacity: 1 !important;
 }
+.logo-frame {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  vertical-align: middle;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #ffffff;
+}
+.logo-frame > img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+.logo-fallback {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 2px;
+  box-sizing: border-box;
+  color: #111827;
+  background: #eef2f7;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.8px;
+  text-align: center;
+  text-transform: uppercase;
+  line-height: 1;
+}
+.logo-frame.logo-missing .logo-fallback {
+  display: inline-flex;
+}
 .brand-panel {
   background: #fff;
   border: 1px solid #e2e6ef;
@@ -302,7 +355,26 @@ label[data-testid="stWidgetLabel"] * {
 .conf-logo {
   width: 84px;
   height: 84px;
-  object-fit: contain;
+  min-width: 84px;
+}
+.conf-logo .logo-fallback {
+  font-size: 20px;
+}
+.conf-title-wrap .logo-fallback,
+.standings-title .logo-fallback,
+.draft-round-title .logo-fallback,
+.league-draft-header .logo-fallback,
+.history-hero .logo-fallback {
+  display: none;
+  letter-spacing: 0.8px;
+  line-height: 1;
+}
+.conf-title-wrap .logo-frame.logo-missing .logo-fallback,
+.standings-title .logo-frame.logo-missing .logo-fallback,
+.draft-round-title .logo-frame.logo-missing .logo-fallback,
+.league-draft-header .logo-frame.logo-missing .logo-fallback,
+.history-hero .logo-frame.logo-missing .logo-fallback {
+  display: inline-flex;
 }
 .conf-kicker {
   font-family: 'Barlow Condensed', sans-serif;
@@ -610,10 +682,13 @@ label[data-testid="stWidgetLabel"] * {
   font-weight: 800;
   color: #fff;
 }
-.league-matrix .conf-head img {
+.league-matrix .conf-head .logo-frame {
   width: 58px;
   height: 42px;
-  object-fit: contain;
+  min-width: 58px;
+}
+.league-matrix .conf-head .logo-fallback {
+  font-size: 11px;
 }
 .conf-head-label {
   font-family: 'Barlow Condensed', sans-serif;
@@ -1666,10 +1741,10 @@ div[data-testid="stButton"] button {
   gap: 16px;
   margin: 18px 0 10px;
 }
-.standings-title img {
+.standings-title .logo-frame {
   width: 54px;
   height: 54px;
-  object-fit: contain;
+  min-width: 54px;
 }
 .standings-title span {
   font-family: 'Bebas Neue', sans-serif;
@@ -2124,6 +2199,12 @@ div[data-testid="stButton"] button {
   height: 34px;
   object-fit: contain;
 }
+.poll-logo.logo-frame {
+  min-width: 34px;
+}
+.poll-logo .logo-fallback {
+  font-size: 9px;
+}
 .poll-team {
   display: flex;
   align-items: center;
@@ -2267,6 +2348,14 @@ div[data-testid="stButton"] button {
   height: 72px;
   object-fit: contain;
 }
+.draft-hero .logo-frame {
+  width: 72px;
+  height: 72px;
+  min-width: 72px;
+}
+.draft-hero .logo-fallback {
+  font-size: 16px;
+}
 .draft-kicker {
   font-family: 'Barlow Condensed', sans-serif;
   font-size: 13px;
@@ -2281,6 +2370,10 @@ div[data-testid="stButton"] button {
   letter-spacing: 3px;
   line-height: 1;
   color: #111827;
+}
+.standings-title .logo-frame,
+.standings-title .logo-frame span {
+  letter-spacing: 0;
 }
 .draft-meta {
   display: flex;
@@ -2318,7 +2411,13 @@ div[data-testid="stButton"] button {
   height: 46px;
   object-fit: contain;
 }
-.draft-round-title img + span {
+.draft-round-title .logo-frame {
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
+}
+.draft-round-title img + span,
+.draft-round-title .logo-frame + span {
   font-family: 'Bebas Neue', sans-serif;
   font-size: 42px;
   letter-spacing: 2px;
@@ -2538,6 +2637,14 @@ div[data-testid="stButton"] button {
   height: var(--conf-logo-size);
   object-fit: contain;
 }
+.league-draft-header .logo-frame {
+  width: var(--conf-logo-size);
+  height: var(--conf-logo-size);
+  min-width: var(--conf-logo-size);
+}
+.league-draft-header .logo-fallback {
+  font-size: calc(var(--conf-logo-size) * 0.28);
+}
 .league-draft-header span {
   font-family: 'Bebas Neue', sans-serif;
   font-size: var(--conf-font-size);
@@ -2659,6 +2766,12 @@ div[data-testid="stButton"] button {
   width: 108px;
   height: 108px;
   object-fit: contain;
+}
+.history-hero-logo.logo-frame {
+  min-width: 108px;
+}
+.history-hero-logo .logo-fallback {
+  font-size: 20px;
 }
 .history-metrics {
   display: grid;
@@ -2966,6 +3079,12 @@ div[data-testid="stButton"] button {
   width: 42px;
   height: 32px;
   object-fit: contain;
+}
+.player-history-matrix .conf-logo-history.logo-frame {
+  min-width: 42px;
+}
+.player-history-matrix .conf-logo-history .logo-fallback {
+  font-size: 9px;
 }
 .player-chart-shell {
   padding: 4px 10px 10px;
