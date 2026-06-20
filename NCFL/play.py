@@ -57,7 +57,7 @@ LEAGUE_IDS_BY_YEAR: dict[int, dict[str, str]] = {
         "MAC": "1349455814967971840",
         "C-USA": "1349455990495379456",
         "SBC": "1349456254895951872",
-        "AAC": "1349456864814850048",
+        "American": "1349456864814850048",
         "The 12": "1349457011871354880",
     },
 }
@@ -65,10 +65,12 @@ LEAGUE_IDS_BY_YEAR: dict[int, dict[str, str]] = {
 CONFERENCE_ALIASES = {
     "6IX": "G6",
     "The 12": "F12",
+    "AAC": "American",
 }
 CONFERENCE_EXPORT_ALIASES = {
     "G6": "6IX",
     "F12": "The 12",
+    "AAC": "American",
 }
 STARTER_COLUMNS = [
     "Team",

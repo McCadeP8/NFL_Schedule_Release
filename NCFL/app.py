@@ -37,7 +37,7 @@ LEAGUE_ROSTER_ORDER = [
     "MAC",
     "C-USA",
     "SBC",
-    "AAC",
+    "American",
     "F12",
 ]
 SUPERFLEX_CONFERENCES = {"Big 12", "B1G", "SEC", "Pac-12", "ACC", "G6"}
@@ -61,7 +61,7 @@ SCHEDULE_STATUS_COLORS = {
     "pending": "#8a96b0",
 }
 CACHE_TTL_SECONDS = 60 * 60 * 24
-DATA_CACHE_VERSION = "conference-logo-frame-v1"
+DATA_CACHE_VERSION = "american-conference-v1"
 STANDINGS_CACHE_VERSION = "ignore-zero-future-games-v1"
 
 
@@ -6346,8 +6346,8 @@ def render_rules() -> None:
         <tbody>
           <tr><td>Big XII</td><td>Sun Belt</td></tr>
           <tr><td>Big Ten</td><td>MAC</td></tr>
-          <tr><td>PAC</td><td>American</td></tr>
-          <tr><td>ACC</td><td>AAC</td></tr>
+          <tr><td>PAC</td><td>MW</td></tr>
+          <tr><td>ACC</td><td>American</td></tr>
           <tr><td>SEC</td><td>C-USA</td></tr>
           <tr><td>The 6ix</td><td>The 12</td></tr>
         </tbody>
