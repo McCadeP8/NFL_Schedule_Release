@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import html
 import hashlib
 import re
@@ -11,7 +10,6 @@ from typing import Optional
 
 import altair as alt
 import pandas as pd
-import requests
 import streamlit as st
 
 from data import LEAGUES, POSITIONS, load_all_rosters as fetch_all_rosters
@@ -80,6 +78,19 @@ def clean_text(value: object, fallback: str = "") -> str:
 
 def esc(value: object, fallback: str = "") -> str:
     return html.escape(clean_text(value, fallback))
+
+
+def img_tag(src: object, alt: object, class_name: str = "", title: object = "") -> str:
+    src_text = clean_text(src)
+    if not src_text:
+        return ""
+    class_attr = f' class="{esc(class_name)}"' if class_name else ""
+    title_text = clean_text(title)
+    title_attr = f' title="{esc(title_text)}"' if title_text else ""
+    return (
+        f'<img{class_attr} src="{esc(src_text)}" alt="{esc(alt)}"{title_attr} '
+        'referrerpolicy="no-referrer" loading="lazy">'
+    )
 
 
 def loading_spinner(message: str):
@@ -3330,31 +3341,9 @@ def score_lookup(scores: pd.DataFrame, cache_version: str = STANDINGS_CACHE_VERS
     return lookup
 
 
-@st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner=False, max_entries=64)
-def image_url_to_data_uri(url: str) -> str:
-    url = clean_text(url)
-    if not url or url.startswith("data:"):
-        return url
-    try:
-        response = requests.get(
-            url,
-            headers={"User-Agent": "Mozilla/5.0"},
-            timeout=20,
-        )
-        response.raise_for_status()
-    except requests.RequestException:
-        return url
-
-    content_type = response.headers.get("content-type", "").split(";")[0].strip()
-    if not content_type.startswith("image/"):
-        return url
-    encoded = base64.b64encode(response.content).decode("ascii")
-    return f"data:{content_type};base64,{encoded}"
-
-
 def conference_logo(conferences: pd.DataFrame, conference: str) -> str:
     match = conferences.loc[conferences["Conference"].astype(str).eq(str(conference))]
-    return image_url_to_data_uri(first_value(match, "Logo", ""))
+    return first_value(match, "Logo", "")
 
 
 def conference_code(conferences: pd.DataFrame, conference: str) -> str:
@@ -4644,6 +4633,7 @@ def render_standings_section(
         method="min",
     )
     conf_logo = conference_logo(conferences, conference)
+    conf_logo_html = img_tag(conf_logo, conference)
 
     rows = []
     for index, row in section.iterrows():
@@ -4678,7 +4668,7 @@ def render_standings_section(
         f"""
 <div class="standings-wrap">
   {f'''<div class="standings-title">
-    {'<img src="' + esc(conf_logo) + '" alt="' + esc(conference) + '">' if conf_logo else ''}
+    {conf_logo_html}
     <span>{esc(conference)}</span>
     <div></div>
   </div>''' if show_conference_title else ''}
@@ -5004,7 +4994,7 @@ def history_hero(title: str, subtitle: str, logo: str = "", accent: str = "#f2cf
     <div class="history-title">{esc(title)}</div>
     <div class="history-sub">{esc(subtitle)}</div>
   </div>
-  {f'<img class="history-hero-logo" src="{esc(logo)}" alt="{esc(title)}">' if logo else ''}
+  {img_tag(logo, title, "history-hero-logo")}
 </div>
 """
     )
@@ -5712,7 +5702,7 @@ def render_player_current_ownership(
     for conference in LEAGUE_ROSTER_ORDER:
         conf_logo = conference_logo(conferences, conference)
         headers.append(
-            f'<th class="conf-head">{f"""<img src="{esc(conf_logo)}" alt="{esc(conference)}" title="{esc(conference)}">""" if conf_logo else esc(conference)}</th>'
+            f'<th class="conf-head">{img_tag(conf_logo, conference, title=conference) if conf_logo else esc(conference)}</th>'
         )
         match = owned.loc[owned["league_name"].astype(str).eq(conference)]
         if match.empty:
@@ -6103,7 +6093,7 @@ def render_player_dashboard(
         "Taxi": ("🚕", "Taxi"),
     }
     headers = ["<th>Week</th>"] + [
-        f'<th>{f"""<img class="conf-logo-history" src="{esc(conference_logo(conferences, conference))}" alt="{esc(conference)}" title="{esc(conference)}">""" if conference_logo(conferences, conference) else esc(conference)}</th>'
+        f'<th>{img_tag(conference_logo(conferences, conference), conference, "conf-logo-history", conference) or esc(conference)}</th>'
         for conference in LEAGUE_ROSTER_ORDER
     ] + ["<th>Start %</th>", "<th>Position Rank</th>", "<th>Overall Rank</th>", "<th>Points</th>"]
     rows = []
@@ -6571,7 +6561,7 @@ def poll_rows_html(
             f"""
 <tr>
   <td class="poll-rank-cell"><span class="poll-rank">{rank}</span></td>
-  <td class="poll-logo-cell">{f'<img class="poll-logo" src="{esc(conf_logo)}" alt="{esc(conf)}">' if conf_logo else ''}</td>
+  <td class="poll-logo-cell">{img_tag(conf_logo, conf, "poll-logo") if conf_logo else ''}</td>
   <td>
     <div class="poll-team">
       {f'<img class="poll-team-logo" src="{esc(team_logo)}" alt="{esc(team)}">' if team_logo else ''}
@@ -6872,7 +6862,7 @@ def render_draft_board(
         f"""
 <div class="draft-hero" style="--accent:#c8102e;">
   <div class="draft-hero-main">
-    <img src="{esc(conf_logo)}" alt="{esc(board_title)}">
+    {img_tag(conf_logo, board_title)}
     <div>
       <div class="draft-kicker">{esc(board_kicker)}</div>
       <div class="draft-title">{esc(board_title)}</div>
@@ -6899,7 +6889,7 @@ def render_draft_board(
             group_logo = conference_logo(conferences, clean_text(group_conference))
             sections.append(
                 f"""
-<div class="draft-round-title"><img class="conf-logo" src="{esc(group_logo)}" alt="{esc(group_conference)}"><span>{esc(group_conference)}</span><span></span></div>
+<div class="draft-round-title">{img_tag(group_logo, group_conference, "conf-logo")}<span>{esc(group_conference)}</span><span></span></div>
 """
             )
         for draft_type, type_board in group_board.groupby("Type", sort=False):
@@ -7062,7 +7052,7 @@ def render_league_draft_board(
                 f"""
 <section class="league-draft-column {column_class}">
   <div class="league-draft-header">
-    {f'<img src="{esc(logo)}" alt="{esc(conference)}">' if logo else ''}
+    {img_tag(logo, conference)}
     <span>{esc(conference)}</span>
   </div>
   {''.join(pick_rows)}
@@ -7337,7 +7327,7 @@ def render_league_roster_matrix(
         for conference in conference_order:
             logo = conference_logos.get(conference, "")
             header_content = (
-                f'<img src="{esc(logo)}" alt="{esc(conference)}" title="{esc(conference)}">'
+                img_tag(logo, conference, title=conference)
                 if logo
                 else f'<span class="conf-head-label">{esc(conference)}</span>'
             )
@@ -7930,7 +7920,7 @@ with conference_tab:
         f"""
 <div class="brand-panel conf-hero" style="--accent:#c8102e;">
   <div class="conf-title-wrap">
-    <img class="conf-logo" src="{esc(conf_logo)}" alt="{esc(selected_conference)}">
+    {img_tag(conf_logo, selected_conference, "conf-logo")}
     <div>
       <div class="conf-kicker">{esc(conf_code)} Conference</div>
       <div class="conf-title">{esc(selected_conference)}</div>
