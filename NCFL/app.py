@@ -178,6 +178,7 @@ def official_team_name(value: object, resolver: dict[str, str]) -> str:
 
 
 def inject_css() -> None:
+    # App styling lives here so Streamlit reruns keep the visual system in sync.
     st.html(
         """
 <style>
@@ -189,6 +190,11 @@ html, body, [class*="css"] {
   color: #1a2030;
 }
 .stApp { background: #f4f6fa; }
+.stApp,
+.block-container,
+section[data-testid="stSidebar"] {
+  background-color: #f4f6fa;
+}
 footer { visibility: hidden; }
 .block-container {
   max-width: 1780px !important;
@@ -476,6 +482,7 @@ label[data-testid="stWidgetLabel"] * {
 }
 .roster-table tr:nth-child(even) td { background: #fbfcff; }
 .team-hero {
+  isolation: isolate;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -773,6 +780,9 @@ label[data-testid="stWidgetLabel"] * {
 .team-roster-player:nth-child(even) {
   background: #fbfcff;
 }
+.team-roster-player:nth-child(odd) {
+  background: #ffffff;
+}
 .team-roster-player img {
   width: 44px;
   height: 44px;
@@ -841,6 +851,12 @@ label[data-testid="stWidgetLabel"] * {
   border-radius: 8px;
   box-shadow: 0 2px 10px rgba(15,23,42,0.07);
   padding: 11px 12px;
+}
+.draft-pick-card:nth-child(even) {
+  background: #fbfcff;
+}
+.draft-pick-card:nth-child(odd) {
+  background: #ffffff;
 }
 .draft-pick-top {
   display: flex;
@@ -2431,14 +2447,14 @@ div[data-testid="stButton"] button {
 }
 .draft-grid {
   display: grid;
-  grid-template-columns: repeat(12, minmax(112px, 1fr));
+  grid-template-columns: repeat(12, minmax(120px, 1fr));
   gap: 8px;
   overflow-x: auto;
   padding-bottom: 4px;
 }
 .draft-card {
   display: grid;
-  grid-template-rows: auto auto 76px;
+  grid-template-rows: auto auto minmax(72px, auto);
   align-items: start;
   background: #ffffff;
   border: 1px solid #e2e6ef;
@@ -2446,7 +2462,7 @@ div[data-testid="stButton"] button {
   border-radius: 10px;
   box-shadow: 0 2px 10px rgba(15,23,42,0.07);
   padding: 10px 9px 12px;
-  min-height: 214px;
+  min-height: 206px;
 }
 .draft-card-top {
   display: flex;
@@ -2489,7 +2505,7 @@ div[data-testid="stButton"] button {
   display: -webkit-box;
   align-items: center;
   justify-content: center;
-  height: 76px;
+  min-height: 72px;
   font-family: 'Bebas Neue', sans-serif;
   font-size: 24px;
   letter-spacing: 1px;
@@ -2571,7 +2587,8 @@ div[data-testid="stButton"] button {
   --pick-slot-size: 31px;
   --pick-slot-font: 11px;
   --pick-player-font: 14px;
-  --pick-row-height: 82px;
+  --pick-by-font: 10px;
+  --pick-row-height: 90px;
   display: grid;
   grid-template-columns: repeat(var(--conference-count), minmax(0, 1fr));
   gap: 10px;
@@ -2587,7 +2604,8 @@ div[data-testid="stButton"] button {
   --pick-slot-size: 42px;
   --pick-slot-font: 14px;
   --pick-player-font: 19px;
-  --pick-row-height: 112px;
+  --pick-by-font: 12px;
+  --pick-row-height: 122px;
   gap: 14px;
 }
 .league-draft-board.roomy {
@@ -2599,7 +2617,8 @@ div[data-testid="stButton"] button {
   --pick-slot-size: 54px;
   --pick-slot-font: 17px;
   --pick-player-font: 26px;
-  --pick-row-height: 146px;
+  --pick-by-font: 15px;
+  --pick-row-height: 156px;
   gap: 18px;
 }
 .league-draft-column {
@@ -2716,6 +2735,18 @@ div[data-testid="stButton"] button {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
+.league-draft-by {
+  margin-top: 3px;
+  min-height: 1.05em;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: var(--pick-by-font);
+  font-weight: 800;
+  line-height: 1.05;
+  color: #6b7a99;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .league-draft-empty {
   padding: 18px 10px;
   font-family: 'Rajdhani', sans-serif;
@@ -2724,6 +2755,88 @@ div[data-testid="stButton"] button {
   color: #9aa5be;
   text-align: center;
   text-transform: uppercase;
+}
+.draft-room {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 14px;
+  margin: 10px 0 18px;
+}
+.draft-room-main,
+.draft-clock-card {
+  background: #05070b;
+  color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(15,23,42,0.18);
+}
+.draft-room-main {
+  padding: 24px 28px;
+  border-left: 9px solid #c8102e;
+}
+.draft-room-kicker {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: #f2cf68;
+}
+.draft-room-title {
+  margin-top: 3px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 62px;
+  line-height: 0.95;
+  letter-spacing: 3px;
+}
+.draft-room-dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 14px;
+}
+.draft-room-date {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 999px;
+  padding: 6px 11px;
+  background: rgba(255,255,255,0.08);
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.draft-clock-card {
+  min-width: 280px;
+  padding: 18px 20px;
+  border-top: 7px solid #f2cf68;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.draft-clock-label {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #b0baca;
+}
+.draft-clock-team {
+  margin-top: 4px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 42px;
+  line-height: 0.95;
+  letter-spacing: 2px;
+}
+.draft-clock-meta {
+  margin-top: 8px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 15px;
+  font-weight: 900;
+  color: #f2cf68;
 }
 .history-hero {
   display: grid;
@@ -7051,6 +7164,56 @@ def render_draft_board(
     st.html("".join(sections))
 
 
+def render_draft_room_header(
+    board: pd.DataFrame,
+    teams: dict[str, dict[str, str]],
+    season: int,
+) -> None:
+    upcoming = board.loc[board["Player"].map(clean_text).eq("")].copy()
+    upcoming = upcoming.sort_values(["_type_order", "Type", "Round", "Pick", "Conference", "Team"], na_position="last")
+    if upcoming.empty:
+        clock_team = "Draft Complete"
+        clock_meta = "All picks have players"
+    else:
+        pick = upcoming.iloc[0]
+        team = clean_text(pick.get("Team"), "TBD")
+        nickname = clean_text(teams.get(team, {}).get("nickname"))
+        round_number = pick.get("Round")
+        pick_number = pick.get("Pick")
+        round_label = "-" if pd.isna(round_number) else str(int(round_number))
+        pick_label = "-" if pd.isna(pick_number) else str(int(pick_number))
+        clock_team = team
+        clock_meta = " - ".join(
+            value
+            for value in [
+                nickname,
+                clean_text(pick.get("Conference")),
+                f"Pick {round_label}.{pick_label}",
+            ]
+            if value
+        )
+
+    st.html(
+        f"""
+<section class="draft-room">
+  <div class="draft-room-main">
+    <div class="draft-room-kicker">{season} Live Draft Room</div>
+    <div class="draft-room-title">League Draft Board</div>
+    <div class="draft-room-dates">
+      <span class="draft-room-date">Round 1 - Saturday, June 27, {season}</span>
+      <span class="draft-room-date">Round 2 - Sunday, June 28, {season}</span>
+    </div>
+  </div>
+  <aside class="draft-clock-card">
+    <div class="draft-clock-label">On The Clock</div>
+    <div class="draft-clock-team">{esc(clock_team)}</div>
+    <div class="draft-clock-meta">{esc(clock_meta)}</div>
+  </aside>
+</section>
+"""
+    )
+
+
 @loading_spinner("Loading league draft board...")
 def render_league_draft_board(
     drafts: pd.DataFrame,
@@ -7080,9 +7243,12 @@ def render_league_draft_board(
     )
 
     teams = team_lookup(schools)
-
-    st.html(
-        f"""
+    is_current_draft = season == current_roster_season()
+    if is_current_draft:
+        render_draft_room_header(board, teams, season)
+    else:
+        st.html(
+            f"""
 <div class="draft-hero" style="--accent:#c8102e;">
   <div class="draft-hero-main">
     <img src="{LEAGUE_LOGO}" alt="{esc(LEAGUE_NAME)}">
@@ -7093,7 +7259,7 @@ def render_league_draft_board(
   </div>
 </div>
 """
-    )
+        )
 
     phase_groups = []
     for draft_type, draft_type_board in board.groupby("Type", sort=False):
@@ -7147,6 +7313,7 @@ def render_league_draft_board(
                 player = clean_text(row.get("Player"), "TBD")
                 info = teams.get(team, {})
                 team_logo = clean_text(info.get("logo"))
+                team_nickname = clean_text(info.get("nickname"))
                 color = esc(info.get("color"), "#1a2030")
                 round_number = row.get("Round")
                 pick_number = row.get("Pick")
@@ -7162,6 +7329,7 @@ def render_league_draft_board(
     <img class="league-draft-player-photo" src="{esc(player_picture(player))}" alt="{esc(player)}" onerror="{player_picture_fallback()}">
   </div>
   <div class="league-draft-player">{esc(player)}</div>
+  {f'<div class="league-draft-by">{esc(team)}{f" - {esc(team_nickname)}" if team_nickname else ""}</div>' if is_current_draft else ''}
 </div>
 """
                 )

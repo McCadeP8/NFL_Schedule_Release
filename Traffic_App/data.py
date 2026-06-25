@@ -86,3 +86,21 @@ def load_utah_crashes() -> pd.DataFrame:
 def load_utah_county_analytics() -> pd.DataFrame:
     """Load complete Utah county-year all-severity crash analytics."""
     return load_table("utah_county_crash_analytics")
+
+
+@st.cache_data(show_spinner=False)
+def load_all_state_crashes() -> pd.DataFrame:
+    """Load normalized all-severity crash records from automated state sources."""
+    return load_table("all_state_crashes")
+
+
+@st.cache_data(show_spinner=False)
+def load_all_state_county_analytics() -> pd.DataFrame:
+    """Load county-year analytics for automated all-severity state sources."""
+    return load_table("all_state_county_crash_analytics")
+
+
+@st.cache_data(show_spinner=False)
+def load_all_crash_source_status() -> pd.DataFrame:
+    """Load state-by-state all-crash source acquisition status."""
+    return load_table("all_crash_source_status")

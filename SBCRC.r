@@ -6,10 +6,10 @@
 #   3. Run:
 #      Rscript SBCRC.r
 #
-# Or supply an input path and optional HTML output path:
-#   Rscript SBCRC.r "path/to/responses.csv" "path/to/table.html"
+# Or supply an input path and optional PNG output path:
+#   Rscript SBCRC.r "path/to/responses.csv" "path/to/table.png"
 
-required_packages <- c("dplyr", "gt", "tibble", "tidyr")
+required_packages <- c("dplyr", "gt", "tibble", "tidyr", "webshot2")
 missing_packages <- required_packages[
   !vapply(required_packages, requireNamespace, quietly = TRUE, FUN.VALUE = logical(1))
 ]
@@ -54,11 +54,27 @@ if (!file.exists(input_path)) {
 
 message("Using rule-change input: ", normalizePath(input_path, winslash = "/", mustWork = FALSE))
 
-output_path <- if (length(args) >= 2) {
-  args[[2]]
-} else {
-  file.path(script_dir, "2026_rule_changes_gt_table.html")
+normalize_png_path <- function(path) {
+  extension <- tolower(tools::file_ext(path))
+
+  if (!nzchar(extension)) {
+    return(paste0(path, ".png"))
+  }
+
+  if (extension %in% c("html", "htm")) {
+    return(sub("\\.[^.]*$", ".png", path))
+  }
+
+  path
 }
+
+output_path <- normalize_png_path(
+  if (length(args) >= 2) {
+    args[[2]]
+  } else {
+    file.path(script_dir, "2026_rule_changes_gt_table.png")
+  }
+)
 
 team_lookup <- tibble::tribble(
   ~Team, ~Q1,
@@ -371,7 +387,12 @@ for (question in question_columns) {
     )
 }
 
-gt::gtsave(rule_changes_gt, filename = output_path)
+gt::gtsave(
+  rule_changes_gt,
+  filename = output_path,
+  vwidth = 1800,
+  expand = 24
+)
 
 message("Saved gt table to: ", normalizePath(output_path, winslash = "/", mustWork = FALSE))
 message("Teams with a matched response: ", nrow(latest_responses), " of 30")

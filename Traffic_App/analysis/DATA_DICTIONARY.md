@@ -69,6 +69,35 @@ Important fields include:
 - `fatal_crashes`
 - `motor_carrier_crashes` and `commercial_vehicle_crashes`
 - `dui_crashes`, `distracted_driving_crashes`, and `speed_related_crashes`
+
+## `all_state_crashes_2019_2024.csv.gz`
+
+One row per normalized all-severity crash from automated state sources. Current states:
+
+- Utah from UDOT Crash Locations.
+- Virginia from Virginia Roads/VDOT Full_Crash, sourced from DMV TREDS.
+
+Important shared fields:
+
+- `state`, `state_code`, `county`, `year`, `crash_date`
+- `latitude`, `longitude`
+- `crash_severity_desc`
+- `fatalities`, `injury_crash`, `suspected_serious_injuries`
+- `commercial_vehicle_involved`, `large_truck_bus_involved`
+- `weather`, `light_condition`, `work_zone`
+- `speed_related`, `distracted_driving`, `dui`
+- `main_road_name`, `route_id`, `location_desc`, `manner_collision_desc`
+
+## `all_state_county_crash_analytics_2019_2024.csv`
+
+One row per county, state, and year for automated all-severity state sources. It mirrors
+the Utah county analytics structure so the app can support additional states without
+state-specific UI logic.
+
+## `all_crash_source_status.csv`
+
+One row per requested priority state describing whether all-severity crash data has been
+automated, requires portal/credential review, or still needs source negotiation.
 - `target_establishments` and `target_industry_employees`
 
 Population-adjusted fields are unavailable for 2019 because the loaded Census

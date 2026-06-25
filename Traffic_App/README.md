@@ -49,12 +49,21 @@ The refresh also creates clean CSV exports in `data/exports/` for analysis in R:
 - `county_marketing_analytics.csv`
 - `utah_crashes_2019_2024.csv.gz`
 - `utah_county_crash_analytics_2019_2024.csv`
+- `all_state_crashes_2019_2024.csv.gz`
+- `all_state_county_crash_analytics_2019_2024.csv`
+- `all_crash_source_status.csv`
 
 Start with `analysis/eda_starter.R` and `analysis/DATA_DICTIONARY.md`.
 
-The pipeline also loads UDOT's anonymized Utah Crash Locations service for all reported
-crash severities from 2019-2024. UDOT refreshes the public service nightly; recent-year
-records may be preliminary or delayed, so the app intentionally uses completed years.
+The pipeline also loads automated all-severity crash sources where official public APIs
+are available. Current automated all-crash states are Utah and Virginia:
+
+- Utah: UDOT anonymized Utah Crash Locations FeatureServer, 2019-2024.
+- Virginia: Virginia Roads/VDOT Full_Crash FeatureServer sourced from DMV TREDS, 2019-2024.
+
+Other priority states are tracked in `all_crash_source_status.csv`; most require portal
+access, a formal data request, or source-specific credential review before they can be
+loaded responsibly.
 
 To rebuild the compact data bundle committed for Streamlit Cloud:
 

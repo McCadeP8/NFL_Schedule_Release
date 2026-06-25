@@ -10,12 +10,13 @@ import pydeck as pdk
 import streamlit as st
 
 from data import (
+    load_all_crash_source_status,
+    load_all_state_county_analytics,
+    load_all_state_crashes,
     load_business_patterns,
     load_county_analytics,
     load_data_sources,
     load_fars_crashes,
-    load_utah_crashes,
-    load_utah_county_analytics,
 )
 
 
@@ -415,8 +416,9 @@ fars = load_fars_crashes()
 businesses = load_business_patterns()
 sources = load_data_sources()
 county_analytics = load_county_analytics()
-utah_crashes = load_utah_crashes()
-utah_county_analytics = load_utah_county_analytics()
+all_state_crashes = load_all_state_crashes()
+all_state_county_analytics = load_all_state_county_analytics()
+all_crash_source_status = load_all_crash_source_status()
 
 st.html(
     """
@@ -445,8 +447,17 @@ with st.container(key="navigation_row"):
                 st.rerun()
 page = st.session_state.page
 
-states = sorted(fars["state"].dropna().unique()) if not fars.empty else ["Utah"]
-utah_all_crash_available = not utah_crashes.empty and "year" in utah_crashes.columns
+states = sorted(
+    set(fars["state"].dropna().unique() if not fars.empty else [])
+    | set(all_state_crashes["state"].dropna().unique() if not all_state_crashes.empty else [])
+)
+if not states:
+    states = ["Utah"]
+all_crash_states = (
+    set(all_state_crashes["state"].dropna().unique())
+    if not all_state_crashes.empty and "state" in all_state_crashes.columns
+    else set()
+)
 with st.container(key="filter_strip"):
     state_column, scope_column, years_column = st.columns((0.9, 1.5, 2.8), gap="large")
     with state_column:
@@ -456,7 +467,7 @@ with st.container(key="filter_strip"):
             index=states.index("Utah") if "Utah" in states else 0,
         )
     with scope_column:
-        if selected_state == "Utah" and utah_all_crash_available:
+        if selected_state in all_crash_states:
             crash_scope = st.radio(
                 "Data Scope",
                 ("All Reported Crashes", "Fatal Crashes Only"),
@@ -466,12 +477,15 @@ with st.container(key="filter_strip"):
         else:
             crash_scope = "Fatal Crashes Only"
             st.text_input("Data Scope", value=crash_scope, disabled=True)
-    use_utah_all_crashes = (
-        selected_state == "Utah"
+    use_all_state_crashes = (
+        selected_state in all_crash_states
         and crash_scope == "All Reported Crashes"
-        and utah_all_crash_available
     )
-    year_source = utah_crashes if use_utah_all_crashes else fars
+    year_source = (
+        all_state_crashes[all_state_crashes["state"] == selected_state]
+        if use_all_state_crashes
+        else fars
+    )
     available_years = (
         sorted(year_source["year"].dropna().astype(int).unique(), reverse=True)
         if "year" in year_source.columns
@@ -493,34 +507,11 @@ if fars.empty or not selected_years:
     st.info("Select at least one year or run `python ingest.py` to load official data.")
     st.stop()
 
-if use_utah_all_crashes:
-    raw_utah = utah_crashes[utah_crashes["year"].isin(selected_years)].copy()
-    state_crashes = pd.DataFrame(
-        {
-            "case_id": raw_utah["crash_id"],
-            "year": raw_utah["year"],
-            "county": raw_utah["county_name"],
-            "fatalities": pd.to_numeric(raw_utah["number_fatalities"], errors="coerce").fillna(0),
-            "commercial_vehicle_involved": raw_utah["motor_carrier_involved_yn"].eq("Y").astype(int),
-            "large_truck_bus_involved": raw_utah["commercial_motor_veh_involved"].eq("Y").astype(int),
-            "work_zone": raw_utah["work_zone_related_ynu"],
-            "weather": raw_utah["weather_condition_desc"],
-            "light_condition": raw_utah["light_condition_desc"],
-            "latitude": raw_utah["latitude"],
-            "longitude": raw_utah["longitude"],
-            "injury_crash": raw_utah["crash_severity_desc"].fillna("").ne("No Injury/PDO").astype(int),
-            "suspected_serious_injuries": pd.to_numeric(raw_utah["number_four_injuries"], errors="coerce").fillna(0),
-            "speed_related": raw_utah["speed_related"].eq("Y").astype(int),
-            "distracted_driving": raw_utah["distracted_driving"].eq("Y").astype(int),
-            "dui": raw_utah["dui"].eq("Y").astype(int),
-            "crash_severity_desc": raw_utah["crash_severity_desc"],
-            "main_road_name": raw_utah["main_road_name"],
-            "route_id": raw_utah["route_id"],
-            "location_desc": raw_utah["location_desc"],
-            "manner_collision_desc": raw_utah["manner_collision_desc"],
-            "number_vehicles_involved": raw_utah["number_vehicles_involved"],
-        }
-    )
+if use_all_state_crashes:
+    state_crashes = all_state_crashes[
+        (all_state_crashes["state"] == selected_state)
+        & (all_state_crashes["year"].isin(selected_years))
+    ].copy()
 else:
     state_crashes = fars[(fars["state"] == selected_state) & (fars["year"].isin(selected_years))].copy()
     state_crashes["injury_crash"] = 0
@@ -529,14 +520,17 @@ else:
     state_crashes["distracted_driving"] = 0
     state_crashes["dui"] = 0
 
-state_code = "49" if use_utah_all_crashes else str(int(state_crashes["state_code"].iloc[0])).zfill(2)
+state_code = str(int(float(state_crashes["state_code"].iloc[0]))).zfill(2)
 state_businesses = businesses[businesses["state_fips"] == state_code].copy()
 latest_year = max(selected_years)
 latest_rates_base = county_analytics[
     (county_analytics["state"] == selected_state) & (county_analytics["year"] == latest_year)
 ].copy()
-if use_utah_all_crashes and not utah_county_analytics.empty:
-    latest_rates = utah_county_analytics[utah_county_analytics["year"] == latest_year].copy()
+if use_all_state_crashes and not all_state_county_analytics.empty:
+    latest_rates = all_state_county_analytics[
+        (all_state_county_analytics["state"] == selected_state)
+        & (all_state_county_analytics["year"] == latest_year)
+    ].copy()
     latest_rates["fatal_crashes"] = latest_rates["all_crashes"]
     latest_rates["fatal_crashes_per_100k"] = latest_rates["all_crashes_per_100k"]
     latest_rates["commercial_involved_crashes"] = latest_rates["motor_carrier_crashes"]
@@ -552,8 +546,8 @@ target_establishments = int(state_businesses["establishments"].sum())
 target_employees = int(state_businesses["employees"].sum())
 highest_rate_county = stable_rates["county_name"].iloc[0] if not stable_rates.empty else "-"
 period = f"{min(selected_years)}–{max(selected_years)}" if len(selected_years) > 1 else str(selected_years[0])
-crash_label = "Reported Crashes" if use_utah_all_crashes else "Fatal Crashes"
-crash_label_short = "crashes" if use_utah_all_crashes else "fatal crashes"
+crash_label = "Reported Crashes" if use_all_state_crashes else "Fatal Crashes"
+crash_label_short = "crashes" if use_all_state_crashes else "fatal crashes"
 
 st.html(
     f"""
@@ -638,8 +632,8 @@ elif page == "Risk Factors":
     carrier = int(state_crashes["commercial_vehicle_involved"].sum())
     large_vehicle = int(state_crashes["large_truck_bus_involved"].sum())
     work_zone = int((state_crashes["work_zone"].fillna("").str.lower() != "none").sum())
-    risk_third_value = int(state_crashes["distracted_driving"].sum()) if use_utah_all_crashes else work_zone
-    risk_third_label = "Distracted-driving crashes" if use_utah_all_crashes else "Work-zone coded crashes"
+    risk_third_value = int(state_crashes["distracted_driving"].sum()) if use_all_state_crashes else work_zone
+    risk_third_label = "Distracted-driving crashes" if use_all_state_crashes else "Work-zone coded crashes"
     st.html(
         f"""
         <div class="insight-strip">
@@ -660,11 +654,11 @@ elif page == "Risk Factors":
     st.html('<div class="note-box">Commercial-involved means FARS recorded a motor-carrier identifier. It does not prove every person involved was working at the time.</div>')
 
 else:
-    map_title = "Reported Crash Locations" if use_utah_all_crashes else "Fatal Crash Locations"
-    map_source = "UDOT" if use_utah_all_crashes else "FARS"
+    map_title = "Reported Crash Locations" if use_all_state_crashes else "Fatal Crash Locations"
+    map_source = "State crash source" if use_all_state_crashes else "FARS"
     section_title(map_title, f"Reported {map_source} coordinates for {selected_state} during {period}.")
     map_data = state_crashes.dropna(subset=["latitude", "longitude"]).copy()
-    if use_utah_all_crashes:
+    if use_all_state_crashes:
         severity_options = [
             ("Fatal", "severity_fatal"),
             ("Suspected Serious Injury", "severity_serious"),
@@ -769,3 +763,10 @@ with st.expander("Data sources and refresh status"):
         for row in sources.itertuples()
     ]
     simple_table(["Dataset", "Purpose", "Years", "Records", "Refreshed"], source_rows)
+    if not all_crash_source_status.empty:
+        st.html("<br>")
+        status_rows = [
+            [row.state, row.tier, row.status, row.source_name]
+            for row in all_crash_source_status.itertuples()
+        ]
+        simple_table(["State", "Priority", "All-Crash Status", "Source"], status_rows)
