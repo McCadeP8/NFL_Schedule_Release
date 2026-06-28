@@ -9,6 +9,7 @@ from functools import wraps
 from typing import Optional
 
 import altair as alt
+import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -3334,22 +3335,21 @@ def build_dynasty_coaches_poll(
     for value_column, ecr_column in [("value_1qb", "ecr_1qb"), ("value_2qb", "ecr_2qb")]:
         reference = (
             player_values[[ecr_column, value_column]]
+            .apply(pd.to_numeric, errors="coerce")
             .dropna()
             .groupby(ecr_column, as_index=False)[value_column]
             .mean()
             .sort_values(ecr_column)
         )
-        pick_values[value_column] = pd.to_numeric(pick_values[ecr_column], errors="coerce").map(
-            lambda ecr: float(
-                pd.Series(reference[value_column].values, index=reference[ecr_column])
-                .reindex(reference[ecr_column].tolist() + [ecr])
-                .sort_index()
-                .interpolate(method="index", limit_direction="both")
-                .loc[ecr]
+        pick_ecr = pd.to_numeric(pick_values[ecr_column], errors="coerce")
+        pick_values[value_column] = 0.0
+        valid_pick_ecr = pick_ecr.notna()
+        if not reference.empty and valid_pick_ecr.any():
+            pick_values.loc[valid_pick_ecr, value_column] = np.interp(
+                pick_ecr.loc[valid_pick_ecr].astype(float),
+                reference[ecr_column].astype(float),
+                reference[value_column].astype(float),
             )
-            if not pd.isna(ecr)
-            else 0
-        )
     season_round_values = (
         pick_values.dropna(subset=["season", "round"])
         .groupby(["season", "round"])[["value_1qb", "value_2qb"]]
