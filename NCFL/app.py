@@ -79,6 +79,14 @@ NPL_TIER_DIVISIONS = {
 NPL_PROMOTION_SLOTS = {2: 3, 3: 3}
 NPL_RELEGATION_SLOTS = {1: 3, 2: 6, 3: 6}
 NPL_FEEDER_AT_LARGE_PROMOTIONS = 8
+NPL_DIVISION_ROMAN = {
+    "National League Division 1": "National League Division I",
+    "National League Division 2": "National League Division II",
+    "Feed League Division 1": "Feeder League Division I",
+    "Feed League Division 2": "Feeder League Division II",
+    "Feed League Division 3": "Feeder League Division III",
+    "Feed League Division 4": "Feeder League Division IV",
+}
 
 
 def clean_text(value: object, fallback: str = "") -> str:
@@ -284,8 +292,23 @@ footer { visibility: hidden; }
   color: #111827 !important;
   padding: 16px 28px;
 }
+.stTabs [role="tab"],
+.stTabs [role="tab"] * {
+  color: #111827 !important;
+  -webkit-text-fill-color: #111827 !important;
+}
+.stTabs [data-baseweb="tab"] p,
+.stTabs [data-baseweb="tab"] span,
+.stTabs [data-baseweb="tab"] div,
+.stTabs [role="tab"] p,
+.stTabs [role="tab"] span,
+.stTabs [role="tab"] div {
+  color: #111827 !important;
+  -webkit-text-fill-color: #111827 !important;
+}
 .stTabs [data-baseweb="tab"] * {
   color: #111827 !important;
+  -webkit-text-fill-color: #111827 !important;
 }
 .stTabs [data-baseweb="tab"]:hover,
 .stTabs [data-baseweb="tab"]:hover * {
@@ -1815,6 +1838,16 @@ div[data-testid="stButton"] button {
   text-align: right;
   white-space: nowrap;
 }
+.standings-table th,
+.standings-table th *,
+.standings-table td,
+.standings-table td * {
+  color: #111827 !important;
+  -webkit-text-fill-color: #111827 !important;
+}
+.standings-table th {
+  color: #111827 !important;
+}
 .standings-table th.team-col {
   text-align: left;
   width: 380px;
@@ -1848,6 +1881,58 @@ div[data-testid="stButton"] button {
 .standings-table.npl-table tr.npl-bronze td {
   background: #ffedd5;
 }
+.npl-wrap.tier-1 {
+  border-top: 7px solid #facc15;
+  box-shadow: 0 8px 26px rgba(250,204,21,0.20);
+}
+.npl-wrap.tier-1 .standings-title {
+  background: linear-gradient(90deg, #111827, #3f2f09);
+}
+.npl-wrap.tier-1 .standings-title span {
+  color: #fef3c7;
+}
+.npl-wrap.tier-2 {
+  border-top: 6px solid #94a3b8;
+}
+.npl-wrap.tier-3 {
+  border-top: 5px solid #64748b;
+}
+.npl-wrap.tier-4 {
+  border-top: 5px solid #cbd5e1;
+  opacity: 0.94;
+}
+.npl-wrap.tier-4 .standings-title span {
+  color: #64748b;
+}
+.npl-logo-grid {
+  display: grid;
+  grid-template-columns: repeat(18, minmax(42px, 1fr));
+  gap: 8px;
+  padding: 14px;
+  background: #ffffff;
+}
+.npl-logo-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 54px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+.npl-logo-slot img {
+  max-width: 42px;
+  max-height: 42px;
+  object-fit: contain;
+}
+.npl-logo-fallback {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.8px;
+  color: #111827;
+  text-align: center;
+}
 .npl-status-pill {
   display: inline-flex;
   align-items: center;
@@ -1865,27 +1950,33 @@ div[data-testid="stButton"] button {
 .npl-status-pill.promote-winner,
 .npl-status-pill.promote-pf {
   background: #bbf7d0;
-  color: #166534;
+  color: #166534 !important;
+  -webkit-text-fill-color: #166534 !important;
 }
 .npl-status-pill.gold {
   background: #facc15;
-  color: #713f12;
+  color: #713f12 !important;
+  -webkit-text-fill-color: #713f12 !important;
 }
 .npl-status-pill.silver {
   background: #cbd5e1;
-  color: #334155;
+  color: #334155 !important;
+  -webkit-text-fill-color: #334155 !important;
 }
 .npl-status-pill.bronze {
   background: #fdba74;
-  color: #7c2d12;
+  color: #7c2d12 !important;
+  -webkit-text-fill-color: #7c2d12 !important;
 }
 .npl-status-pill.relegate {
   background: #fecdd3;
-  color: #9f1239;
+  color: #9f1239 !important;
+  -webkit-text-fill-color: #9f1239 !important;
 }
 .npl-status-pill.stay {
   background: #e2e8f0;
-  color: #334155;
+  color: #334155 !important;
+  -webkit-text-fill-color: #334155 !important;
 }
 .standings-team-cell {
   border-left: 6px solid var(--team-color);
@@ -4363,6 +4454,7 @@ def render_schedule_cards(
         notes = clean_text(game.get("Notes"))
         bowl = bowl_for_notes(notes, bowls)
         rivalry = rivalry_name(game)
+        npl_badge = npl_division_label(game.get("Division")) if clean_text(game.get("Tier")) else ""
         is_conference = bool(game.get("Conference", False))
         score_a = starter_scores_by_team_week.get((match_key(team_a), week))
         score_b = starter_scores_by_team_week.get((match_key(team_b), week))
@@ -4370,7 +4462,7 @@ def render_schedule_cards(
             score_a = scores_by_team_week.get((match_key(team_a), week))
         if score_b is None:
             score_b = scores_by_team_week.get((match_key(team_b), week))
-        badge = "Bowl Game" if bowl else ("Rivalry" if rivalry else ("Conference" if is_conference else "Non-Conf"))
+        badge = "Bowl Game" if bowl else ("Rivalry" if rivalry else (npl_badge or ("Conference" if is_conference else "Non-Conf")))
         game_ranks = schedule_ap_top25(rankings, week)
         record_week = max(week - 1, 0)
         team_a_record = team_record_through_week(full_schedule, scores, schools, team_a, record_week)
@@ -4931,6 +5023,21 @@ def npl_division_sort(value: object) -> str:
     return clean_text(value, "Unassigned").casefold()
 
 
+def npl_division_label(value: object) -> str:
+    division = clean_text(value, "NPL")
+    return NPL_DIVISION_ROMAN.get(division, division)
+
+
+def npl_schedule_for_display(npl_schedule: pd.DataFrame) -> pd.DataFrame:
+    if npl_schedule.empty:
+        return npl_schedule.copy()
+    display = npl_schedule.copy()
+    if "Division" in display.columns:
+        display["Notes"] = display["Division"].map(npl_division_label)
+        display["Division"] = display["Division"].map(npl_division_label)
+    return display
+
+
 def npl_team_info(schools: pd.DataFrame, team: str) -> dict[str, str]:
     return team_lookup(schools).get(team, {})
 
@@ -5150,6 +5257,7 @@ def render_npl_table(title: str, standings: pd.DataFrame, projection: bool = Fal
     if standings.empty:
         return
 
+    tier_class = f"tier-{int(standings['tier'].iloc[0])}" if "tier" in standings.columns and not standings.empty else ""
     rows = []
     for index, row in standings.iterrows():
         logo = clean_text(row.get("logo"))
@@ -5172,15 +5280,15 @@ def render_npl_table(title: str, standings: pd.DataFrame, projection: bool = Fal
   <td>{float(row["pf"]):,.2f}</td>
   <td>{float(row["pa"]):,.2f}</td>
   <td>{float(row["pd"]):+,.2f}</td>
-  {f'<td><span class="npl-status-pill {esc(status)}">{esc(npl_status_label(status))}</span></td><td>Tier {int(row["next_tier"])}</td>' if projection else ''}
+  {f'<td><span class="npl-status-pill {esc(status)}">{esc(npl_status_label(status))}</span></td>' if projection else ''}
 </tr>
 """
         )
 
-    extra_headers = "<th>2027 Status</th><th>2027 Tier</th>" if projection else ""
+    extra_headers = "<th>Movement</th>" if projection else ""
     st.html(
         f"""
-<div class="standings-wrap npl-wrap">
+<div class="standings-wrap npl-wrap {esc(tier_class)}">
   <div class="standings-title">
     <span>{esc(title)}</span>
     <div></div>
@@ -5190,7 +5298,7 @@ def render_npl_table(title: str, standings: pd.DataFrame, projection: bool = Fal
       <colgroup>
         <col style="width:6%;">
         <col class="standings-team-column">
-        <col span="{6 if projection else 4}">
+        <col span="{5 if projection else 4}">
       </colgroup>
       <thead>
         <tr>
@@ -5211,64 +5319,29 @@ def render_npl_table(title: str, standings: pd.DataFrame, projection: bool = Fal
     )
 
 
-def render_projected_npl_table(title: str, projection: pd.DataFrame) -> None:
+def render_projected_npl_logo_grid(title: str, projection: pd.DataFrame) -> None:
     if projection.empty:
         return
 
-    rows = []
-    for index, row in projection.iterrows():
+    tier_class = f"tier-{int(projection['next_tier'].iloc[0])}" if "next_tier" in projection.columns else ""
+    logos = []
+    for _, row in projection.iterrows():
         logo = clean_text(row.get("logo"))
-        logo_html = f'<img src="{esc(logo)}" alt="{esc(row["team"])}">' if logo else ""
-        status = clean_text(row.get("status"), "stay")
-        origin = f'Tier {int(row["tier"])} · {clean_text(row.get("division"))}'
-        rows.append(
-            f"""
-<tr class="npl-{status}">
-  <td>{index + 1}</td>
-  <td class="standings-team-cell" style="--team-color:{esc(row.get("color"), "#1a2030")};">
-    <div class="standings-team">
-      {logo_html}
-      <div>
-        <div class="standings-team-name">{esc(row["team"])}</div>
-        <div class="standings-team-sub">{esc(origin)}</div>
-      </div>
-    </div>
-  </td>
-  <td><span class="npl-status-pill {esc(status)}">{esc(npl_status_label(status))}</span></td>
-  <td>{int(row["projected_pf_seed"])}</td>
-  <td>{record_html(int(row["wins"]), int(row["losses"]), int(row["ties"]), float(row["win_pct"]))}</td>
-  <td>{float(row["pf"]):,.2f}</td>
-</tr>
-"""
+        team = clean_text(row.get("team"))
+        logos.append(
+            f"""<div class="npl-logo-slot" title="{esc(team)}">
+  {f'<img src="{esc(logo)}" alt="{esc(team)}">' if logo else f'<span class="npl-logo-fallback">{esc(team)}</span>'}
+</div>"""
         )
 
     st.html(
         f"""
-<div class="standings-wrap npl-wrap">
+<div class="standings-wrap npl-wrap {esc(tier_class)}">
   <div class="standings-title">
     <span>{esc(title)}</span>
     <div></div>
   </div>
-  <div class="standings-scroll">
-    <table class="standings-table npl-table">
-      <colgroup>
-        <col style="width:6%;">
-        <col class="standings-team-column">
-        <col span="4">
-      </colgroup>
-      <thead>
-        <tr>
-          <th>Seed</th>
-          <th class="team-col">Team</th>
-          <th>Movement</th>
-          <th>PF Seed</th>
-          <th>2026 Record</th>
-          <th>2026 PF</th>
-        </tr>
-      </thead>
-      <tbody>{''.join(rows)}</tbody>
-    </table>
-  </div>
+  <div class="npl-logo-grid">{''.join(logos)}</div>
 </div>
 """
     )
@@ -5288,23 +5361,7 @@ def render_npl_schedule(
         npl_empty_state()
         return
 
-    tier_options = ["All"] + [
-        f"Tier {tier}"
-        for tier in sorted(npl_schedule["Tier"].dropna().map(npl_tier_sort).unique())
-    ]
-    selected_tier = st.selectbox("Tier", tier_options, key="npl_schedule_tier")
-    filtered = npl_schedule.copy()
-    if selected_tier != "All":
-        selected_tier_number = int(selected_tier.split()[-1])
-        filtered = filtered.loc[filtered["Tier"].map(npl_tier_sort).eq(selected_tier_number)].copy()
-
-    division_options = ["All"] + sorted(
-        filtered["Division"].dropna().map(lambda value: clean_text(value, "Unassigned")).unique(),
-        key=lambda value: value.casefold(),
-    )
-    selected_division = st.selectbox("Division", division_options, key="npl_schedule_division")
-    if selected_division != "All":
-        filtered = filtered.loc[filtered["Division"].map(lambda value: clean_text(value, "Unassigned")).eq(selected_division)].copy()
+    filtered = npl_schedule_for_display(npl_schedule)
 
     weeks = schedule_weeks(filtered)
     if not weeks:
@@ -5340,8 +5397,10 @@ def render_npl_standings(npl_schedule: pd.DataFrame, scores: pd.DataFrame, schoo
         npl_empty_state()
         return
 
+    standings = npl_projection_frame(standings)
+    standings["division"] = standings["division"].map(npl_division_label)
     for (tier, division), section in standings.groupby(["tier", "division"], sort=False):
-        render_npl_table(f"Tier {int(tier)} · {division}", section.reset_index(drop=True))
+        render_npl_table(f"Tier {int(tier)} · {division}", section.reset_index(drop=True), projection=True)
 
 
 @loading_spinner("Projecting the 2027 Premier League pyramid...")
@@ -5353,45 +5412,13 @@ def render_npl_projection(npl_schedule: pd.DataFrame, scores: pd.DataFrame, scho
 
     projected = npl_projection_frame(standings)
     next_year = projected_npl_divisions(projected)
+    next_year["projected_division"] = next_year["projected_division"].map(npl_division_label)
 
-    st.html(
-        """
-<div class="history-section-title">
-  <span>Projected 2027 Pyramid</span>
-  <div></div>
-</div>
-"""
-    )
     for (tier, division), section in next_year.groupby(["next_tier", "projected_division"], sort=True):
-        render_projected_npl_table(
-            f"2027 Tier {int(tier)} · {division}",
+        render_projected_npl_logo_grid(
+            division,
             section.reset_index(drop=True),
         )
-
-    st.html(
-        """
-<div class="history-section-title">
-  <span>2026 Movement Board</span>
-  <div></div>
-</div>
-"""
-    )
-
-    for (tier, division), section in projected.groupby(["tier", "division"], sort=False):
-        render_npl_table(
-            f"Tier {int(tier)} · {division} 2027 Projection",
-            section.reset_index(drop=True),
-            projection=True,
-        )
-
-    promoted = int(projected["status"].isin(["promote", "promote-winner", "promote-pf"]).sum())
-    relegated = int(projected["status"].eq("relegate").sum())
-    st.caption(
-        "Projection rules: Premier medals for 1st/2nd/3rd and bottom 3 relegated; "
-        "Champions top 3 promoted and bottom 6 relegated; National top 3 and bottom 6 per division; "
-        f"Feed division winners plus {NPL_FEEDER_AT_LARGE_PROMOTIONS} highest remaining PF promoted. "
-        f"Currently {promoted} promoted and {relegated} relegated."
-    )
 
 
 @loading_spinner("Loading league standings...")
@@ -5485,8 +5512,8 @@ def team_record_text(
         )
         conference_name = clean_text(row.get("conference"), "Conference")
         parts = [
-            f"{rank_prefix(team_name, latest_ap_top25(rankings))}{overall} NCAA Record",
-            f"{conference} {conference_name} Record",
+            f"{rank_prefix(team_name, latest_ap_top25(rankings))}{overall} NCAA",
+            f"{conference} {conference_name}",
         ]
 
     if npl_schedule is not None and not npl_schedule.empty:
@@ -5499,7 +5526,7 @@ def team_record_text(
                 int(npl_row["losses"]),
                 int(npl_row["ties"]),
             )
-            parts.append(f"{npl_record} {clean_text(npl_row.get('division'), 'NPL')} Record")
+            parts.append(f"{npl_record} {npl_division_label(npl_row.get('division'))}")
 
     return ", ".join(parts)
 
@@ -8487,18 +8514,18 @@ with st.spinner("Loading league datasets...", show_time=True):
     branding_data = load_branding_data(DATA_CACHE_VERSION)
 if len(branding_data) == 9:
     schools, conferences, schedule, scores, rankings, drafts, starters, bowls, player_pictures = branding_data
-    npl_schedule = pd.DataFrame(columns=["Year", "Week", "Tier", "Division", "TeamA", "TeamB", "Notes", "Rivalry"])
+    npl_schedule = pd.DataFrame(columns=["Year", "Week", "Tier", "Division", "TeamA", "TeamB", "TeamASeed", "TeamBSeed", "Notes", "Rivalry"])
 elif len(branding_data) == 10:
     schools, conferences, schedule, scores, rankings, drafts, starters, bowls, player_pictures, npl_schedule = branding_data
 elif len(branding_data) == 8:
     schools, conferences, schedule, scores, rankings, drafts, starters, bowls = branding_data
     player_pictures = pd.DataFrame(columns=["Player", "Picture"])
-    npl_schedule = pd.DataFrame(columns=["Year", "Week", "Tier", "Division", "TeamA", "TeamB", "Notes", "Rivalry"])
+    npl_schedule = pd.DataFrame(columns=["Year", "Week", "Tier", "Division", "TeamA", "TeamB", "TeamASeed", "TeamBSeed", "Notes", "Rivalry"])
 elif len(branding_data) == 7:
     schools, conferences, schedule, scores, rankings, drafts, starters = branding_data
     bowls = pd.DataFrame(columns=["Bowl", "Logo"])
     player_pictures = pd.DataFrame(columns=["Player", "Picture"])
-    npl_schedule = pd.DataFrame(columns=["Year", "Week", "Tier", "Division", "TeamA", "TeamB", "Notes", "Rivalry"])
+    npl_schedule = pd.DataFrame(columns=["Year", "Week", "Tier", "Division", "TeamA", "TeamB", "TeamASeed", "TeamBSeed", "Notes", "Rivalry"])
 else:
     raise ValueError(
         f"Expected 7, 8, 9, or 10 branding datasets, received {len(branding_data)}. "
@@ -8630,18 +8657,6 @@ with league_tab:
         render_league_history(history_ledger, schools, bowls)
 
 with npl_tab:
-    st.html(
-        f"""
-<div class="brand-panel conf-hero" style="--accent:#111827;">
-  <div>
-    <div class="conf-kicker">NCFL Premier League</div>
-    <div class="conf-title">NPL</div>
-    <div class="rules-note">Eight divisions across four tiers: 1-1-2-4, 18 teams each, Weeks 1-17 single round robin.</div>
-  </div>
-  <img class="league-logo" src="{LEAGUE_LOGO}" alt="{esc(LEAGUE_NAME)}">
-</div>
-"""
-    )
     npl_schedule_tab, npl_standings_tab, npl_projection_tab = st.tabs(
         ["📅 Schedule", "📊 Standings", "🔮 2027 Projection"]
     )
@@ -8801,24 +8816,48 @@ with team_tab:
         ["📅 Schedule", "👥 Rosters", "🕰️ History"]
     )
     with team_schedule_tab:
-        team_schedule = team_context_schedule.loc[
-            team_context_schedule["TeamA"].eq(selected_team)
-            | team_context_schedule["TeamB"].eq(selected_team)
+        ncaa_team_schedule = schedule.loc[
+            schedule["TeamA"].eq(selected_team)
+            | schedule["TeamB"].eq(selected_team)
         ].copy()
-        render_schedule_cards(
-            team_schedule,
-            scores,
-            schools,
-            rankings=rankings,
-            rosters=all_rosters,
-            starters=starters,
-            bowls=bowls,
-            schedule_context=team_context_schedule,
-            empty_label=f"No {selected_team} games",
-            stacked=True,
-            sort_by_rank=False,
-            key_prefix=f"team_schedule_{match_key(selected_team)}",
-        )
+        npl_display_schedule = npl_schedule_for_display(npl_schedule)
+        npl_team_schedule = npl_display_schedule.loc[
+            npl_display_schedule["TeamA"].eq(selected_team)
+            | npl_display_schedule["TeamB"].eq(selected_team)
+        ].copy()
+        ncaa_col, npl_col = st.columns(2)
+        with ncaa_col:
+            st.html('<div class="history-section-title"><span>NCAA League Play</span><div></div></div>')
+            render_schedule_cards(
+                ncaa_team_schedule,
+                scores,
+                schools,
+                rankings=rankings,
+                rosters=all_rosters,
+                starters=starters,
+                bowls=bowls,
+                schedule_context=schedule,
+                empty_label=f"No NCAA games for {selected_team}",
+                stacked=True,
+                sort_by_rank=False,
+                key_prefix=f"team_schedule_ncaa_{match_key(selected_team)}",
+            )
+        with npl_col:
+            st.html('<div class="history-section-title"><span>Premier League Play</span><div></div></div>')
+            render_schedule_cards(
+                npl_team_schedule,
+                scores,
+                schools,
+                rankings=rankings,
+                rosters=all_rosters,
+                starters=starters,
+                bowls=bowls,
+                schedule_context=npl_display_schedule,
+                empty_label=f"No Premier League games for {selected_team}",
+                stacked=True,
+                sort_by_rank=False,
+                key_prefix=f"team_schedule_npl_{match_key(selected_team)}",
+            )
     with team_roster_tab:
         render_team_roster(
             roster_snapshot,
