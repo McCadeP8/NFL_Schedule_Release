@@ -49,6 +49,7 @@ SCHOOL_ALIASES = {
     "Oregon St": "Oregon State",
     "Oregon St.": "Oregon State",
     "ECU": "East Carolina",
+    "Eastern Carolina": "East Carolina",
     "FAU": "Florida Atlantic",
     "FIU": "Florida International",
     "Sam Houston": "Sam Houston State",
@@ -56,7 +57,11 @@ SCHOOL_ALIASES = {
     "Sam Houston St.": "Sam Houston State",
     "Southern Miss": "Southern Mississippi",
     "UL Monroe": "Louisiana Monroe",
+    "UL Monroe Monroe": "Louisiana Monroe",
     "UL Munroe": "Louisiana Monroe",
+    "UL Munroe Monroe": "Louisiana Monroe",
+    "UL Monrue": "Louisiana Monroe",
+    "UL Monrue Monroe": "Louisiana Monroe",
     "ULM": "Louisiana Monroe",
     "Tarleton State": "Tarleton St.",
     "Tarleton St": "Tarleton St.",
@@ -332,6 +337,44 @@ def _optional_npl_schedule() -> pd.DataFrame:
     return _empty_npl_schedule()
 
 
+def _optional_schedule() -> Optional[pd.DataFrame]:
+    schedule_path = Path(__file__).with_name("schedule_2026.csv")
+    if not schedule_path.exists():
+        return None
+
+    schedule = _normalize_sheet(pd.read_csv(schedule_path))
+    if not _has_columns(schedule, ["Week", "TeamA", "TeamB"]):
+        return None
+    schedule["Year"] = 2026
+    return schedule
+
+
+def _derive_schedule_conference_flags(schedule: pd.DataFrame, schools: pd.DataFrame) -> pd.DataFrame:
+    schedule = schedule.copy()
+    if schedule.empty or schools.empty or not _has_columns(schedule, ["TeamA", "TeamB"]):
+        return schedule
+    if "Conference" in schedule.columns and schedule["Conference"].notna().any():
+        return schedule
+    if not _has_columns(schools, ["School", "Conference"]):
+        return schedule
+
+    school_conferences = (
+        schools.dropna(subset=["School"])
+        .assign(Conference=lambda frame: frame["Conference"].map(_normalize_conference))
+        .drop_duplicates("School", keep="last")
+        .set_index("School")["Conference"]
+        .to_dict()
+    )
+    schedule["Conference"] = schedule.apply(
+        lambda row: bool(
+            school_conferences.get(row.get("TeamA"))
+            and school_conferences.get(row.get("TeamA")) == school_conferences.get(row.get("TeamB"))
+        ),
+        axis=1,
+    )
+    return schedule
+
+
 def _normalize_school(value: object) -> object:
     if pd.isna(value):
         return value
@@ -380,6 +423,8 @@ def _repair_school_branding(schools: pd.DataFrame) -> pd.DataFrame:
         & nicknames.str.contains("Ragin", case=False, na=False)
     )
     schools.loc[cajuns_mask, "School"] = "Louisiana"
+    schools["School"] = schools["School"].map(_normalize_school)
+    schools = schools.drop_duplicates("School", keep="last").reset_index(drop=True)
 
     return schools
 
@@ -424,7 +469,9 @@ def get_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, 
     schools = _read_csv_url(schools_url)
     if not _has_columns(schools, ["School", "TeamID"]):
         schools = _read_google_sheet(SCHOOLS_SHEET_ID, 0)
-    schedule = _safe_read_csv_url(schedule_url, _empty_schedule())
+    schedule = _optional_schedule()
+    if schedule is None:
+        schedule = _safe_read_csv_url(schedule_url, _empty_schedule())
     scores = _safe_read_csv_url(scores_url, _empty_scores())
     rankings = _safe_read_csv_url(rankings_url, _empty_rankings())
     drafts = _safe_read_csv_url(drafts_url, _empty_drafts())
@@ -445,6 +492,7 @@ def get_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, 
         )
     schools = _repair_school_branding(schools)
     schedule = _ensure_columns(schedule, ["Year", "Week", "TeamA", "TeamB", "Conference", "Notes", "Rivalry"])
+    schedule = _derive_schedule_conference_flags(schedule, schools)
     npl_schedule = _ensure_columns(npl_schedule, ["Year", "Week", "Tier", "Division", "TeamA", "TeamB", "TeamASeed", "TeamBSeed", "Notes", "Rivalry"])
     scores = _ensure_columns(scores, ["Year", "Team", "Week", "Points"])
     rankings = _ensure_columns(rankings, ["Year", "Week", "Type", "Rank", "Team"])

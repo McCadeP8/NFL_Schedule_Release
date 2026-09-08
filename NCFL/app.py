@@ -62,8 +62,8 @@ SCHEDULE_STATUS_COLORS = {
     "pending": "#8a96b0",
 }
 CACHE_TTL_SECONDS = 60 * 60 * 24
-DATA_CACHE_VERSION = "louisiana-monroe-split-v1"
-STANDINGS_CACHE_VERSION = "ignore-zero-future-games-v1"
+DATA_CACHE_VERSION = "ul-monroe-canonical-v2"
+STANDINGS_CACHE_VERSION = "ul-monroe-canonical-v2"
 NPL_SEASON = 2026
 NPL_TIER_DIVISIONS = {
     1: ["Premier League"],
@@ -207,6 +207,23 @@ def official_team_resolver(schools: pd.DataFrame) -> dict[str, str]:
             "fsu": "Florida State",
             "miami": "Miami (FL)",
             "smu": "Southern Methodist",
+            "ecu": "East Carolina",
+            "easterncarolina": "East Carolina",
+            "fau": "Florida Atlantic",
+            "fiu": "Florida International",
+            "samhousston": "Sam Houston State",
+            "samhouston": "Sam Houston State",
+            "samhoustonst": "Sam Houston State",
+            "southernmiss": "Southern Mississippi",
+            "ulmonroe": "Louisiana Monroe",
+            "ulmonroemonroe": "Louisiana Monroe",
+            "ulmunroe": "Louisiana Monroe",
+            "ulmunroemonroe": "Louisiana Monroe",
+            "ulmonrue": "Louisiana Monroe",
+            "ulmonruemonroe": "Louisiana Monroe",
+            "ulm": "Louisiana Monroe",
+            "tarletonstate": "Tarleton St.",
+            "tarletonst": "Tarleton St.",
         }
     )
     return resolver
