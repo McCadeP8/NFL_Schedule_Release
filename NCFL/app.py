@@ -62,8 +62,8 @@ SCHEDULE_STATUS_COLORS = {
     "pending": "#8a96b0",
 }
 CACHE_TTL_SECONDS = 60 * 60 * 24
-DATA_CACHE_VERSION = "ul-monroe-canonical-v2"
-STANDINGS_CACHE_VERSION = "ul-monroe-canonical-v2"
+DATA_CACHE_VERSION = "npl-score-name-canonical-v1"
+STANDINGS_CACHE_VERSION = "npl-resilient-team-lookup-v1"
 NPL_SEASON = 2026
 NPL_TIER_DIVISIONS = {
     1: ["Premier League"],
@@ -3720,6 +3720,15 @@ def team_lookup(schools: pd.DataFrame) -> dict[str, dict[str, str]]:
     return lookup
 
 
+def team_info_from_lookup(teams: dict[str, dict[str, str]], team: object) -> dict[str, str]:
+    team_name = clean_text(team)
+    if team_name in teams:
+        return teams[team_name]
+
+    keyed_lookup = {canonical_team_key(name): info for name, info in teams.items()}
+    return keyed_lookup.get(canonical_team_key(team_name), {})
+
+
 @st.cache_data(show_spinner="Indexing weekly scores...", max_entries=32)
 def score_lookup(scores: pd.DataFrame, cache_version: str = STANDINGS_CACHE_VERSION) -> dict[tuple[str, int], float]:
     del cache_version
@@ -4814,6 +4823,7 @@ def render_npl_schedule_matrices(
     npl_schedule: pd.DataFrame,
     scores: pd.DataFrame,
     schools: pd.DataFrame,
+    starters: Optional[pd.DataFrame] = None,
 ) -> None:
     if npl_schedule.empty:
         npl_empty_state()
@@ -4821,6 +4831,7 @@ def render_npl_schedule_matrices(
 
     teams = team_lookup(schools)
     scores_by_team_week = score_lookup(scores)
+    starter_scores_by_team_week = starter_score_lookup(starters if starters is not None else pd.DataFrame())
     display_schedule = npl_schedule_for_display(npl_schedule)
 
     for (tier, division), league_games in display_schedule.groupby(["Tier", "Division"], sort=True):
@@ -4873,8 +4884,14 @@ def render_npl_schedule_matrices(
                 team_b = clean_text(game_row.get("TeamB"))
                 opponent = team_b if team_a == team else team_a
                 opponent_logo = clean_text(teams.get(opponent, {}).get("logo"))
-                team_score = scores_by_team_week.get((match_key(team), int(week)))
-                opponent_score = scores_by_team_week.get((match_key(opponent), int(week)))
+                team_key = (match_key(team), int(week))
+                opponent_key = (match_key(opponent), int(week))
+                team_score = starter_scores_by_team_week.get(team_key)
+                opponent_score = starter_scores_by_team_week.get(opponent_key)
+                if team_score is None:
+                    team_score = scores_by_team_week.get(team_key)
+                if opponent_score is None:
+                    opponent_score = scores_by_team_week.get(opponent_key)
                 result = score_class(team_score, opponent_score)
 
                 if opponent_logo:
@@ -5274,7 +5291,7 @@ def npl_schedule_for_display(npl_schedule: pd.DataFrame) -> pd.DataFrame:
 
 
 def npl_team_info(schools: pd.DataFrame, team: str) -> dict[str, str]:
-    return team_lookup(schools).get(team, {})
+    return team_info_from_lookup(team_lookup(schools), team)
 
 
 def empty_npl_standing(team: str, tier: object, division: object, info: dict[str, str]) -> dict[str, object]:
@@ -5324,7 +5341,7 @@ def build_npl_standings(
                     team,
                     tier,
                     division,
-                    school_lookup.get(team, {}),
+                    team_info_from_lookup(school_lookup, team),
                 )
             if team:
                 seed = pd.to_numeric(game.get(seed_column), errors="coerce")
@@ -8957,7 +8974,7 @@ with npl_tab:
     with npl_standings_tab:
         render_npl_standings(npl_schedule, scores, schools, rankings)
     with npl_league_schedule_tab:
-        render_npl_schedule_matrices(npl_schedule, scores, schools)
+        render_npl_schedule_matrices(npl_schedule, scores, schools, starters)
     with npl_projection_tab:
         render_npl_projection(npl_schedule, scores, schools)
 
