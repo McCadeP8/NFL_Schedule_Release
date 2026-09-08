@@ -62,7 +62,7 @@ SCHEDULE_STATUS_COLORS = {
     "pending": "#8a96b0",
 }
 CACHE_TTL_SECONDS = 60 * 60 * 24
-DATA_CACHE_VERSION = "npl-tab-v1"
+DATA_CACHE_VERSION = "louisiana-monroe-split-v1"
 STANDINGS_CACHE_VERSION = "ignore-zero-future-games-v1"
 NPL_SEASON = 2026
 NPL_TIER_DIVISIONS = {
@@ -4541,7 +4541,7 @@ def render_schedule_cards(
         notes = clean_text(game.get("Notes"))
         bowl = bowl_for_notes(notes, bowls)
         rivalry = rivalry_name(game)
-        npl_badge = npl_division_label(game.get("Division")) if clean_text(game.get("Tier")) else ""
+        npl_badge = "NPL" if clean_text(game.get("Tier")) else ""
         is_conference = bool(game.get("Conference", False))
         score_a = starter_scores_by_team_week.get((match_key(team_a), week))
         score_b = starter_scores_by_team_week.get((match_key(team_b), week))
@@ -4790,6 +4790,101 @@ def render_conference_schedule_matrix(
 </div>
 """
     )
+
+
+@loading_spinner("Building Premier League schedule grids...")
+def render_npl_schedule_matrices(
+    npl_schedule: pd.DataFrame,
+    scores: pd.DataFrame,
+    schools: pd.DataFrame,
+) -> None:
+    if npl_schedule.empty:
+        npl_empty_state()
+        return
+
+    teams = team_lookup(schools)
+    scores_by_team_week = score_lookup(scores)
+    display_schedule = npl_schedule_for_display(npl_schedule)
+
+    for (tier, division), league_games in display_schedule.groupby(["Tier", "Division"], sort=True):
+        league_games = league_games.copy()
+        weeks = schedule_weeks(league_games)
+        if not weeks:
+            continue
+
+        seeds: dict[str, int] = {}
+        for _, row in league_games.iterrows():
+            for team_column, seed_column in (("TeamA", "TeamASeed"), ("TeamB", "TeamBSeed")):
+                team = clean_text(row.get(team_column))
+                seed = pd.to_numeric(row.get(seed_column), errors="coerce")
+                if team and not pd.isna(seed):
+                    seeds[team] = min(seeds.get(team, int(seed)), int(seed))
+
+        league_teams = sorted(
+            set(league_games["TeamA"].dropna().map(clean_text))
+            | set(league_games["TeamB"].dropna().map(clean_text)),
+            key=lambda team: (seeds.get(team, 999), team.casefold()),
+        )
+        if not league_teams:
+            continue
+
+        headers = ['<th class="schedule-week-head">Week</th>']
+        for team in league_teams:
+            logo = clean_text(teams.get(team, {}).get("logo"))
+            if logo:
+                header = f'<img src="{esc(logo)}" alt="{esc(team)}" title="{esc(team)}">'
+            else:
+                header = f'<span class="conf-head-label">{esc(team)}</span>'
+            headers.append(f'<th class="schedule-matrix-team-head">{header}</th>')
+
+        body_rows = []
+        for week in weeks:
+            week_games = league_games.loc[league_games["Week"].eq(week)]
+            cells = [f'<td class="schedule-week-cell">Week {week}</td>']
+
+            for team in league_teams:
+                game = week_games.loc[
+                    week_games["TeamA"].eq(team) | week_games["TeamB"].eq(team)
+                ]
+
+                if game.empty:
+                    cells.append('<td class="schedule-opponent-cell pending"><span class="schedule-bye">BYE</span></td>')
+                    continue
+
+                game_row = game.iloc[0]
+                team_a = clean_text(game_row.get("TeamA"))
+                team_b = clean_text(game_row.get("TeamB"))
+                opponent = team_b if team_a == team else team_a
+                opponent_logo = clean_text(teams.get(opponent, {}).get("logo"))
+                team_score = scores_by_team_week.get((match_key(team), int(week)))
+                opponent_score = scores_by_team_week.get((match_key(opponent), int(week)))
+                result = score_class(team_score, opponent_score)
+
+                if opponent_logo:
+                    content = f'<img src="{esc(opponent_logo)}" alt="{esc(opponent)}" title="{esc(opponent)}">'
+                else:
+                    content = f'<span class="conf-head-label">{esc(opponent)}</span>'
+                rivalry = rivalry_name(game_row)
+                if rivalry:
+                    content = f'{content}<span class="schedule-matrix-rivalry">{esc(rivalry)}</span>'
+
+                cells.append(f'<td class="schedule-opponent-cell {result}">{content}</td>')
+
+            body_rows.append(f"<tr>{''.join(cells)}</tr>")
+
+        st.html(
+            f"""
+<div class="schedule-matrix-wrap npl-wrap tier-{int(tier)}">
+  <div class="schedule-matrix-title"><span>{esc(division)}</span><div></div></div>
+  <div class="schedule-matrix-scroll">
+    <table class="schedule-matrix">
+      <thead><tr>{''.join(headers)}</tr></thead>
+      <tbody>{''.join(body_rows)}</tbody>
+    </table>
+  </div>
+</div>
+"""
+        )
 
 
 def pct(wins: float, losses: float, ties: float) -> float:
@@ -5393,7 +5488,12 @@ def projected_npl_divisions(projected: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def render_npl_table(title: str, standings: pd.DataFrame, projection: bool = False) -> None:
+def render_npl_table(
+    title: str,
+    standings: pd.DataFrame,
+    projection: bool = False,
+    ap_ranks: Optional[dict[str, int]] = None,
+) -> None:
     if standings.empty:
         return
 
@@ -5403,6 +5503,7 @@ def render_npl_table(title: str, standings: pd.DataFrame, projection: bool = Fal
         logo = clean_text(row.get("logo"))
         logo_html = f'<img src="{esc(logo)}" alt="{esc(row["team"])}">' if logo else ""
         status = clean_text(row.get("status"))
+        display_name = f"{rank_prefix(row['team'], ap_ranks)}{clean_text(row['team'])}"
         rows.append(
             f"""
 <tr class="npl-{status}">
@@ -5411,7 +5512,7 @@ def render_npl_table(title: str, standings: pd.DataFrame, projection: bool = Fal
     <div class="standings-team">
       {logo_html}
       <div>
-        <div class="standings-team-name">{esc(row["team"])}</div>
+        <div class="standings-team-name">{esc(display_name)}</div>
         <div class="standings-team-sub">{esc(nickname_owner(row.get("nickname"), row.get("owner")))}</div>
       </div>
     </div>
@@ -5537,12 +5638,18 @@ def render_npl_schedule(
 
 
 @loading_spinner("Loading Premier League standings...")
-def render_npl_standings(npl_schedule: pd.DataFrame, scores: pd.DataFrame, schools: pd.DataFrame) -> None:
+def render_npl_standings(
+    npl_schedule: pd.DataFrame,
+    scores: pd.DataFrame,
+    schools: pd.DataFrame,
+    rankings: Optional[pd.DataFrame] = None,
+) -> None:
     standings = sort_npl_standings(build_npl_standings(npl_schedule, scores, schools))
     if standings.empty:
         npl_empty_state()
         return
 
+    ap_ranks = latest_ap_top25(rankings)
     standings = npl_projection_frame(standings)
     standings["division"] = standings["division"].map(npl_division_label)
     for (tier, division), section in standings.groupby(["tier", "division"], sort=False):
@@ -5555,7 +5662,12 @@ def render_npl_standings(npl_schedule: pd.DataFrame, scores: pd.DataFrame, schoo
                 )
                 .drop(columns=["_status_sort"])
             )
-        render_npl_table(f"Tier {int(tier)} · {division}", section.reset_index(drop=True), projection=True)
+        render_npl_table(
+            f"Tier {int(tier)} · {division}",
+            section.reset_index(drop=True),
+            projection=True,
+            ap_ranks=ap_ranks,
+        )
 
 
 @loading_spinner("Projecting the 2027 Premier League pyramid...")
@@ -8724,23 +8836,21 @@ league_tab, npl_tab, conference_tab, team_tab, players_tab, rules_tab = st.tabs(
 
 with league_tab:
     (
-        league_standings_tab,
         league_schedule_tab,
+        league_standings_tab,
         league_rankings_tab,
         league_rosters_tab,
         league_drafts_tab,
         league_history_tab,
     ) = st.tabs(
         [
-            "📊 Standings",
             "📅 Schedule",
+            "📊 Standings",
             "⭐ Rankings",
             "👥 Rosters",
             "🧾 Drafts",
         ] + ["🕰️ History"]
     )
-    with league_standings_tab:
-        render_league_standings(schedule, scores, schools, conferences, rankings)
     with league_schedule_tab:
         weeks = schedule_weeks(schedule)
         if weeks:
@@ -8777,6 +8887,8 @@ with league_tab:
                 empty_label="No schedule loaded",
                 key_prefix="league_schedule_empty",
             )
+    with league_standings_tab:
+        render_league_standings(schedule, scores, schools, conferences, rankings)
     with league_rankings_tab:
         render_rankings(
             rankings,
@@ -8812,8 +8924,8 @@ with league_tab:
         render_league_history(history_ledger, schools, bowls)
 
 with npl_tab:
-    npl_schedule_tab, npl_standings_tab, npl_projection_tab = st.tabs(
-        ["📅 Schedule", "📊 Standings", "🔮 2027 Projection"]
+    npl_schedule_tab, npl_standings_tab, npl_league_schedule_tab, npl_projection_tab = st.tabs(
+        ["📅 Schedule", "📊 Standings", "🗓️ League Schedule", "🔮 2027 Projection"]
     )
     with npl_schedule_tab:
         render_npl_schedule(
@@ -8826,7 +8938,9 @@ with npl_tab:
             bowls,
         )
     with npl_standings_tab:
-        render_npl_standings(npl_schedule, scores, schools)
+        render_npl_standings(npl_schedule, scores, schools, rankings)
+    with npl_league_schedule_tab:
+        render_npl_schedule_matrices(npl_schedule, scores, schools)
     with npl_projection_tab:
         render_npl_projection(npl_schedule, scores, schools)
 

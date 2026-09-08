@@ -48,6 +48,18 @@ SCHOOL_ALIASES = {
     "SMU": "Southern Methodist",
     "Oregon St": "Oregon State",
     "Oregon St.": "Oregon State",
+    "ECU": "East Carolina",
+    "FAU": "Florida Atlantic",
+    "FIU": "Florida International",
+    "Sam Houston": "Sam Houston State",
+    "Sam Houston St": "Sam Houston State",
+    "Sam Houston St.": "Sam Houston State",
+    "Southern Miss": "Southern Mississippi",
+    "UL Monroe": "Louisiana Monroe",
+    "UL Munroe": "Louisiana Monroe",
+    "ULM": "Louisiana Monroe",
+    "Tarleton State": "Tarleton St.",
+    "Tarleton St": "Tarleton St.",
 }
 
 COLUMN_ALIASES = {
@@ -356,6 +368,22 @@ def _normalize_sheet(df: pd.DataFrame) -> pd.DataFrame:
     return _normalize_school_names(_normalize_columns(df))
 
 
+def _repair_school_branding(schools: pd.DataFrame) -> pd.DataFrame:
+    schools = schools.copy()
+    if schools.empty or "School" not in schools.columns:
+        return schools
+
+    school_names = schools["School"].fillna("").astype(str)
+    nicknames = schools.get("Nickname", pd.Series("", index=schools.index)).fillna("").astype(str)
+    cajuns_mask = (
+        school_names.eq("Louisiana Monroe")
+        & nicknames.str.contains("Ragin", case=False, na=False)
+    )
+    schools.loc[cajuns_mask, "School"] = "Louisiana"
+
+    return schools
+
+
 def _normalize_conference(value: object) -> str:
     conference = str(value).strip()
     aliases = {str(key).casefold(): normalized for key, normalized in CONFERENCE_ALIASES.items()}
@@ -415,6 +443,7 @@ def get_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, 
         player_pictures = _safe_read_google_sheet(
             SCHOOLS_SHEET_ID, 1477564005, _empty_player_pictures()
         )
+    schools = _repair_school_branding(schools)
     schedule = _ensure_columns(schedule, ["Year", "Week", "TeamA", "TeamB", "Conference", "Notes", "Rivalry"])
     npl_schedule = _ensure_columns(npl_schedule, ["Year", "Week", "Tier", "Division", "TeamA", "TeamB", "TeamASeed", "TeamBSeed", "Notes", "Rivalry"])
     scores = _ensure_columns(scores, ["Year", "Team", "Week", "Points"])
