@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 from typing import Any, Optional, Tuple
 import unicodedata
+from urllib.parse import quote
 
 import pandas as pd
 from pandas.errors import EmptyDataError
@@ -58,6 +59,12 @@ COLUMN_ALIASES = {
     "team_b": "TeamB",
     "rivalry": "Rivalry",
     "rivarly": "Rivalry",
+    "tier": "Tier",
+    "npl tier": "Tier",
+    "premier tier": "Tier",
+    "division": "Division",
+    "npl division": "Division",
+    "npl league": "Division",
 }
 
 SHEET_ID = "1qjPpIEGmhV8aF3CZ8hi-ijQlIP-_z6QYJzSArjJV9d8"
@@ -213,6 +220,10 @@ def _sheet_csv_url(sheet_id: str, gid: Any) -> str:
     return f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&gid={gid}"
 
 
+def _sheet_name_csv_url(sheet_id: str, sheet_name: str) -> str:
+    return f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={quote(sheet_name)}"
+
+
 def _sheet_export_url(sheet_id: str, gid: Any) -> str:
     return f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
 
@@ -227,6 +238,15 @@ def _read_google_sheet(sheet_id: str, gid: Any) -> pd.DataFrame:
 def _empty_schedule() -> pd.DataFrame:
     return pd.DataFrame(
         columns=["Year", "Week", "TeamA", "TeamB", "Conference", "Notes", "Rivalry"]
+    )
+
+
+def _empty_npl_schedule() -> pd.DataFrame:
+    return pd.DataFrame(
+        columns=[
+            "Year", "Week", "Tier", "Division", "TeamA", "TeamB",
+            "TeamASeed", "TeamBSeed", "Notes", "Rivalry",
+        ]
     )
 
 
@@ -282,6 +302,22 @@ def _ensure_columns(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
 
 def _has_columns(df: pd.DataFrame, columns: list[str]) -> bool:
     return all(column in df.columns for column in columns)
+
+
+def _optional_npl_schedule() -> pd.DataFrame:
+    npl_schedule_path = Path(__file__).with_name("npl_schedule_2026.csv")
+    if npl_schedule_path.exists():
+        return _normalize_sheet(pd.read_csv(npl_schedule_path))
+
+    for sheet_name in ("NPL", "NPL Schedule", "Premier League"):
+        try:
+            schedule = _read_csv_url(_sheet_name_csv_url(SCHOOLS_SHEET_ID, sheet_name))
+        except (requests.RequestException, EmptyDataError):
+            continue
+        if _has_columns(schedule, ["Week", "TeamA", "TeamB"]):
+            return schedule
+
+    return _empty_npl_schedule()
 
 
 def _normalize_school(value: object) -> object:
@@ -347,7 +383,7 @@ def _fallback_conferences(schools: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def get_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def get_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     schools_url = "https://docs.google.com/spreadsheets/d/19bH4vYzaV7pbuQ2bcdz3HAaOWGb-BBJhQ9EgBp7YvoY/export?format=csv&gid=1436567589"
     conferences_url = "https://docs.google.com/spreadsheets/d/19bH4vYzaV7pbuQ2bcdz3HAaOWGb-BBJhQ9EgBp7YvoY/export?format=csv&gid=1436567589"
     schedule_url = "https://docs.google.com/spreadsheets/d/19bH4vYzaV7pbuQ2bcdz3HAaOWGb-BBJhQ9EgBp7YvoY/export?format=csv&gid=1612692704"
@@ -366,6 +402,7 @@ def get_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, 
     drafts = _safe_read_csv_url(drafts_url, _empty_drafts())
     bowls = _safe_read_csv_url(bowls_url, _empty_bowls())
     player_pictures = _safe_read_csv_url(player_pictures_url, _empty_player_pictures())
+    npl_schedule = _optional_npl_schedule()
     starters_path = Path(__file__).with_name("weekly_starters.csv")
     starters = _normalize_sheet(pd.read_csv(starters_path)) if starters_path.exists() else _empty_starters()
     if rankings.empty:
@@ -379,6 +416,7 @@ def get_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, 
             SCHOOLS_SHEET_ID, 1477564005, _empty_player_pictures()
         )
     schedule = _ensure_columns(schedule, ["Year", "Week", "TeamA", "TeamB", "Conference", "Notes", "Rivalry"])
+    npl_schedule = _ensure_columns(npl_schedule, ["Year", "Week", "Tier", "Division", "TeamA", "TeamB", "TeamASeed", "TeamBSeed", "Notes", "Rivalry"])
     scores = _ensure_columns(scores, ["Year", "Team", "Week", "Points"])
     rankings = _ensure_columns(rankings, ["Year", "Week", "Type", "Rank", "Team"])
     drafts = _ensure_columns(drafts, ["Year", "Conference", "Type", "Round", "Pick", "Team", "Player"])
@@ -430,6 +468,13 @@ def get_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, 
         schedule["Week"] = pd.to_numeric(schedule["Week"], errors="coerce")
     if "Conference" in schedule.columns:
         schedule["Conference"] = schedule["Conference"].map(_parse_bool)
+    if "Year" in npl_schedule.columns:
+        npl_schedule["Year"] = pd.to_numeric(npl_schedule["Year"], errors="coerce")
+    if "Week" in npl_schedule.columns:
+        npl_schedule["Week"] = pd.to_numeric(npl_schedule["Week"], errors="coerce")
+    for column in ("TeamASeed", "TeamBSeed"):
+        if column in npl_schedule.columns:
+            npl_schedule[column] = pd.to_numeric(npl_schedule[column], errors="coerce")
     if "Year" in scores.columns:
         scores["Year"] = pd.to_numeric(scores["Year"], errors="coerce")
     if "Week" in scores.columns:
@@ -468,7 +513,7 @@ def get_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, 
         player_pictures["Player"].notna() & player_pictures["Player"].ne("")
     ].drop_duplicates("Player", keep="last").reset_index(drop=True)
 
-    return schools, conferences, schedule, scores, rankings, drafts, starters, bowls, player_pictures
+    return schools, conferences, schedule, scores, rankings, drafts, starters, bowls, player_pictures, npl_schedule
 
 
 def enrich_rosters(rosters: pd.DataFrame, schools: pd.DataFrame) -> pd.DataFrame:
@@ -523,7 +568,7 @@ def load_all_rosters(schools: Optional[pd.DataFrame] = None) -> pd.DataFrame:
     return enrich_rosters(pd.concat(league_rosters, ignore_index=True), schools)
 
 
-def load_branding_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def load_branding_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     return get_data()
 
 
