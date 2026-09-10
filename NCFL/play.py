@@ -269,6 +269,7 @@ def get_weekly_starters(
     weeks: Iterable[int] = range(1, 19),
     years: Iterable[int] | None = None,
     conferences: Iterable[str] | None = None,
+    schools: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Load every weekly Sleeper matchup player, marking starters and bench."""
     league_ids_by_year = league_ids_by_year or LEAGUE_IDS_BY_YEAR
@@ -278,7 +279,8 @@ def get_weekly_starters(
     )
     weeks = [int(week) for week in weeks]
     players = get_players()
-    schools, *_ = load_branding_data()
+    if schools is None:
+        schools, *_ = load_branding_data()
     rows = []
 
     for year, leagues in league_ids_by_year.items():

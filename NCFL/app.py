@@ -4,7 +4,7 @@ import html
 import hashlib
 import re
 import unicodedata
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from functools import wraps
 from typing import Optional
 
@@ -16,6 +16,7 @@ import streamlit as st
 from data import LEAGUES, POSITIONS, load_all_rosters as fetch_all_rosters
 from data import get_future_draft_picks as fetch_future_draft_picks
 from data import load_branding_data as fetch_branding_data
+from play import get_weekly_starters as fetch_weekly_starters
 
 
 LEAGUE_NAME = "NCAA/NFL Crossover"
@@ -62,6 +63,8 @@ SCHEDULE_STATUS_COLORS = {
     "pending": "#8a96b0",
 }
 CACHE_TTL_SECONDS = 60 * 60 * 24
+LIVE_WEEK_CACHE_KEY = "live_weekly_starters"
+LIVE_WEEK_FLASH_KEY = "live_week_refresh_message"
 DATA_CACHE_VERSION = "npl-score-name-canonical-v1"
 STANDINGS_CACHE_VERSION = "npl-resilient-team-lookup-v1"
 NPL_SEASON = 2026
@@ -1333,6 +1336,24 @@ div[data-testid="stButton"] button {
   font-weight: 800 !important;
   letter-spacing: 1.8px !important;
   text-transform: uppercase !important;
+}
+.st-key-live_week_refresh button {
+  min-height: 58px !important;
+  background: linear-gradient(180deg, #e31b23 0%, #b50920 100%) !important;
+  border: 2px solid #8e0719 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 7px 0 #760514, 0 11px 24px rgba(181, 9, 32, 0.28) !important;
+  font-size: 20px !important;
+  letter-spacing: 2.2px !important;
+}
+.st-key-live_week_refresh button:hover {
+  background: linear-gradient(180deg, #f52a32 0%, #c8102e 100%) !important;
+  border-color: #760514 !important;
+  transform: translateY(-1px);
+}
+.st-key-live_week_refresh button:active {
+  box-shadow: 0 3px 0 #760514, 0 6px 14px rgba(181, 9, 32, 0.24) !important;
+  transform: translateY(4px);
 }
 .boxscore-matchup-card {
   background: #ffffff;
@@ -3509,6 +3530,96 @@ def render_data_controls() -> None:
         ):
             st.cache_data.clear()
             st.rerun()
+
+
+def fantasy_week_for_date(season: int, today: Optional[date] = None) -> Optional[int]:
+    """Return the Wednesday-Tuesday NFL fantasy week for a season."""
+    today = today or datetime.now().astimezone().date()
+    september_first = date(int(season), 9, 1)
+    labor_day = september_first + timedelta(days=(7 - september_first.weekday()) % 7)
+    week_one_start = labor_day + timedelta(days=2)
+    week = ((today - week_one_start).days // 7) + 1
+    return week if 1 <= week <= 18 else None
+
+
+def apply_live_week_cache(starters: pd.DataFrame) -> pd.DataFrame:
+    """Overlay session-only Sleeper refreshes without touching the source CSV."""
+    cached_weeks = st.session_state.get(LIVE_WEEK_CACHE_KEY, {})
+    merged = starters.copy()
+    for (year, week), entry in cached_weeks.items():
+        live_rows = entry.get("frame") if isinstance(entry, dict) else entry
+        if not isinstance(live_rows, pd.DataFrame) or live_rows.empty:
+            continue
+        if {"Year", "Week"}.issubset(merged.columns):
+            keep = ~(
+                pd.to_numeric(merged["Year"], errors="coerce").eq(int(year))
+                & pd.to_numeric(merged["Week"], errors="coerce").eq(int(week))
+            )
+            merged = merged.loc[keep].copy()
+        merged = pd.concat([merged, live_rows], ignore_index=True, sort=False)
+    return merged
+
+
+def render_live_week_refresh(season: int, schools: pd.DataFrame) -> None:
+    current_week = fantasy_week_for_date(season)
+    label = (
+        f"🔴 Load Current Week {current_week} Rosters + Live Scores"
+        if current_week is not None
+        else "🔴 Live Scores Available During Weeks 1–18"
+    )
+    if st.button(
+        label,
+        key="live_week_refresh",
+        type="primary",
+        use_container_width=True,
+        disabled=current_week is None,
+    ):
+        try:
+            with st.spinner(
+                f"Loading {season} Week {current_week} from Sleeper...",
+                show_time=True,
+            ):
+                live_rows = fetch_weekly_starters(
+                    years=[season],
+                    weeks=[current_week],
+                    schools=schools,
+                )
+        except Exception as exc:
+            st.error(f"Sleeper refresh failed: {exc}")
+        else:
+            if live_rows.empty:
+                st.warning(
+                    f"Sleeper returned no roster or matchup data for {season} Week {current_week}."
+                )
+            else:
+                fetched_at = datetime.now().astimezone()
+                cached_weeks = dict(st.session_state.get(LIVE_WEEK_CACHE_KEY, {}))
+                cached_weeks[(int(season), int(current_week))] = {
+                    "frame": live_rows,
+                    "fetched_at": fetched_at.isoformat(),
+                }
+                st.session_state[LIVE_WEEK_CACHE_KEY] = cached_weeks
+                team_count = live_rows["Team"].dropna().nunique()
+                st.session_state[LIVE_WEEK_FLASH_KEY] = (
+                    f"Week {current_week} refreshed at {fetched_at:%I:%M:%S %p}: "
+                    f"{team_count} teams and {len(live_rows):,} roster rows loaded into this session."
+                )
+                st.rerun()
+
+    flash = st.session_state.pop(LIVE_WEEK_FLASH_KEY, None)
+    if flash:
+        st.success(flash)
+
+    if current_week is not None:
+        entry = st.session_state.get(LIVE_WEEK_CACHE_KEY, {}).get(
+            (int(season), int(current_week))
+        )
+        if isinstance(entry, dict) and entry.get("fetched_at"):
+            fetched_at = datetime.fromisoformat(entry["fetched_at"])
+            st.caption(
+                f"Week {current_week} session cache last loaded "
+                f"{fetched_at:%I:%M:%S %p %Z} · source CSV unchanged"
+            )
 
 
 def under_construction(label: str) -> None:
@@ -8832,6 +8943,7 @@ else:
         f"Expected 7, 8, 9, or 10 branding datasets, received {len(branding_data)}. "
         "Confirm the published app.py and data.py are from the same version."
     )
+starters = apply_live_week_cache(starters)
 PLAYER_PICTURE_LOOKUP = {
     player_picture_key(row["Player"]): clean_text(row["Picture"])
     for _, row in player_pictures.iterrows()
@@ -8886,6 +8998,7 @@ with league_tab:
         ] + ["🕰️ History"]
     )
     with league_schedule_tab:
+        render_live_week_refresh(selected_season, schools)
         weeks = schedule_weeks(schedule)
         if weeks:
             selected_week = st.selectbox(
