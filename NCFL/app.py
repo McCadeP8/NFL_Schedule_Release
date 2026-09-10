@@ -64,7 +64,6 @@ SCHEDULE_STATUS_COLORS = {
 }
 CACHE_TTL_SECONDS = 60 * 60 * 24
 LIVE_WEEK_CACHE_KEY = "live_weekly_starters"
-LIVE_WEEK_FLASH_KEY = "live_week_refresh_message"
 DATA_CACHE_VERSION = "npl-score-name-canonical-v1"
 STANDINGS_CACHE_VERSION = "npl-resilient-team-lookup-v1"
 NPL_SEASON = 2026
@@ -3574,20 +3573,51 @@ def render_live_week_refresh(season: int, schools: pd.DataFrame) -> None:
         use_container_width=True,
         disabled=current_week is None,
     ):
-        try:
-            with st.spinner(
-                f"Loading {season} Week {current_week} from Sleeper...",
-                show_time=True,
-            ):
-                live_rows = fetch_weekly_starters(
-                    years=[season],
-                    weeks=[current_week],
-                    schools=schools,
+        load_status = st.status(
+            f"Preparing {season} Week {current_week} live refresh...",
+            expanded=True,
+        )
+        with load_status:
+            progress_bar = st.progress(0, text="Downloading the NFL player directory...")
+            loaded_leagues = st.empty()
+        completed: list[str] = []
+
+        def show_progress(
+            phase: str,
+            league_number: int,
+            total_leagues: int,
+            conference: str,
+            row_count: int,
+        ) -> None:
+            if phase == "loading":
+                load_status.update(
+                    label=f"League {league_number} of {total_leagues}: loading {conference}..."
                 )
+                progress_bar.progress(
+                    (league_number - 1) / max(total_leagues, 1),
+                    text=f"Loading {conference} ({league_number}/{total_leagues})",
+                )
+                return
+            completed.append(f"✓ {conference} ({row_count:,} rows)")
+            progress_bar.progress(
+                league_number / max(total_leagues, 1),
+                text=f"Loaded {conference} ({league_number}/{total_leagues})",
+            )
+            loaded_leagues.markdown("  \n".join(completed))
+
+        try:
+            live_rows = fetch_weekly_starters(
+                years=[season],
+                weeks=[current_week],
+                schools=schools,
+                progress_callback=show_progress,
+            )
         except Exception as exc:
+            load_status.update(label="Live refresh failed", state="error", expanded=True)
             st.error(f"Sleeper refresh failed: {exc}")
         else:
             if live_rows.empty:
+                load_status.update(label="No matchup data returned", state="error", expanded=True)
                 st.warning(
                     f"Sleeper returned no roster or matchup data for {season} Week {current_week}."
                 )
@@ -3600,15 +3630,15 @@ def render_live_week_refresh(season: int, schools: pd.DataFrame) -> None:
                 }
                 st.session_state[LIVE_WEEK_CACHE_KEY] = cached_weeks
                 team_count = live_rows["Team"].dropna().nunique()
-                st.session_state[LIVE_WEEK_FLASH_KEY] = (
-                    f"Week {current_week} refreshed at {fetched_at:%I:%M:%S %p}: "
-                    f"{team_count} teams and {len(live_rows):,} roster rows loaded into this session."
+                load_status.update(
+                    label=(
+                        f"Week {current_week} loaded: {team_count} teams, "
+                        f"{len(live_rows):,} roster rows"
+                    ),
+                    state="complete",
+                    expanded=False,
                 )
                 st.rerun()
-
-    flash = st.session_state.pop(LIVE_WEEK_FLASH_KEY, None)
-    if flash:
-        st.success(flash)
 
     if current_week is not None:
         entry = st.session_state.get(LIVE_WEEK_CACHE_KEY, {}).get(
@@ -3620,6 +3650,16 @@ def render_live_week_refresh(season: int, schools: pd.DataFrame) -> None:
                 f"Week {current_week} session cache last loaded "
                 f"{fetched_at:%I:%M:%S %p %Z} · source CSV unchanged"
             )
+
+
+def standings_score_mode(key: str) -> str:
+    return st.segmented_control(
+        "Score view",
+        options=["Static", "Live"],
+        default="Static",
+        key=key,
+        help="Static uses published results. Live uses the latest session refresh from Sleeper.",
+    ) or "Static"
 
 
 def under_construction(label: str) -> None:
@@ -8943,29 +8983,35 @@ else:
         f"Expected 7, 8, 9, or 10 branding datasets, received {len(branding_data)}. "
         "Confirm the published app.py and data.py are from the same version."
     )
-starters = apply_live_week_cache(starters)
+static_starters_all = starters.copy()
+live_starters_all = apply_live_week_cache(static_starters_all)
 PLAYER_PICTURE_LOOKUP = {
     player_picture_key(row["Player"]): clean_text(row["Picture"])
     for _, row in player_pictures.iterrows()
     if player_picture_key(row.get("Player")) and clean_text(row.get("Picture"))
 }
 with st.spinner(f"Preparing the {selected_season} season...", show_time=True):
+    published_scores_all = scores.copy()
     full_schedule = schedule.copy()
     full_npl_schedule = npl_schedule.copy()
     full_history_schedule = combine_schedule_frames(full_schedule, full_npl_schedule)
     full_rankings = rankings.copy()
-    full_starters = starters.copy()
+    full_starters = static_starters_all.copy()
     full_drafts = drafts.copy()
-    full_scores = aggregate_scores_from_starters(starters, scores)
+    full_scores = aggregate_scores_from_starters(static_starters_all, published_scores_all)
     schools = apply_season_owners(schools, selected_season)
     schedule = filter_by_season(schedule, selected_season)
     npl_schedule = filter_by_season(npl_schedule, selected_season)
     team_context_schedule = combine_schedule_frames(schedule, npl_schedule)
-    scores = filter_by_season(scores, selected_season)
+    published_scores = filter_by_season(published_scores_all, selected_season)
     rankings = filter_by_season(rankings, selected_season)
     drafts = filter_by_season(drafts, selected_season)
-    starters = filter_by_season(starters, selected_season)
-    scores = aggregate_scores_from_starters(starters, scores)
+    static_starters = filter_by_season(static_starters_all, selected_season)
+    live_starters = filter_by_season(live_starters_all, selected_season)
+    static_scores = aggregate_scores_from_starters(static_starters, published_scores)
+    live_scores = aggregate_scores_from_starters(live_starters, static_scores)
+    starters = static_starters
+    scores = static_scores
     all_rosters = load_all_rosters(schools)
     future_draft_picks = load_future_draft_picks()
     is_current_roster_season = selected_season == current_roster_season()
@@ -8975,6 +9021,8 @@ with st.spinner(f"Preparing the {selected_season} season...", show_time=True):
         else historical_roster_snapshot(starters, schools, selected_season)
     )
     history_ledger = build_history_ledger(full_history_schedule, full_scores, schools, full_rankings)
+
+render_live_week_refresh(selected_season, schools)
 
 league_tab, npl_tab, conference_tab, team_tab, players_tab, rules_tab = st.tabs(
     ["🏆 NCAA", "🏆 NPL", "🏟️ Conference", "🎓 Team", "🏈 Players", "📘 Rules"]
@@ -8998,24 +9046,23 @@ with league_tab:
         ] + ["🕰️ History"]
     )
     with league_schedule_tab:
-        render_live_week_refresh(selected_season, schools)
         weeks = schedule_weeks(schedule)
         if weeks:
             selected_week = st.selectbox(
                 "Week",
                 weeks,
-                index=next_unplayed_schedule_week_index(weeks, schedule, scores),
+                index=next_unplayed_schedule_week_index(weeks, schedule, live_scores),
                 key="league_schedule_week_v2",
                 format_func=week_label,
             )
             week_games = schedule.loc[schedule["Week"].eq(selected_week)].copy()
             render_schedule_cards(
                 week_games,
-                scores,
+                live_scores,
                 schools,
                 rankings=rankings,
                 rosters=all_rosters,
-                starters=starters,
+                starters=live_starters,
                 bowls=bowls,
                 schedule_context=schedule,
                 empty_label=f"No Week {selected_week} games",
@@ -9024,18 +9071,22 @@ with league_tab:
         else:
             render_schedule_cards(
                 schedule,
-                scores,
+                live_scores,
                 schools,
                 rankings=rankings,
                 rosters=all_rosters,
-                starters=starters,
+                starters=live_starters,
                 bowls=bowls,
                 schedule_context=schedule,
                 empty_label="No schedule loaded",
                 key_prefix="league_schedule_empty",
             )
     with league_standings_tab:
-        render_league_standings(schedule, scores, schools, conferences, rankings)
+        league_mode = standings_score_mode("ncaa_standings_score_mode")
+        league_standings_scores = live_scores if league_mode == "Live" else static_scores
+        render_league_standings(
+            schedule, league_standings_scores, schools, conferences, rankings
+        )
     with league_rankings_tab:
         render_rankings(
             rankings,
@@ -9077,17 +9128,21 @@ with npl_tab:
     with npl_schedule_tab:
         render_npl_schedule(
             npl_schedule,
-            scores,
+            live_scores,
             schools,
             rankings,
             all_rosters,
-            starters,
+            live_starters,
             bowls,
         )
     with npl_standings_tab:
-        render_npl_standings(npl_schedule, scores, schools, rankings)
+        npl_mode = standings_score_mode("npl_standings_score_mode")
+        npl_standings_scores = live_scores if npl_mode == "Live" else static_scores
+        render_npl_standings(npl_schedule, npl_standings_scores, schools, rankings)
     with npl_league_schedule_tab:
-        render_npl_schedule_matrices(npl_schedule, scores, schools, starters)
+        render_npl_schedule_matrices(
+            npl_schedule, live_scores, schools, live_starters
+        )
     with npl_projection_tab:
         render_npl_projection(npl_schedule, scores, schools)
 
@@ -9127,9 +9182,13 @@ with conference_tab:
     with conf_history_tab:
         render_conference_history(history_ledger, schools, conferences, bowls, selected_conference)
     with conf_standings_tab:
+        conference_mode = standings_score_mode("conference_standings_score_mode")
+        conference_standings_scores = (
+            live_scores if conference_mode == "Live" else static_scores
+        )
         render_conference_standings(
             schedule,
-            scores,
+            conference_standings_scores,
             schools,
             conferences,
             rankings,
@@ -9146,7 +9205,9 @@ with conference_tab:
             selected_week = st.selectbox(
                 "Week",
                 weeks,
-                index=next_unplayed_schedule_week_index(weeks, conference_schedule, scores),
+                index=next_unplayed_schedule_week_index(
+                    weeks, conference_schedule, live_scores
+                ),
                 key=f"conference_schedule_week_v2_{selected_conference}",
                 format_func=week_label,
             )
@@ -9155,11 +9216,11 @@ with conference_tab:
             ].copy()
             render_schedule_cards(
                 week_games,
-                scores,
+                live_scores,
                 schools,
                 rankings=rankings,
                 rosters=all_rosters,
-                starters=starters,
+                starters=live_starters,
                 bowls=bowls,
                 schedule_context=schedule,
                 empty_label=f"No Week {selected_week} {selected_conference} games",
@@ -9167,18 +9228,18 @@ with conference_tab:
             )
             render_conference_schedule_matrix(
                 conference_schedule,
-                scores,
+                live_scores,
                 schools,
                 selected_conference,
             )
         else:
             render_schedule_cards(
                 conference_schedule,
-                scores,
+                live_scores,
                 schools,
                 rankings=rankings,
                 rosters=all_rosters,
-                starters=starters,
+                starters=live_starters,
                 bowls=bowls,
                 schedule_context=schedule,
                 empty_label=f"No {selected_conference} games",
@@ -9186,7 +9247,7 @@ with conference_tab:
             )
             render_conference_schedule_matrix(
                 conference_schedule,
-                scores,
+                live_scores,
                 schools,
                 selected_conference,
             )

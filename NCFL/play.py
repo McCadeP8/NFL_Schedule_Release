@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 import pandas as pd
 import requests
@@ -270,6 +270,7 @@ def get_weekly_starters(
     years: Iterable[int] | None = None,
     conferences: Iterable[str] | None = None,
     schools: pd.DataFrame | None = None,
+    progress_callback: Callable[[str, int, int, str, int], None] | None = None,
 ) -> pd.DataFrame:
     """Load every weekly Sleeper matchup player, marking starters and bench."""
     league_ids_by_year = league_ids_by_year or LEAGUE_IDS_BY_YEAR
@@ -281,27 +282,36 @@ def get_weekly_starters(
     players = get_players()
     if schools is None:
         schools, *_ = load_branding_data()
-    rows = []
-
+    targets = []
     for year, leagues in league_ids_by_year.items():
         if requested_years and year not in requested_years:
             continue
         for conference, league_id in leagues.items():
             if requested_conferences and conference.casefold() not in requested_conferences:
                 continue
-            print(
-                f"Fetching {year} {conference} from Sleeper league {league_id} "
-                f"for weeks {min(weeks)}-{max(weeks)}..."
-            )
-            rows.extend(
-                _weekly_roster_rows_for_league(
-                    league_id=str(league_id),
-                    year=year,
-                    conference=conference,
-                    players=players,
-                    schools=schools,
-                    weeks=weeks,
-                )
+            targets.append((year, conference, league_id))
+
+    rows = []
+    total_leagues = len(targets)
+    for league_number, (year, conference, league_id) in enumerate(targets, start=1):
+        if progress_callback is not None:
+            progress_callback("loading", league_number, total_leagues, conference, 0)
+        print(
+            f"Fetching {year} {conference} from Sleeper league {league_id} "
+            f"for weeks {min(weeks)}-{max(weeks)}..."
+        )
+        league_rows = _weekly_roster_rows_for_league(
+            league_id=str(league_id),
+            year=year,
+            conference=conference,
+            players=players,
+            schools=schools,
+            weeks=weeks,
+        )
+        rows.extend(league_rows)
+        if progress_callback is not None:
+            progress_callback(
+                "loaded", league_number, total_leagues, conference, len(league_rows)
             )
 
     return pd.DataFrame(rows, columns=STARTER_COLUMNS).sort_values(

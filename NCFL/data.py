@@ -469,9 +469,9 @@ def get_data() -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, 
     schools = _read_csv_url(schools_url)
     if not _has_columns(schools, ["School", "TeamID"]):
         schools = _read_google_sheet(SCHOOLS_SHEET_ID, 0)
-    schedule = _optional_schedule()
-    if schedule is None:
-        schedule = _safe_read_csv_url(schedule_url, _empty_schedule())
+    local_schedule = _optional_schedule()
+    schedule_fallback = local_schedule if local_schedule is not None else _empty_schedule()
+    schedule = _safe_read_csv_url(schedule_url, schedule_fallback)
     scores = _safe_read_csv_url(scores_url, _empty_scores())
     rankings = _safe_read_csv_url(rankings_url, _empty_rankings())
     drafts = _safe_read_csv_url(drafts_url, _empty_drafts())
