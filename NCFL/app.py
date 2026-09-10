@@ -1768,6 +1768,113 @@ div[data-testid="stButton"] button {
 .boxscore-total .boxscore-points {
   color: #ffffff !important;
 }
+.boxscore-mobile-lineups {
+  display: none;
+}
+.mobile-lineup-team {
+  overflow: hidden;
+  margin: 12px 0;
+  border: 1px solid #e2e6ef;
+  border-top: 6px solid var(--team-color);
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 2px 10px rgba(15,23,42,0.08);
+}
+.mobile-lineup-team-head {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--team-color) 10%, white);
+}
+.mobile-lineup-team-head img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+.mobile-lineup-team-name,
+.mobile-lineup-total {
+  font-family: 'Bebas Neue', sans-serif;
+  color: #111827;
+  line-height: 1;
+}
+.mobile-lineup-team-name {
+  font-size: 28px;
+  letter-spacing: 1px;
+}
+.mobile-lineup-total {
+  font-size: 34px;
+}
+.mobile-lineup-section-title {
+  padding: 7px 10px 5px;
+  background: #111827;
+  color: #ffffff;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+}
+.mobile-lineup-row {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 58px;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 5px 10px;
+  border-bottom: 1px solid #edf0f7;
+}
+.mobile-lineup-position {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 12px;
+  font-weight: 900;
+  color: #64748b;
+}
+.mobile-lineup-player {
+  overflow: hidden;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  color: #111827;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.mobile-lineup-points {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 17px;
+  font-weight: 900;
+  color: #111827;
+  text-align: right;
+}
+@media (max-width: 760px) {
+  .boxscore-matchup-card,
+  .boxscore-desktop-lineups {
+    display: none;
+  }
+  .boxscore-mobile-lineups {
+    display: block;
+  }
+  .boxscore-bowl-masthead {
+    grid-template-columns: 48px minmax(0, 1fr);
+    padding: 12px;
+  }
+  .boxscore-bowl-logo {
+    width: 48px;
+    height: 48px;
+  }
+  .boxscore-bowl-title {
+    font-size: 34px;
+  }
+  .boxscore-rivalry-masthead {
+    margin-bottom: 10px;
+    padding: 10px 12px;
+  }
+  .boxscore-rivalry-title {
+    font-size: 28px;
+  }
+}
 .team-schedule-stack {
   display: grid;
   grid-template-columns: 1fr;
@@ -3541,9 +3648,18 @@ def fantasy_week_for_date(season: int, today: Optional[date] = None) -> Optional
     return week if 1 <= week <= 18 else None
 
 
+@st.cache_resource(show_spinner=False)
+def shared_live_week_cache() -> dict[tuple[int, int], dict[str, object]]:
+    """Share ephemeral live data across desktop and mobile browser sessions."""
+    return {}
+
+
 def apply_live_week_cache(starters: pd.DataFrame) -> pd.DataFrame:
-    """Overlay session-only Sleeper refreshes without touching the source CSV."""
-    cached_weeks = st.session_state.get(LIVE_WEEK_CACHE_KEY, {})
+    """Overlay shared, ephemeral Sleeper refreshes without touching the source CSV."""
+    cached_weeks = shared_live_week_cache()
+    legacy_session_cache = st.session_state.get(LIVE_WEEK_CACHE_KEY, {})
+    if isinstance(legacy_session_cache, dict):
+        cached_weeks.update(legacy_session_cache)
     merged = starters.copy()
     for (year, week), entry in cached_weeks.items():
         live_rows = entry.get("frame") if isinstance(entry, dict) else entry
@@ -3623,12 +3739,13 @@ def render_live_week_refresh(season: int, schools: pd.DataFrame) -> None:
                 )
             else:
                 fetched_at = datetime.now().astimezone()
-                cached_weeks = dict(st.session_state.get(LIVE_WEEK_CACHE_KEY, {}))
-                cached_weeks[(int(season), int(current_week))] = {
+                cache_entry = {
                     "frame": live_rows,
                     "fetched_at": fetched_at.isoformat(),
                 }
-                st.session_state[LIVE_WEEK_CACHE_KEY] = cached_weeks
+                cache_key = (int(season), int(current_week))
+                shared_live_week_cache()[cache_key] = cache_entry
+                st.session_state[LIVE_WEEK_CACHE_KEY] = {cache_key: cache_entry}
                 team_count = live_rows["Team"].dropna().nunique()
                 load_status.update(
                     label=(
@@ -3641,13 +3758,11 @@ def render_live_week_refresh(season: int, schools: pd.DataFrame) -> None:
                 st.rerun()
 
     if current_week is not None:
-        entry = st.session_state.get(LIVE_WEEK_CACHE_KEY, {}).get(
-            (int(season), int(current_week))
-        )
+        entry = shared_live_week_cache().get((int(season), int(current_week)))
         if isinstance(entry, dict) and entry.get("fetched_at"):
             fetched_at = datetime.fromisoformat(entry["fetched_at"])
             st.caption(
-                f"Week {current_week} session cache last loaded "
+                f"Week {current_week} shared cache last loaded "
                 f"{fetched_at:%I:%M:%S %p %Z} · source CSV unchanged"
             )
 
@@ -4169,13 +4284,10 @@ def boxscore_total(rows: list[dict[str, object]], team: str, week: int) -> float
     total = 0.0
     for row in rows:
         player = clean_text(row.get("player"))
-        slot = clean_text(row.get("slot"))
         if player and player != "TBD":
             actual_points = pd.to_numeric(row.get("points"), errors="coerce")
             if not pd.isna(actual_points):
                 total += float(actual_points)
-            else:
-                total += boxscore_points(team, week, player, slot)
     return total
 
 
@@ -4429,8 +4541,6 @@ def boxscore_rows_html(
     right_team: str,
     week: int,
     include_total: bool = True,
-    show_projections: bool = True,
-    show_stats: bool = True,
 ) -> str:
     row_count = max(len(left_rows), len(right_rows))
     rows = []
@@ -4446,41 +4556,16 @@ def boxscore_rows_html(
         right_player = clean_text(right.get("player"))
         left_actual = pd.to_numeric(left.get("points"), errors="coerce")
         right_actual = pd.to_numeric(right.get("points"), errors="coerce")
-        left_points = (
-            float(left_actual)
-            if not pd.isna(left_actual)
-            else boxscore_points(left_team, week, left_player, slot)
-            if left_player and left_player != "TBD"
-            else 0.0
-        )
-        right_points = (
-            float(right_actual)
-            if not pd.isna(right_actual)
-            else boxscore_points(right_team, week, right_player, slot)
-            if right_player and right_player != "TBD"
-            else 0.0
-        )
-        left_projection = (
-            boxscore_projection(left_team, week, left_player, slot)
-            if show_projections and left_player and left_player != "TBD"
-            else None
-        )
-        right_projection = (
-            boxscore_projection(right_team, week, right_player, slot)
-            if show_projections and right_player and right_player != "TBD"
-            else None
-        )
-        left_stats = player_stat_pills(left_team, week, left_player, slot) if show_stats else ""
-        right_stats = player_stat_pills(right_team, week, right_player, slot) if show_stats else ""
-        left_total += left_points
-        right_total += right_points
+        left_points = float(left_actual) if not pd.isna(left_actual) else None
+        right_points = float(right_actual) if not pd.isna(right_actual) else None
+        left_total += left_points or 0.0
+        right_total += right_points or 0.0
         left_player_html = (
             f"""
     <div class="boxscore-player-wrap">
       <img class="boxscore-headshot" src="{esc(player_picture(left_player))}" alt="{esc(left_player)}" onerror="{player_picture_fallback()}">
       <div>
         <div class="boxscore-player-name">{esc(left_player)}</div>
-        {left_stats}
       </div>
     </div>
 """
@@ -4492,7 +4577,6 @@ def boxscore_rows_html(
     <div class="boxscore-player-wrap">
       <div>
         <div class="boxscore-player-name">{esc(right_player)}</div>
-        {right_stats}
       </div>
       <img class="boxscore-headshot" src="{esc(player_picture(right_player))}" alt="{esc(right_player)}" onerror="{player_picture_fallback()}">
     </div>
@@ -4501,16 +4585,10 @@ def boxscore_rows_html(
             else ""
         )
         left_points_html = (
-            f'{left_points:.2f}'
-            f'{f"""<br><span class="boxscore-proj">{left_projection:.1f}</span>""" if left_projection is not None else ""}'
-            if left_player
-            else ""
+            (f"{left_points:.2f}" if left_points is not None else "-") if left_player else ""
         )
         right_points_html = (
-            f'{right_points:.2f}'
-            f'{f"""<br><span class="boxscore-proj">{right_projection:.1f}</span>""" if right_projection is not None else ""}'
-            if right_player
-            else ""
+            (f"{right_points:.2f}" if right_points is not None else "-") if right_player else ""
         )
         rows.append(
             f"""
@@ -4539,6 +4617,56 @@ def boxscore_rows_html(
     return "".join(rows)
 
 
+def mobile_boxscore_team_html(
+    team: str,
+    groups: dict[str, list[dict[str, object]]],
+    teams: dict[str, dict[str, str]],
+    total: float,
+) -> str:
+    info = teams.get(team, {})
+    logo = clean_text(info.get("logo"))
+    color = esc(info.get("color"), "#1a2030")
+    sections = []
+    for section_name in ("Starters", "Bench", "Injured Reserve", "Taxi"):
+        section_rows = groups.get(section_name, [])
+        if not section_rows:
+            continue
+        player_rows = []
+        for row in section_rows:
+            player = clean_text(row.get("player"), "TBD")
+            position = clean_text(row.get("slot")) or clean_text(row.get("position")) or "—"
+            points = pd.to_numeric(row.get("points"), errors="coerce")
+            points_text = "-" if pd.isna(points) else f"{float(points):.2f}"
+            player_rows.append(
+                f"""
+<div class="mobile-lineup-row">
+  <span class="mobile-lineup-position">{esc(position)}</span>
+  <span class="mobile-lineup-player">{esc(player)}</span>
+  <span class="mobile-lineup-points">{points_text}</span>
+</div>
+"""
+            )
+        sections.append(
+            f"""
+<div class="mobile-lineup-section">
+  <div class="mobile-lineup-section-title">{esc(section_name)}</div>
+  {''.join(player_rows)}
+</div>
+"""
+        )
+
+    return f"""
+<div class="mobile-lineup-team" style="--team-color:{color};">
+  <div class="mobile-lineup-team-head">
+    {f'<img src="{esc(logo)}" alt="{esc(team)}">' if logo else ''}
+    <div class="mobile-lineup-team-name">{esc(team)}</div>
+    <div class="mobile-lineup-total">{total:.2f}</div>
+  </div>
+  {''.join(sections)}
+</div>
+"""
+
+
 @st.dialog("Box Score", width="large")
 def render_box_score_dialog(
     game: dict[str, object],
@@ -4552,7 +4680,6 @@ def render_box_score_dialog(
 ) -> None:
     week = int(game["Week"]) if not pd.isna(game.get("Week")) else 0
     year = int(game["Year"]) if not pd.isna(game.get("Year")) else 0
-    show_projections = year > 2025
     team_a = clean_text(game.get("TeamA"))
     team_b = clean_text(game.get("TeamB"))
     bowl = bowl_for_notes(game.get("Notes"), bowls)
@@ -4561,10 +4688,6 @@ def render_box_score_dialog(
     ranks = schedule_ap_top25(rankings, week)
     team_a_color = clean_text(teams.get(team_a, {}).get("color"), "#1a2030")
     team_b_color = clean_text(teams.get(team_b, {}).get("color"), "#c8102e")
-    win_probability = seeded_float(team_a, team_b, week, "win-probability", low=0.05, high=0.95)
-    favorite = team_a if win_probability >= 0.5 else team_b
-    favorite_probability = win_probability if favorite == team_a else 1 - win_probability
-    label_pct = min(max(win_probability * 100, 14), 86)
     team_a_rows = team_boxscore_from_starters(starters, team_a, week)
     team_b_rows = team_boxscore_from_starters(starters, team_b, week)
     if not team_a_rows["Starters"]:
@@ -4596,8 +4719,6 @@ def render_box_score_dialog(
             team_b,
             week,
             include_total=include_total,
-            show_projections=show_projections and section_name == "Starters",
-            show_stats=section_name == "Starters",
         )
         sections.append(
             f"""
@@ -4616,6 +4737,11 @@ def render_box_score_dialog(
 </table>
 """
         )
+
+    mobile_lineups = (
+        mobile_boxscore_team_html(team_a, team_a_rows, teams, team_a_total)
+        + mobile_boxscore_team_html(team_b, team_b_rows, teams, team_b_total)
+    )
 
     st.html(
         f"""
@@ -4643,11 +4769,8 @@ def render_box_score_dialog(
     </div>
   </div>
 </div>
-{f'''<div class="win-prob" style="--left-color:{esc(team_a_color)}; --right-color:{esc(team_b_color)}; --left-pct:{win_probability * 100:.2f}%; --label-pct:{label_pct:.2f}%;">
-  <div class="win-prob-marker"></div>
-  <div class="win-prob-label">{esc(favorite)} {favorite_probability * 100:.0f}% to win</div>
-</div>''' if show_projections else ''}
-{''.join(sections)}
+<div class="boxscore-desktop-lineups">{''.join(sections)}</div>
+<div class="boxscore-mobile-lineups">{mobile_lineups}</div>
 """
     )
 
