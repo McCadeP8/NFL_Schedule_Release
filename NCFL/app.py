@@ -7,6 +7,7 @@ import unicodedata
 from datetime import date, datetime, timedelta
 from functools import wraps
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 import altair as alt
 import numpy as np
@@ -3640,7 +3641,7 @@ def render_data_controls() -> None:
 
 def fantasy_week_for_date(season: int, today: Optional[date] = None) -> Optional[int]:
     """Return the Wednesday-Tuesday NFL fantasy week for a season."""
-    today = today or datetime.now().astimezone().date()
+    today = today or datetime.now(ZoneInfo("America/Denver")).date()
     september_first = date(int(season), 9, 1)
     labor_day = september_first + timedelta(days=(7 - september_first.weekday()) % 7)
     week_one_start = labor_day + timedelta(days=2)
@@ -4067,6 +4068,15 @@ def next_unplayed_schedule_week_index(
         return 0
     if schedule.empty or not {"Week", "TeamA", "TeamB"}.issubset(schedule.columns):
         return 0
+
+    # Live points are not final results. While the season is underway, the
+    # Wednesday-Tuesday calendar—not nonzero scores—controls the default week.
+    if "Year" in schedule.columns:
+        years = pd.to_numeric(schedule["Year"], errors="coerce").dropna().unique()
+        if len(years) == 1:
+            current_week = fantasy_week_for_date(int(years[0]))
+            if current_week in weeks:
+                return weeks.index(current_week)
 
     schedule_copy = schedule.copy()
     schedule_copy["Week"] = pd.to_numeric(schedule_copy["Week"], errors="coerce")
@@ -5927,7 +5937,7 @@ def render_npl_schedule(
         "Week",
         weeks,
         index=next_unplayed_schedule_week_index(weeks, filtered, scores),
-        key="npl_schedule_week",
+        key="npl_schedule_week_v2",
         format_func=week_label,
     )
     week_games = filtered.loc[filtered["Week"].eq(selected_week)].copy()
@@ -9175,7 +9185,7 @@ with league_tab:
                 "Week",
                 weeks,
                 index=next_unplayed_schedule_week_index(weeks, schedule, live_scores),
-                key="league_schedule_week_v2",
+                key="league_schedule_week_v3",
                 format_func=week_label,
             )
             week_games = schedule.loc[schedule["Week"].eq(selected_week)].copy()
@@ -9331,7 +9341,7 @@ with conference_tab:
                 index=next_unplayed_schedule_week_index(
                     weeks, conference_schedule, live_scores
                 ),
-                key=f"conference_schedule_week_v2_{selected_conference}",
+                key=f"conference_schedule_week_v3_{selected_conference}",
                 format_func=week_label,
             )
             week_games = conference_schedule.loc[
