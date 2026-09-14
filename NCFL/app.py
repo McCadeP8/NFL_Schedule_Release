@@ -1804,6 +1804,13 @@ div[data-testid="stButton"] button {
   font-size: 28px;
   letter-spacing: 1px;
 }
+.mobile-lineup-record {
+  margin-top: 2px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  color: #475569;
+}
 .mobile-lineup-total {
   font-size: 34px;
 }
@@ -4632,6 +4639,7 @@ def mobile_boxscore_team_html(
     groups: dict[str, list[dict[str, object]]],
     teams: dict[str, dict[str, str]],
     total: float,
+    record: str,
 ) -> str:
     info = teams.get(team, {})
     logo = clean_text(info.get("logo"))
@@ -4669,7 +4677,10 @@ def mobile_boxscore_team_html(
 <div class="mobile-lineup-team" style="--team-color:{color};">
   <div class="mobile-lineup-team-head">
     {f'<img src="{esc(logo)}" alt="{esc(team)}">' if logo else ''}
-    <div class="mobile-lineup-team-name">{esc(team)}</div>
+    <div>
+      <div class="mobile-lineup-team-name">{esc(team)}</div>
+      {f'<div class="mobile-lineup-record">{esc(record)}</div>' if record else ''}
+    </div>
     <div class="mobile-lineup-total">{total:.2f}</div>
   </div>
   {''.join(sections)}
@@ -4707,8 +4718,11 @@ def render_box_score_dialog(
     team_a_total = boxscore_total(team_a_rows["Starters"], team_a, week)
     team_b_total = boxscore_total(team_b_rows["Starters"], team_b, week)
     record_week = max(week - 1, 0)
-    team_a_record = team_record_through_week(schedule, scores, schools, team_a, record_week)
-    team_b_record = team_record_through_week(schedule, scores, schools, team_b, record_week)
+    record_for_game = (
+        npl_record_through_week if clean_text(game.get("Tier")) else team_record_through_week
+    )
+    team_a_record = record_for_game(schedule, scores, schools, team_a, record_week)
+    team_b_record = record_for_game(schedule, scores, schools, team_b, record_week)
 
     sections = []
     for section_name, include_total in [
@@ -4749,8 +4763,8 @@ def render_box_score_dialog(
         )
 
     mobile_lineups = (
-        mobile_boxscore_team_html(team_a, team_a_rows, teams, team_a_total)
-        + mobile_boxscore_team_html(team_b, team_b_rows, teams, team_b_total)
+        mobile_boxscore_team_html(team_a, team_a_rows, teams, team_a_total, team_a_record)
+        + mobile_boxscore_team_html(team_b, team_b_rows, teams, team_b_total, team_b_record)
     )
 
     st.html(
@@ -4862,8 +4876,9 @@ def render_schedule_cards(
         badge = "Bowl Game" if bowl else ("Rivalry" if rivalry else (npl_badge or ("Conference" if is_conference else "Non-Conf")))
         game_ranks = schedule_ap_top25(rankings, week)
         record_week = max(week - 1, 0)
-        team_a_record = team_record_through_week(full_schedule, scores, schools, team_a, record_week)
-        team_b_record = team_record_through_week(full_schedule, scores, schools, team_b, record_week)
+        record_for_game = npl_record_through_week if npl_badge else team_record_through_week
+        team_a_record = record_for_game(full_schedule, scores, schools, team_a, record_week)
+        team_b_record = record_for_game(full_schedule, scores, schools, team_b, record_week)
         if bowl:
             rivalry_note = (
                 f'<div class="schedule-rivalry-note">{render_rivalry_pill(rivalry)}</div>'
@@ -6141,6 +6156,24 @@ def team_record_through_week(
         int(row["conf_ties"]),
     )
     return f"{overall} ({conference})"
+
+
+def npl_record_through_week(
+    schedule: pd.DataFrame,
+    scores: pd.DataFrame,
+    schools: pd.DataFrame,
+    team_name: str,
+    week: int,
+) -> str:
+    """Return only the NPL record entering the selected week."""
+    schedule_part, scores_part = through_week(schedule, scores, week)
+    standings = build_npl_standings(schedule_part, scores_part, schools)
+    team = standings.loc[standings["team"].eq(team_name)]
+    if team.empty:
+        return "0-0"
+
+    row = team.iloc[0]
+    return record_text(int(row["wins"]), int(row["losses"]), int(row["ties"]))
 
 
 @st.cache_data(show_spinner="Building historical results...", max_entries=8)
