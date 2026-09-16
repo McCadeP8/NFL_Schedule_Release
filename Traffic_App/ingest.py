@@ -39,6 +39,11 @@ VIRGINIA_CRASH_SERVICE = (
     "https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/"
     "Full_Crash/FeatureServer"
 )
+OKLAHOMA_KAB_SERVICES = {
+    2019: "https://services2.arcgis.com/1RKb5IC5HFxsUYMS/arcgis/rest/services/kab_crashes_2019/FeatureServer",
+    2020: "https://services2.arcgis.com/1RKb5IC5HFxsUYMS/arcgis/rest/services/2020_kab_crashes/FeatureServer",
+    2021: "https://services2.arcgis.com/1RKb5IC5HFxsUYMS/arcgis/rest/services/2021_kab_crashes_a/FeatureServer",
+}
 UTAH_CRASH_LAYERS = {
     2019: 7,
     2020: 6,
@@ -104,6 +109,14 @@ ALL_CRASH_SOURCE_STATUS = [
         "source_name": "PennDOT crash systems",
         "source_url": "https://www.penndot.pa.gov/",
         "notes": "Official data exists, but a statewide public bulk API was not confirmed.",
+    },
+    {
+        "state": "Oklahoma",
+        "tier": "Tier 1",
+        "status": "Automated - KAB only",
+        "source_name": "Oklahoma OHSO KAB Crash Maps",
+        "source_url": "https://oklahoma.gov/highwaysafety/data/current-crash-data.html",
+        "notes": "Official public ArcGIS layers loaded for 2019-2021 fatal and injury crashes only; property-damage-only crashes are not included.",
     },
     {
         "state": "Kentucky",
@@ -635,10 +648,148 @@ def normalize_virginia_all_crashes(virginia_crashes: pd.DataFrame) -> pd.DataFra
     return normalized
 
 
+def load_oklahoma_crash_year(year: int) -> pd.DataFrame:
+    """Load one year of Oklahoma OHSO fatal and injury crash records."""
+    service_url = OKLAHOMA_KAB_SERVICES.get(year)
+    if service_url is None:
+        print(f"Skipping Oklahoma KAB records: no public adapter for {year}")
+        return pd.DataFrame()
+
+    cache_path = RAW_DIRECTORY / f"oklahoma_kab_crashes_{year}.csv"
+    raw = fetch_arcgis_features(
+        service_url,
+        0,
+        "1=1",
+        cache_path,
+        page_size=1000,
+    )
+    raw["year"] = year
+    return raw
+
+
+def normalize_oklahoma_severity(value: object) -> str:
+    """Map Oklahoma KAB labels into the app's five severity bands."""
+    text = "" if pd.isna(value) else str(value).strip().lower()
+    if "fatal" in text or text.startswith("a"):
+        return "Fatal"
+    if "serious" in text or "incapacitating" in text and "non-" not in text:
+        return "Suspected Serious Injury"
+    if "minor" in text or "non-incapacitating" in text or text.startswith("c"):
+        return "Suspected Minor Injury"
+    if "possible" in text:
+        return "Possible Injury"
+    return "Suspected Minor Injury"
+
+
+def parse_oklahoma_crash_datetime(raw: pd.DataFrame) -> pd.Series:
+    """Parse Oklahoma date/time fields that vary by source year."""
+    dates = raw.get("DATE", pd.Series(index=raw.index, dtype="object"))
+    numeric_dates = pd.to_numeric(dates, errors="coerce")
+    parsed_dates = pd.to_datetime(numeric_dates, unit="ms", errors="coerce", utc=True)
+    text_dates = pd.to_datetime(dates, errors="coerce", utc=True)
+    parsed_dates = parsed_dates.fillna(text_dates)
+
+    times = raw.get("TIME", pd.Series(index=raw.index, dtype="object")).fillna("").astype(str)
+    time_text = (
+        times.str.replace(".", ":", regex=False)
+        .str.extract(r"(\d{1,2}(?::\d{1,2})?)", expand=False)
+        .fillna("")
+    )
+    needs_minutes = time_text.ne("") & ~time_text.str.contains(":")
+    time_text = time_text.where(~needs_minutes, time_text + ":00")
+
+    date_text = parsed_dates.dt.strftime("%Y-%m-%d")
+    combined = pd.to_datetime(
+        date_text.fillna("") + " " + time_text,
+        errors="coerce",
+        utc=True,
+    )
+    return combined.fillna(parsed_dates)
+
+
+def first_available(raw: pd.DataFrame, *columns: str) -> pd.Series:
+    """Return the first present source column, or an empty object series."""
+    for column in columns:
+        if column in raw:
+            return raw[column]
+    return pd.Series(index=raw.index, dtype="object")
+
+
+def normalize_oklahoma_kab_crashes(oklahoma_crashes: pd.DataFrame) -> pd.DataFrame:
+    """Convert Oklahoma OHSO KAB records to the shared all-state crash schema."""
+    if oklahoma_crashes.empty:
+        return pd.DataFrame()
+
+    raw = oklahoma_crashes.copy()
+    crash_datetime = parse_oklahoma_crash_datetime(raw)
+    vehicle_count = (
+        first_available(raw, "NUMBER_OF_VEHICLES", "VEHICLES_INVOLVED")
+        .fillna("")
+        .astype(str)
+        .str.extract(r"(\d+)", expand=False)
+    )
+    fatalities = pd.to_numeric(
+        first_available(raw, "TOTAL_KILLED", "NUMBER_KILLED"), errors="coerce"
+    ).fillna(0)
+    injuries = pd.to_numeric(
+        first_available(raw, "TOTAL_INJURED", "NUMBER_INJURED"), errors="coerce"
+    ).fillna(0)
+    severity = first_available(raw, "KABCO_LABEL", "SEVERITY").map(
+        normalize_oklahoma_severity
+    )
+    speed = first_available(raw, "ALL_SPEED", "SPEED", "OLD_SPEED")
+    alcohol = first_available(raw, "ALCOHOL_RELATED", "ALCOHOL")
+    drug = first_available(raw, "DRUG_RELATED", "DRUG")
+    dui = (yes_flag(alcohol).astype(bool) | yes_flag(drug).astype(bool)).astype(int)
+    large_truck = first_available(raw, "LARGE_TRUCK")
+    normalized = pd.DataFrame(
+        {
+            "case_id": raw["DOC_ID"],
+            "source_dataset": "Oklahoma OHSO KAB Crash Maps",
+            "state_code": "40",
+            "state": "Oklahoma",
+            "year": pd.to_numeric(raw["YEAR"], errors="coerce"),
+            "crash_datetime": crash_datetime.dt.strftime("%Y-%m-%d %H:%M:%S"),
+            "crash_date": crash_datetime.dt.strftime("%Y-%m-%d"),
+            "county": raw["COUNTY"],
+            "county_code": pd.NA,
+            "fatalities": fatalities,
+            "commercial_vehicle_involved": yes_flag(large_truck),
+            "large_truck_bus_involved": yes_flag(large_truck),
+            "work_zone": raw.get("WORKZONE"),
+            "weather": raw.get("WEATHER"),
+            "light_condition": raw.get("LIGHTING"),
+            "latitude": pd.to_numeric(
+                first_available(raw, "LATITUDE", "LATITIDE", "latitude"),
+                errors="coerce",
+            ),
+            "longitude": pd.to_numeric(
+                first_available(raw, "LONGITUDE", "longitude"),
+                errors="coerce",
+            ),
+            "crash_severity_desc": severity,
+            "suspected_serious_injuries": injuries.where(
+                severity.eq("Suspected Serious Injury"), 0
+            ),
+            "speed_related": yes_flag(speed),
+            "distracted_driving": yes_flag(raw.get("DISTRACTED", "")),
+            "dui": dui,
+            "main_road_name": raw.get("STREET_HIGHWAY"),
+            "route_id": raw.get("HIGHWAY_CLASS"),
+            "location_desc": raw.get("NEAREST_INTERSECTING_ROAD"),
+            "manner_collision_desc": raw.get("LOCALITY"),
+            "number_vehicles_involved": pd.to_numeric(vehicle_count, errors="coerce"),
+        }
+    )
+    normalized["injury_crash"] = normalized["crash_severity_desc"].ne("No Injury/PDO").astype(int)
+    return normalized
+
+
 def load_all_state_crashes(
     utah_crashes: pd.DataFrame,
     years: list[int],
     include_virginia: bool = True,
+    include_oklahoma: bool = True,
 ) -> pd.DataFrame:
     """Load every all-severity state source that has an automated adapter."""
     frames = [normalize_utah_all_crashes(utah_crashes)]
@@ -648,6 +799,12 @@ def load_all_state_crashes(
             ignore_index=True,
         )
         frames.append(normalize_virginia_all_crashes(virginia))
+    if include_oklahoma:
+        oklahoma_frames = [load_oklahoma_crash_year(year) for year in years]
+        oklahoma_frames = [frame for frame in oklahoma_frames if not frame.empty]
+        if oklahoma_frames:
+            oklahoma = pd.concat(oklahoma_frames, ignore_index=True)
+            frames.append(normalize_oklahoma_kab_crashes(oklahoma))
     frames = [frame for frame in frames if not frame.empty]
     if not frames:
         return pd.DataFrame()
@@ -884,6 +1041,7 @@ def county_join_key(series: pd.Series) -> pd.Series:
         .str.replace(r"\s+County$", "", regex=True)
         .str.replace(r"\s+Parish$", "", regex=True)
         .str.replace(r"\s+Borough$", "", regex=True)
+        .str.replace(r"(?i)\bLEFLORE\b", "LE FLORE", regex=True)
         .str.upper()
         .str.strip()
     )
@@ -1010,6 +1168,7 @@ def write_database(
     cbp_year: int,
     all_crash_years: list[int],
     include_virginia: bool = True,
+    include_oklahoma: bool = True,
 ) -> None:
     """Refresh the normalized SQLite database."""
     DATA_DIRECTORY.mkdir(exist_ok=True)
@@ -1036,6 +1195,7 @@ def write_database(
         utah_crashes,
         all_crash_years,
         include_virginia=include_virginia,
+        include_oklahoma=include_oklahoma,
     )
     all_state_county_analytics = build_all_state_county_analytics(
         all_state_crashes, businesses, population
@@ -1084,6 +1244,14 @@ def write_database(
                 "records": len(all_state_crashes[all_state_crashes["state"] == "Virginia"]),
                 "refreshed_at": refreshed_at,
                 "source_url": VIRGINIA_CRASH_SERVICE,
+            },
+            {
+                "dataset": "Oklahoma OHSO KAB Crash Maps",
+                "description": "Official Oklahoma fatal and injury crash records from public OHSO ArcGIS layers",
+                "years": "2019-2021",
+                "records": len(all_state_crashes[all_state_crashes["state"] == "Oklahoma"]),
+                "refreshed_at": refreshed_at,
+                "source_url": "https://oklahoma.gov/highwaysafety/data/current-crash-data.html",
             },
         ]
     )
@@ -1151,7 +1319,7 @@ def write_database(
     print(f"Utah county-year analytical records: {len(utah_county_analytics):,}")
     print(f"All-state all-crash records: {len(all_state_crashes):,}")
     print(
-        "Automated all-crash states: "
+        "Automated state crash sources: "
         + ", ".join(sorted(all_state_crashes["state"].dropna().unique()))
     )
 
@@ -1184,6 +1352,11 @@ def parse_arguments() -> argparse.Namespace:
         action="store_true",
         help="Skip the automated Virginia Roads all-crash adapter.",
     )
+    parser.add_argument(
+        "--skip-oklahoma",
+        action="store_true",
+        help="Skip the automated Oklahoma OHSO KAB crash adapter.",
+    )
     return parser.parse_args()
 
 
@@ -1194,4 +1367,5 @@ if __name__ == "__main__":
         arguments.cbp_year,
         arguments.all_crash_years,
         include_virginia=not arguments.skip_virginia,
+        include_oklahoma=not arguments.skip_oklahoma,
     )

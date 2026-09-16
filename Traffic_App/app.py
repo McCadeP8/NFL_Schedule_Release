@@ -466,11 +466,16 @@ with st.container(key="filter_strip"):
             states,
             index=states.index("Utah") if "Utah" in states else 0,
         )
+    state_crash_scope_label = (
+        "Fatal and Injury Crashes"
+        if selected_state == "Oklahoma"
+        else "All Reported Crashes"
+    )
     with scope_column:
         if selected_state in all_crash_states:
             crash_scope = st.radio(
                 "Data Scope",
-                ("All Reported Crashes", "Fatal Crashes Only"),
+                (state_crash_scope_label, "Fatal Crashes Only"),
                 index=0,
                 horizontal=True,
             )
@@ -479,7 +484,7 @@ with st.container(key="filter_strip"):
             st.text_input("Data Scope", value=crash_scope, disabled=True)
     use_all_state_crashes = (
         selected_state in all_crash_states
-        and crash_scope == "All Reported Crashes"
+        and crash_scope == state_crash_scope_label
     )
     year_source = (
         all_state_crashes[all_state_crashes["state"] == selected_state]
@@ -546,7 +551,7 @@ target_establishments = int(state_businesses["establishments"].sum())
 target_employees = int(state_businesses["employees"].sum())
 highest_rate_county = stable_rates["county_name"].iloc[0] if not stable_rates.empty else "-"
 period = f"{min(selected_years)}–{max(selected_years)}" if len(selected_years) > 1 else str(selected_years[0])
-crash_label = "Reported Crashes" if use_all_state_crashes else "Fatal Crashes"
+crash_label = state_crash_scope_label if use_all_state_crashes else "Fatal Crashes"
 crash_label_short = "crashes" if use_all_state_crashes else "fatal crashes"
 
 st.html(
@@ -654,9 +659,9 @@ elif page == "Risk Factors":
     st.html('<div class="note-box">Commercial-involved means FARS recorded a motor-carrier identifier. It does not prove every person involved was working at the time.</div>')
 
 else:
-    map_title = "Reported Crash Locations" if use_all_state_crashes else "Fatal Crash Locations"
+    map_title = f"{state_crash_scope_label} Locations" if use_all_state_crashes else "Fatal Crash Locations"
     map_source = "State crash source" if use_all_state_crashes else "FARS"
-    section_title(map_title, f"Reported {map_source} coordinates for {selected_state} during {period}.")
+    section_title(map_title, f"{map_source} coordinates for {selected_state} during {period}.")
     map_data = state_crashes.dropna(subset=["latitude", "longitude"]).copy()
     if use_all_state_crashes:
         severity_options = [

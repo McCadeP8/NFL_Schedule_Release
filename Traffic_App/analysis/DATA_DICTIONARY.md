@@ -72,10 +72,12 @@ Important fields include:
 
 ## `all_state_crashes_2019_2024.csv.gz`
 
-One row per normalized all-severity crash from automated state sources. Current states:
+One row per normalized crash from automated state sources. Current states:
 
 - Utah from UDOT Crash Locations.
 - Virginia from Virginia Roads/VDOT Full_Crash, sourced from DMV TREDS.
+- Oklahoma from OHSO public KAB Crash Maps for 2019-2021. Oklahoma records include
+  fatal and injury crashes only; property-damage-only crashes are not represented.
 
 Important shared fields:
 
@@ -90,7 +92,7 @@ Important shared fields:
 
 ## `all_state_county_crash_analytics_2019_2024.csv`
 
-One row per county, state, and year for automated all-severity state sources. It mirrors
+One row per county, state, and year for automated state crash sources. It mirrors
 the Utah county analytics structure so the app can support additional states without
 state-specific UI logic.
 

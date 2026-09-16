@@ -55,11 +55,13 @@ The refresh also creates clean CSV exports in `data/exports/` for analysis in R:
 
 Start with `analysis/eda_starter.R` and `analysis/DATA_DICTIONARY.md`.
 
-The pipeline also loads automated all-severity crash sources where official public APIs
-are available. Current automated all-crash states are Utah and Virginia:
+The pipeline also loads automated state crash sources where official public APIs
+are available. Current automated state sources are Utah, Virginia, and Oklahoma:
 
 - Utah: UDOT anonymized Utah Crash Locations FeatureServer, 2019-2024.
 - Virginia: Virginia Roads/VDOT Full_Crash FeatureServer sourced from DMV TREDS, 2019-2024.
+- Oklahoma: OHSO public KAB crash map FeatureServers, 2019-2021. These include
+  fatal and injury crashes only; property-damage-only records are not included.
 
 Other priority states are tracked in `all_crash_source_status.csv`; most require portal
 access, a formal data request, or source-specific credential review before they can be
