@@ -3923,6 +3923,7 @@ def render_live_week_refresh(season: int, schools: pd.DataFrame) -> None:
                     expanded=False,
                 )
                 load_weekly_projections.clear()
+                build_pearson_poll.clear()
                 st.rerun()
 
     if current_week is not None:
@@ -3976,7 +3977,12 @@ def load_future_draft_picks() -> pd.DataFrame:
     return fetch_future_draft_picks()
 
 
-@st.cache_data(ttl=60 * 60, show_spinner="Loading Sleeper projections...", max_entries=16)
+@st.cache_data(
+    ttl=60 * 60,
+    persist="disk",
+    show_spinner="Loading Sleeper projections...",
+    max_entries=16,
+)
 def load_weekly_projections(season: int, weeks: tuple[int, ...]) -> pd.DataFrame:
     return fetch_weekly_projections(int(season), weeks)
 
@@ -8181,17 +8187,7 @@ def render_rules() -> None:
 <div class="rules-grid">
   <div class="rules-card rules-card-wide" style="--accent:#2563eb;">
     <div class="rules-card-title">Ranking System</div>
-    <p>The live Pearson Poll balances results with expected full-season scoring:</p>
-    <div class="rules-table-wrap">
-      <table class="rules-table rules-table-ranking">
-        <thead><tr><th>Category</th><th>Weight</th><th>Description</th></tr></thead>
-        <tbody>
-          <tr><td>Weighted Win Percentage</td><td>50%</td><td>NCAA wins are worth 1.0; NPL wins are worth 1.5, 1.25, 1.0, or 0.75 in Tiers 1-4. Credits are divided by total games played.</td></tr>
-          <tr><td>Season Points Forecast</td><td>50%</td><td>Actual weekly scores plus best-ball Sleeper projections for every remaining week</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <p>Each category is converted to a tie-aware percentile across all 144 teams. As games finish, actual scores automatically replace that week's projection.</p>
+    <p>The Pearson Poll uses a proprietary blend of on-field results and team performance data to rank all 144 programs.</p>
   </div>
 </div>
 
@@ -8282,17 +8278,29 @@ def best_ball_projection(roster: pd.DataFrame, superflex: bool) -> float:
     return total
 
 
-@st.cache_data(show_spinner="Calculating the Pearson Poll...", max_entries=32)
+@st.cache_data(
+    persist="disk",
+    show_spinner="Calculating the Pearson Poll...",
+    max_entries=32,
+)
 def build_pearson_poll(
     season: int,
     selected_week: int,
-    schedule: pd.DataFrame,
-    npl_schedule: pd.DataFrame,
-    scores: pd.DataFrame,
-    schools: pd.DataFrame,
-    rosters: pd.DataFrame,
-    projections: pd.DataFrame,
+    _schedule: pd.DataFrame,
+    _npl_schedule: pd.DataFrame,
+    _scores: pd.DataFrame,
+    _schools: pd.DataFrame,
+    _rosters: pd.DataFrame,
+    _projections: pd.DataFrame,
 ) -> pd.DataFrame:
+    # The source tables are deliberately excluded from Streamlit's cache key.
+    # Refresh controls explicitly clear this cache when live data changes.
+    schedule = _schedule
+    npl_schedule = _npl_schedule
+    scores = _scores
+    schools = _schools
+    rosters = _rosters
+    projections = _projections
     columns = [
         "Rank", "ConferenceRank", "Team", "Conference", "PearsonRating",
         "WinRating", "ScoringRating", "WeightedWins", "Wins", "Losses",
@@ -8813,7 +8821,7 @@ def render_rankings(
         "Week",
         weeks,
         index=latest_completed_week_index(weeks, scores),
-        key="rankings_week",
+        key="rankings_week_v2",
         format_func=lambda week: "Preseason" if week == 0 else week_label(week),
     )
     selected_week = int(selected_week)
@@ -8887,7 +8895,7 @@ def render_rankings(
     <div class="poll-header">
       <div>
         <div class="poll-title">Pearson Poll</div>
-        <div class="poll-subtitle">{esc(title_week)} · 50% Wins + 50% Season Points Forecast</div>
+        <div class="poll-subtitle">{esc(title_week)} Rankings</div>
       </div>
     </div>
     <div class="poll-table-wrap">
@@ -8951,20 +8959,11 @@ def render_rankings(
     full_poll = pearson_poll[
         [
             "Rank", "ConferenceRank", "Team", "Conference", "PearsonRating",
-            "WinRating", "ScoringRating", "WeightedWins", "Wins", "Losses", "Ties", "Games",
-            "WinPct", "ActualPoints", "ProjectedPoints", "SeasonForecast",
         ]
     ].rename(
         columns={
             "ConferenceRank": "Conf Rank",
             "PearsonRating": "Pearson Rating",
-            "WinRating": "Win Rating",
-            "ScoringRating": "Scoring Rating",
-            "WeightedWins": "Weighted Wins",
-            "WinPct": "Win %",
-            "ActualPoints": "Actual Points",
-            "ProjectedPoints": "Projected Points",
-            "SeasonForecast": "Season Forecast",
         }
     )
     conference_poll = (
@@ -8972,11 +8971,6 @@ def render_rankings(
         .agg(
             Teams=("Team", "count"),
             PearsonRating=("PearsonRating", "mean"),
-            WinRating=("WinRating", "mean"),
-            ScoringRating=("ScoringRating", "mean"),
-            ActualPoints=("ActualPoints", "sum"),
-            ProjectedPoints=("ProjectedPoints", "sum"),
-            SeasonForecast=("SeasonForecast", "sum"),
         )
         .sort_values("PearsonRating", ascending=False)
         .reset_index(drop=True)
@@ -8984,17 +8978,11 @@ def render_rankings(
     conference_poll["Rank"] = range(1, len(conference_poll) + 1)
     conference_poll = conference_poll[
         [
-            "Rank", "Conference", "Teams", "PearsonRating", "WinRating",
-            "ScoringRating", "ActualPoints", "ProjectedPoints", "SeasonForecast",
+            "Rank", "Conference", "Teams", "PearsonRating",
         ]
     ].rename(
         columns={
             "PearsonRating": "Pearson Rating",
-            "WinRating": "Win Rating",
-            "ScoringRating": "Scoring Rating",
-            "ActualPoints": "Actual Points",
-            "ProjectedPoints": "Projected Points",
-            "SeasonForecast": "Season Forecast",
         }
     )
 
