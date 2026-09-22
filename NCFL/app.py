@@ -3601,6 +3601,127 @@ div[data-testid="stButton"] button {
   font-weight: 800;
   color: #8a96b0;
 }
+.scores-shell { margin: 8px 0 32px; }
+.scores-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 29px 32px 24px;
+  border-radius: 14px 14px 0 0;
+  background: radial-gradient(circle at 92% 8%, rgba(200,16,46,0.35), transparent 31%), linear-gradient(125deg, #101827, #202c45 75%, #101827);
+  border-bottom: 5px solid #c8102e;
+  color: #fff;
+  box-shadow: 0 12px 30px rgba(15,23,42,0.17);
+}
+.scores-hero::after {
+  content: "";
+  position: absolute;
+  right: -64px;
+  top: -90px;
+  width: 370px;
+  height: 370px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 50%;
+  box-shadow: 0 0 0 60px rgba(255,255,255,0.025), 0 0 0 120px rgba(255,255,255,0.02);
+  pointer-events: none;
+}
+.scores-hero-heading, .scores-feature-grid { position: relative; z-index: 1; }
+.scores-hero-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
+.scores-eyebrow {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 3.5px;
+  text-transform: uppercase;
+  color: #fda4af;
+}
+.scores-hero h2 {
+  margin: 6px 0 3px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(42px, 5vw, 66px);
+  font-weight: 400;
+  letter-spacing: 2px;
+  line-height: 0.98;
+  color: #fff;
+}
+.scores-hero h2 span { color: #fda4af; }
+.scores-hero p {
+  margin: 9px 0 0;
+  color: #bdc8db;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+}
+.scores-hero-count {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding: 8px 0 0;
+  white-space: nowrap;
+}
+.scores-hero-count strong { font-family: 'Bebas Neue', sans-serif; font-size: 56px; font-weight: 400; line-height: 0.9; color: #fff; }
+.scores-hero-count span { font-family: 'Rajdhani', sans-serif; font-size: 13px; font-weight: 800; letter-spacing: 1px; color: #bdc8db; text-transform: uppercase; }
+.scores-feature-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 13px; margin-top: 25px; }
+.scores-feature {
+  min-height: 95px;
+  padding: 14px 17px;
+  border: 1px solid rgba(255,255,255,0.13);
+  border-top: 4px solid var(--team-color, #c8102e);
+  border-radius: 9px;
+  background: rgba(255,255,255,0.085);
+  backdrop-filter: blur(5px);
+}
+.scores-feature-label { display: block; margin-bottom: 7px; font-family: 'Rajdhani', sans-serif; font-size: 12px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; color: #cbd5e1; }
+.scores-feature-main { display: flex; align-items: center; gap: 12px; }
+.scores-feature-logo.logo-frame { width: 44px; height: 44px; min-width: 44px; background: #fff; padding: 3px; }
+.scores-feature strong { display: block; font-family: 'Barlow Condensed', sans-serif; font-size: 32px; font-weight: 900; line-height: 1; color: #fff; }
+.scores-feature small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: 'Rajdhani', sans-serif; font-size: 13px; font-weight: 700; color: #dbe4f0; }
+.scores-board { overflow: hidden; border: 1px solid #dce3ed; border-top: 0; border-radius: 0 0 14px 14px; background: #fff; box-shadow: 0 12px 30px rgba(15,23,42,0.09); }
+.scores-board-label { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 17px 23px 14px; border-bottom: 1px solid #e8ecf2; }
+.scores-board-label span { font-family: 'Bebas Neue', sans-serif; font-size: 30px; letter-spacing: 1.5px; line-height: 1; color: #111827; }
+.scores-board-label small { font-family: 'Rajdhani', sans-serif; font-size: 13px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.7px; }
+.scores-board-scroll { max-height: 820px; overflow: auto; scrollbar-color: #94a3b8 #f1f5f9; }
+.scores-table { width: 100%; min-width: 780px; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+.scores-col-rank { width: 76px; }
+.scores-col-team { width: auto; }
+.scores-col-points { width: 180px; }
+.scores-col-scope { width: 105px; }
+.scores-table th { position: sticky; top: 0; z-index: 2; padding: 12px 14px; background: #f1f5f9; border-bottom: 2px solid #dbe2ec; font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 900; letter-spacing: 1.7px; text-transform: uppercase; color: #334155; text-align: left; }
+.scores-table th:nth-child(n+3) { text-align: right; }
+.scores-table td { height: 70px; padding: 9px 14px; border-bottom: 1px solid #edf0f5; color: #111827; vertical-align: middle; }
+.scores-table td:nth-child(n+3) { text-align: right; }
+.scores-table tbody tr { background: #fff; transition: background 150ms ease; }
+.scores-table tbody tr:nth-child(even) { background: #fafbfd; }
+.scores-table tbody tr:hover { background: color-mix(in srgb, var(--team-color) 9%, #fff); }
+.scores-table tbody tr td:first-child { border-left: 5px solid var(--team-color); }
+.scores-rank { display: inline-flex; align-items: center; justify-content: center; width: 37px; height: 37px; border-radius: 8px; background: #e9eef5; font-family: 'Barlow Condensed', sans-serif; font-size: 21px; font-weight: 900; color: #334155; }
+.scores-rank-1 { background: #fef3c7; color: #854d0e; box-shadow: inset 0 0 0 1px #facc15; }
+.scores-rank-2 { background: #e2e8f0; color: #334155; box-shadow: inset 0 0 0 1px #94a3b8; }
+.scores-rank-3 { background: #ffedd5; color: #9a3412; box-shadow: inset 0 0 0 1px #fdba74; }
+.scores-team-cell { display: flex; align-items: center; min-width: 0; gap: 13px; }
+.scores-team-logo.logo-frame { width: 49px; height: 49px; min-width: 49px; padding: 2px; border: 1px solid #e9edf4; box-shadow: 0 2px 5px rgba(15,23,42,0.06); }
+.scores-team-copy { min-width: 0; }
+.scores-team-copy strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: 'Barlow Condensed', sans-serif; font-size: 21px; font-weight: 900; letter-spacing: 0.35px; text-transform: uppercase; color: #111827; }
+.scores-team-copy span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: 'Rajdhani', sans-serif; font-size: 13px; font-weight: 700; color: #64748b; }
+.scores-team-copy em { margin-left: 5px; padding: 2px 5px; border-radius: 3px; background: #edf2f7; color: #475569; font-size: 10px; font-style: normal; font-weight: 900; letter-spacing: 0.6px; text-transform: uppercase; }
+.scores-points strong { display: block; font-family: 'Barlow Condensed', sans-serif; font-size: 25px; font-weight: 900; line-height: 1; color: #111827; }
+.scores-points-bar { display: block; width: 100%; height: 4px; margin-top: 8px; border-radius: 5px; background: #e9edf4; overflow: hidden; }
+.scores-points-bar i { display: block; height: 100%; border-radius: inherit; background: var(--team-color); }
+.scores-scope-rank { display: inline-block; font-family: 'Barlow Condensed', sans-serif; font-size: 24px; font-weight: 900; line-height: 1; color: #111827; }
+.scores-table td small { display: block; font-family: 'Rajdhani', sans-serif; font-size: 11px; font-weight: 700; color: #94a3b8; }
+.scores-no-results { padding: 34px !important; text-align: center !important; font-family: 'Rajdhani', sans-serif; font-size: 17px; font-weight: 800; color: #64748b !important; }
+@media (max-width: 820px) {
+  .scores-hero { padding: 23px 20px 19px; }
+  .scores-hero-heading { flex-direction: column; gap: 8px; }
+  .scores-hero-count { flex-direction: row; align-items: baseline; gap: 8px; padding: 0; }
+  .scores-hero-count strong { font-size: 38px; }
+  .scores-feature-grid { grid-template-columns: 1fr; gap: 8px; margin-top: 17px; }
+  .scores-feature { min-height: 0; padding: 10px 13px; }
+  .scores-feature-label { margin-bottom: 3px; }
+  .scores-feature strong { font-size: 25px; }
+  .scores-board-label { padding: 13px 15px; }
+  .scores-board-label small { text-align: right; }
+  .scores-board-scroll { max-height: 72vh; }
+}
 </style>
 """
     )
@@ -3695,7 +3816,7 @@ def render_live_week_refresh(season: int, schools: pd.DataFrame) -> None:
         label,
         key="live_week_refresh",
         type="primary",
-        use_container_width=True,
+        width="stretch",
         disabled=current_week is None,
     ):
         load_status = st.status(
@@ -3755,6 +3876,10 @@ def render_live_week_refresh(season: int, schools: pd.DataFrame) -> None:
                 cache_key = (int(season), int(current_week))
                 shared_live_week_cache()[cache_key] = cache_entry
                 st.session_state[LIVE_WEEK_CACHE_KEY] = {cache_key: cache_entry}
+                if 1 <= current_week <= 17 and pd.to_numeric(
+                    live_rows["TeamPoints"], errors="coerce"
+                ).gt(0).any():
+                    st.session_state["scores_week"] = current_week
                 team_count = live_rows["Team"].dropna().nunique()
                 load_status.update(
                     label=(
@@ -5023,8 +5148,8 @@ def aggregate_scores_from_starters(
     return scores.reset_index(drop=True)
 
 
-def build_scores_table(scores: pd.DataFrame, schools: pd.DataFrame, week: int | str) -> pd.DataFrame:
-    """Rank every school by its selected weekly or season-to-date score."""
+def build_scores_table(scores: pd.DataFrame, schools: pd.DataFrame, week: int) -> pd.DataFrame:
+    """Rank every school by its selected weekly score."""
     teams = (
         schools[["School", "Conference"]]
         .dropna(subset=["School", "Conference"])
@@ -5038,12 +5163,8 @@ def build_scores_table(scores: pd.DataFrame, schools: pd.DataFrame, week: int | 
     available = scores.copy()
     available["Week"] = pd.to_numeric(available["Week"], errors="coerce")
     available["Points"] = pd.to_numeric(available["Points"], errors="coerce")
-    if week == "Total":
-        available = available.loc[available["Week"].between(1, 17)]
-        points = available.groupby("Team")["Points"].sum(min_count=1)
-    else:
-        available = available.loc[available["Week"].eq(int(week))]
-        points = available.groupby("Team")["Points"].first()
+    available = available.loc[available["Week"].eq(int(week))]
+    points = available.groupby("Team")["Points"].first()
     teams["Pts"] = teams["Team"].map(points)
     teams = teams.sort_values(["Pts", "Team"], ascending=[False, True], na_position="last")
     scored = teams["Pts"].notna()
@@ -5058,6 +5179,124 @@ def build_scores_table(scores: pd.DataFrame, schools: pd.DataFrame, week: int | 
         teams.loc[scored].groupby("Group").cumcount() + 1
     ).to_numpy()
     return teams[["Team", "Pts", "Rk", "Conf Rk", "Group Rk"]].reset_index(drop=True)
+
+
+def render_scores_board(
+    score_table: pd.DataFrame,
+    schools: pd.DataFrame,
+    week: int,
+    search: str = "",
+    order: str = "Highest first",
+) -> None:
+    """Render a branded, scrollable league-wide scoring leaderboard."""
+    teams = team_lookup(schools)
+    scored = score_table.loc[score_table["Pts"].notna()]
+    week_title = f"Week {week:02d}"
+
+    def team_identity(team: object) -> tuple[str, str, str, str, str]:
+        info = team_info_from_lookup(teams, team)
+        color = clean_text(info.get("color"), "#1a2030")
+        if not re.fullmatch(r"#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?", color):
+            color = "#1a2030"
+        conference = clean_text(info.get("conference"), "Independent")
+        group = "Power 6" if conference in SUPERFLEX_CONFERENCES else "Group of 6"
+        return color, clean_text(info.get("logo")), clean_text(info.get("nickname")), conference, group
+
+    def feature_card(label: str, row: Optional[pd.Series], average: bool = False) -> str:
+        if row is None:
+            return f'<div class="scores-feature"><span class="scores-feature-label">{esc(label)}</span><strong>—</strong><small>Awaiting final scores</small></div>'
+        color, logo, _, conference, _ = team_identity(row["Team"])
+        if average:
+            color, logo, subtitle = "#c8102e", "", "All scored programs"
+        else:
+            subtitle = f'{row["Team"]} · {conference}'
+        score_text = f'{float(row["Pts"]):,.2f}'
+        return f'''
+<div class="scores-feature" style="--team-color:{esc(color)};">
+  <span class="scores-feature-label">{esc(label)}</span>
+  <div class="scores-feature-main">
+    {img_tag(logo, row["Team"], "scores-feature-logo") if not average else ''}
+    <div><strong>{score_text}</strong><small>{esc(subtitle)}</small></div>
+  </div>
+</div>'''
+
+    highest = scored.iloc[0] if not scored.empty else None
+    lowest = scored.iloc[-1] if not scored.empty else None
+    average_row = pd.Series({"Team": "League Average", "Pts": scored["Pts"].mean()}) if not scored.empty else None
+    feature_html = "".join(
+        [
+            feature_card("Highest scorer", highest),
+            feature_card("League average", average_row, average=True),
+            feature_card("Lowest scorer", lowest),
+        ]
+    )
+
+    display = score_table.copy()
+    query = search.strip().casefold()
+    if query:
+        display = display.loc[
+            display["Team"].map(
+                lambda name: query in " ".join(
+                    [str(name), *team_identity(name)[2:]]
+                ).casefold()
+            )
+        ]
+    if order == "Lowest first":
+        display = display.sort_values(["Pts", "Team"], ascending=[True, True], na_position="last")
+
+    max_points = float(scored["Pts"].max()) if not scored.empty else 0.0
+    rows = []
+    for _, row in display.iterrows():
+        team = clean_text(row["Team"])
+        color, logo, nickname, conference, group = team_identity(team)
+        rank = int(row["Rk"]) if pd.notna(row["Rk"]) else None
+        rank_class = f"scores-rank-{rank}" if rank is not None and rank <= 3 else ""
+        points = float(row["Pts"]) if pd.notna(row["Pts"]) else None
+        points_label = f"{points:,.2f}" if points is not None else "—"
+        bar_width = max(0.0, min(100.0, points / max_points * 100)) if points is not None and max_points else 0.0
+        conf_rank = str(int(row["Conf Rk"])) if pd.notna(row["Conf Rk"]) else "—"
+        group_rank = str(int(row["Group Rk"])) if pd.notna(row["Group Rk"]) else "—"
+        rows.append(
+            f'''
+<tr style="--team-color:{esc(color)};">
+  <td><span class="scores-rank {rank_class}">{rank if rank is not None else '—'}</span></td>
+  <td><div class="scores-team-cell">
+    {img_tag(logo, team, "scores-team-logo")}
+    <div class="scores-team-copy">
+      <strong>{esc(team)}</strong>
+      <span>{esc(nickname) + ' · ' if nickname else ''}{esc(conference)} <em>{esc(group)}</em></span>
+    </div>
+  </div></td>
+  <td><div class="scores-points"><strong>{points_label}</strong><span class="scores-points-bar"><i style="width:{bar_width:.1f}%"></i></span></div></td>
+  <td><span class="scores-scope-rank">{conf_rank}</span><small>of 12</small></td>
+  <td><span class="scores-scope-rank">{group_rank}</span><small>of 72</small></td>
+</tr>'''
+        )
+    body = "".join(rows) if rows else '<tr><td class="scores-no-results" colspan="5">No teams match that search.</td></tr>'
+    st.html(
+        f'''
+<section class="scores-shell">
+  <div class="scores-hero">
+    <div class="scores-hero-heading">
+      <div><span class="scores-eyebrow">NCAA / NFL Crossover · Scoring Central</span>
+        <h2>{esc(week_title)} <span>Leaderboard</span></h2>
+        <p>Every program. Every point. One league-wide scoreboard.</p></div>
+      <div class="scores-hero-count"><strong>{len(scored) if not scored.empty else 0}</strong><span>of {len(score_table)} teams scored</span></div>
+    </div>
+    <div class="scores-feature-grid">{feature_html}</div>
+  </div>
+  <div class="scores-board">
+    <div class="scores-board-label"><span>Full scoreboard</span><small>Showing {len(display)} of {len(score_table)} teams · {esc(order)}</small></div>
+    <div class="scores-board-scroll">
+      <table class="scores-table">
+        <colgroup><col class="scores-col-rank"><col class="scores-col-team"><col class="scores-col-points"><col class="scores-col-scope"><col class="scores-col-scope"></colgroup>
+        <thead><tr><th>Rk</th><th>Team</th><th>Pts</th><th>Conf Rk</th><th>Group Rk</th></tr></thead>
+        <tbody>{body}</tbody>
+      </table>
+    </div>
+  </div>
+</section>'''
+    )
 
 
 def filter_conference_schedule(
@@ -9201,7 +9440,7 @@ if pd.notna(latest_published_week):
         ~current_season_rows
         | pd.to_numeric(static_starters_all["Week"], errors="coerce").le(latest_published_week)
     ].copy()
-live_starters_all = static_starters_all
+live_starters_all = apply_live_week_cache(static_starters_all)
 PLAYER_PICTURE_LOOKUP = {
     player_picture_key(row["Player"]): clean_text(row["Picture"])
     for _, row in player_pictures.iterrows()
@@ -9226,9 +9465,9 @@ with st.spinner(f"Preparing the {selected_season} season...", show_time=True):
     static_starters = filter_by_season(static_starters_all, selected_season)
     live_starters = filter_by_season(live_starters_all, selected_season)
     static_scores = aggregate_scores_from_starters(static_starters, published_scores)
-    live_scores = static_scores
-    starters = static_starters
-    scores = static_scores
+    live_scores = aggregate_scores_from_starters(live_starters, static_scores)
+    starters = live_starters
+    scores = live_scores
     all_rosters = load_all_rosters(schools)
     future_draft_picks = load_future_draft_picks()
     is_current_roster_season = selected_season == current_roster_season()
@@ -9238,6 +9477,8 @@ with st.spinner(f"Preparing the {selected_season} season...", show_time=True):
         else historical_roster_snapshot(starters, schools, selected_season)
     )
     history_ledger = build_history_ledger(full_history_schedule, full_scores, schools, full_rankings)
+
+render_live_week_refresh(selected_season, schools)
 
 league_tab, npl_tab, conference_tab, team_tab, scores_tab, players_tab, rules_tab = st.tabs(
     ["🏆 NCAA", "🏆 NPL", "🏟️ Conference", "🎓 Team", "📊 Scores", "🏈 Players", "📘 Rules"]
@@ -9556,28 +9797,36 @@ with team_tab:
 with scores_tab:
     scored_weeks = pd.to_numeric(scores.get("Week", pd.Series(dtype=float)), errors="coerce")
     latest_scored_week = int(scored_weeks.dropna().max()) if not scored_weeks.dropna().empty else 1
-    score_week_options: list[int | str] = ["Total", *range(1, 18)]
-    selected_score_week = st.selectbox(
-        "Week",
-        score_week_options,
-        index=min(latest_scored_week, 17),
-        format_func=lambda value: "Total" if value == "Total" else f"Week {value}",
-        key="scores_week",
+    score_week_options = list(range(1, 18))
+    if st.session_state.get("scores_week") not in score_week_options:
+        st.session_state.pop("scores_week", None)
+    score_week_index = (
+        None if "scores_week" in st.session_state
+        else max(0, min(latest_scored_week, 17) - 1)
     )
+    week_control, search_control, order_control = st.columns([1, 1.8, 1])
+    with week_control:
+        selected_score_week = st.selectbox(
+            "Week",
+            score_week_options,
+            index=score_week_index,
+            format_func=lambda value: f"Week {value}",
+            key="scores_week",
+        )
+    with search_control:
+        score_search = st.text_input(
+            "Find a team",
+            placeholder="Team, nickname, or conference",
+            key="scores_search",
+        )
+    with order_control:
+        score_order = st.selectbox(
+            "Order",
+            ["Highest first", "Lowest first"],
+            key="scores_order",
+        )
     score_table = build_scores_table(scores, schools, selected_score_week)
-    st.dataframe(
-        score_table,
-        hide_index=True,
-        width="stretch",
-        height=650,
-        column_config={
-            "Team": st.column_config.TextColumn("Team", width="large"),
-            "Pts": st.column_config.NumberColumn("Pts", format="%.2f"),
-            "Rk": st.column_config.NumberColumn("Rk", help="Overall rank among all teams"),
-            "Conf Rk": st.column_config.NumberColumn("Conf Rk", help="Rank within conference"),
-            "Group Rk": st.column_config.NumberColumn("Group Rk", help="Rank within Power 6 or Group of 6"),
-        },
-    )
+    render_scores_board(score_table, schools, selected_score_week, score_search, score_order)
 
 with players_tab:
     player_options = all_time_player_options(all_rosters, full_starters, full_drafts)
