@@ -2540,7 +2540,7 @@ div[data-testid="stButton"] button {
   width: 170px;
 }
 .poll-table.coaches {
-  min-width: 620px;
+  min-width: 560px;
 }
 .poll-table.coaches th:nth-child(1),
 .poll-table.coaches td:nth-child(1) {
@@ -2553,17 +2553,15 @@ div[data-testid="stButton"] button {
 }
 .poll-table.coaches th:nth-child(3),
 .poll-table.coaches td:nth-child(3) {
-  width: 170px;
+  width: 230px;
 }
 .poll-table.coaches th:nth-child(4),
-.poll-table.coaches td:nth-child(4),
+.poll-table.coaches td:nth-child(4) {
+  width: 108px;
+}
 .poll-table.coaches th:nth-child(5),
-.poll-table.coaches td:nth-child(5),
-.poll-table.coaches th:nth-child(6),
-.poll-table.coaches td:nth-child(6),
-.poll-table.coaches th:nth-child(7),
-.poll-table.coaches td:nth-child(7) {
-  width: 76px;
+.poll-table.coaches td:nth-child(5) {
+  width: 88px;
 }
 .poll-table th {
   background: #fbfcff;
@@ -2976,6 +2974,25 @@ div[data-testid="stButton"] button {
   color: #111827;
   white-space: nowrap;
 }
+.poll-record-stack { display: flex; flex-direction: column; align-items: stretch; gap: 2px; }
+.poll-record-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: #fff;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.05;
+  white-space: nowrap;
+}
+.poll-record-pill b { font-size: 9px; letter-spacing: .6px; opacity: .78; }
+.poll-record-pill.total { background: #111827; }
+.poll-record-pill.conf { background: #c8102e; }
+.poll-record-pill.npl { background: #2563eb; }
 .league-draft-phase-title span:last-child {
   flex: 1;
   height: 2px;
@@ -8169,7 +8186,7 @@ def render_rules() -> None:
       <table class="rules-table rules-table-ranking">
         <thead><tr><th>Category</th><th>Weight</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td>Weighted Win Percentage</td><td>50%</td><td>NCAA wins are worth 1.0; NPL wins are worth 2.0, 1.5, 1.0, or 0.5 in Tiers 1-4. Credits are divided by total games played.</td></tr>
+          <tr><td>Weighted Win Percentage</td><td>50%</td><td>NCAA wins are worth 1.0; NPL wins are worth 1.5, 1.25, 1.0, or 0.75 in Tiers 1-4. Credits are divided by total games played.</td></tr>
           <tr><td>Season Points Forecast</td><td>50%</td><td>Actual weekly scores plus best-ball Sleeper projections for every remaining week</td></tr>
         </tbody>
       </table>
@@ -8279,8 +8296,10 @@ def build_pearson_poll(
     columns = [
         "Rank", "ConferenceRank", "Team", "Conference", "PearsonRating",
         "WinRating", "ScoringRating", "WeightedWins", "Wins", "Losses",
-        "Ties", "Games", "WinPct", "ActualPoints", "ProjectedPoints",
-        "SeasonForecast",
+        "Ties", "Games", "WinPct", "NCAAWins", "NCAALosses", "NCAATies",
+        "NCAAGames", "NCAACredit", "NPLTier", "NPLWinValue", "NPLWins",
+        "NPLLosses", "NPLTies", "NPLGames", "NPLCredit", "ActualPoints",
+        "ProjectedPoints", "SeasonForecast",
     ]
     teams = (
         schools[["School", "Conference"]]
@@ -8307,6 +8326,7 @@ def build_pearson_poll(
     ].copy()
     combined_standings = build_standings(completed_schedule, completed_scores, schools)
     ncaa_standings = build_standings(completed_ncaa_schedule, completed_scores, schools)
+    npl_standings = build_npl_standings(completed_npl_schedule, completed_scores, schools)
     standing_columns = [
         "team", "league_wins", "league_losses", "league_ties",
         "league_games", "league_win_pct",
@@ -8329,6 +8349,42 @@ def build_pearson_poll(
     for column in ("Wins", "Losses", "Ties", "Games", "WinPct"):
         teams[column] = pd.to_numeric(teams[column], errors="coerce").fillna(0.0)
 
+    ncaa_details = ncaa_standings[
+        ["team", "league_wins", "league_losses", "league_ties", "league_games"]
+    ].rename(
+        columns={
+            "league_wins": "NCAAWins",
+            "league_losses": "NCAALosses",
+            "league_ties": "NCAATies",
+            "league_games": "NCAAGames",
+        }
+    ) if not ncaa_standings.empty else pd.DataFrame(
+        columns=["team", "NCAAWins", "NCAALosses", "NCAATies", "NCAAGames"]
+    )
+    teams = teams.merge(ncaa_details, left_on="Team", right_on="team", how="left")
+    teams = teams.drop(columns=["team"], errors="ignore")
+
+    npl_details = npl_standings[
+        ["team", "tier", "wins", "losses", "ties", "games"]
+    ].rename(
+        columns={
+            "tier": "NPLTier",
+            "wins": "NPLWins",
+            "losses": "NPLLosses",
+            "ties": "NPLTies",
+            "games": "NPLGames",
+        }
+    ) if not npl_standings.empty else pd.DataFrame(
+        columns=["team", "NPLTier", "NPLWins", "NPLLosses", "NPLTies", "NPLGames"]
+    )
+    teams = teams.merge(npl_details, left_on="Team", right_on="team", how="left")
+    teams = teams.drop(columns=["team"], errors="ignore")
+    for column in (
+        "NCAAWins", "NCAALosses", "NCAATies", "NCAAGames",
+        "NPLWins", "NPLLosses", "NPLTies", "NPLGames",
+    ):
+        teams[column] = pd.to_numeric(teams[column], errors="coerce").fillna(0.0)
+
     ncaa_credit = {}
     if not ncaa_standings.empty:
         ncaa_credit = {
@@ -8337,7 +8393,7 @@ def build_pearson_poll(
         }
     npl_credit: dict[str, float] = {}
     scores_by_team_week = score_lookup(completed_scores)
-    tier_win_values = {1: 2.0, 2: 1.5, 3: 1.0, 4: 0.5}
+    tier_win_values = {1: 1.5, 2: 1.25, 3: 1.0, 4: 0.75}
     for _, game in completed_npl_schedule.iterrows():
         week = pd.to_numeric(game.get("Week"), errors="coerce")
         tier = pd.to_numeric(game.get("Tier"), errors="coerce")
@@ -8362,6 +8418,14 @@ def build_pearson_poll(
     teams["WeightedWins"] = teams["Team"].map(
         lambda team: ncaa_credit.get(clean_text(team), 0.0) + npl_credit.get(clean_text(team), 0.0)
     )
+    teams["NCAACredit"] = teams["Team"].map(
+        lambda team: ncaa_credit.get(clean_text(team), 0.0)
+    )
+    teams["NPLCredit"] = teams["Team"].map(
+        lambda team: npl_credit.get(clean_text(team), 0.0)
+    )
+    teams["NPLTier"] = pd.to_numeric(teams["NPLTier"], errors="coerce").astype("Int64")
+    teams["NPLWinValue"] = teams["NPLTier"].map(tier_win_values).fillna(1.0)
     teams["WinPct"] = np.where(
         teams["Games"].gt(0),
         teams["WeightedWins"] / teams["Games"],
@@ -8666,9 +8730,11 @@ def pearson_poll_rows_html(
       </div>
     </div>
   </td>
-  <td class="poll-metric">{esc(total_record)}</td>
-  <td class="poll-metric">{esc(conference_record)}</td>
-  <td class="poll-metric">{esc(npl_record)}</td>
+  <td><div class="poll-record-stack">
+    <span class="poll-record-pill total"><b>TOTAL</b>{esc(total_record)}</span>
+    <span class="poll-record-pill conf"><b>CONF</b>{esc(conference_record)}</span>
+    <span class="poll-record-pill npl"><b>NPL</b>{esc(npl_record)}</span>
+  </div></td>
   <td class="poll-metric">{float(item["ActualPoints"]):,.2f}</td>
 </tr>
 """
@@ -8831,9 +8897,7 @@ def render_rankings(
             <th>Rk</th>
             <th>Conf</th>
             <th>Team</th>
-            <th>Total</th>
-            <th>Conf</th>
-            <th>NPL</th>
+            <th>Records</th>
             <th>PF</th>
           </tr>
         </thead>
@@ -8938,6 +9002,45 @@ def render_rankings(
         st.html(rankings_detail_table_html(conference_poll))
     with st.expander("Full 144-Team Pearson Poll", expanded=False):
         st.html(rankings_detail_table_html(full_poll))
+
+    audit_code = st.text_input(
+        "Commissioner ranking audit",
+        type="password",
+        key="pearson_poll_audit_code",
+        placeholder="Enter audit code",
+    )
+    if audit_code == "McCadeP8":
+        audit = pearson_poll.copy().rename(
+            columns={
+                "ConferenceRank": "Conference Rank",
+                "PearsonRating": "Pearson Rating",
+                "WinRating": "Win Rating",
+                "ScoringRating": "Scoring Rating",
+                "WeightedWins": "Weighted Win Credits",
+                "WinPct": "Weighted Win Rate",
+                "NCAAWins": "NCAA Wins",
+                "NCAALosses": "NCAA Losses",
+                "NCAATies": "NCAA Ties",
+                "NCAAGames": "NCAA Games",
+                "NCAACredit": "NCAA Win Credits",
+                "NPLTier": "NPL Tier",
+                "NPLWinValue": "NPL Win Value",
+                "NPLWins": "NPL Wins",
+                "NPLLosses": "NPL Losses",
+                "NPLTies": "NPL Ties",
+                "NPLGames": "NPL Games",
+                "NPLCredit": "NPL Win Credits",
+                "ActualPoints": "Actual Points",
+                "ProjectedPoints": "Remaining Projected Points",
+                "SeasonForecast": "Season Points Forecast",
+            }
+        )
+        st.dataframe(
+            audit,
+            hide_index=True,
+            width="stretch",
+            height=760,
+        )
 
 
 @loading_spinner("Loading conference draft board...")
