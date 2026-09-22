@@ -3679,7 +3679,7 @@ div[data-testid="stButton"] button {
 .scores-board-label { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 17px 23px 14px; border-bottom: 1px solid #e8ecf2; }
 .scores-board-label span { font-family: 'Bebas Neue', sans-serif; font-size: 30px; letter-spacing: 1.5px; line-height: 1; color: #111827; }
 .scores-board-label small { font-family: 'Rajdhani', sans-serif; font-size: 13px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.7px; }
-.scores-board-scroll { max-height: 820px; overflow: auto; scrollbar-color: #94a3b8 #f1f5f9; }
+.scores-board-scroll { overflow: visible; }
 .scores-table { width: 100%; min-width: 780px; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
 .scores-col-rank { width: 76px; }
 .scores-col-team { width: auto; }
@@ -3707,8 +3707,17 @@ div[data-testid="stButton"] button {
 .scores-points-bar { display: block; width: 100%; height: 4px; margin-top: 8px; border-radius: 5px; background: #e9edf4; overflow: hidden; }
 .scores-points-bar i { display: block; height: 100%; border-radius: inherit; background: var(--team-color); }
 .scores-scope-rank { display: inline-block; font-family: 'Barlow Condensed', sans-serif; font-size: 24px; font-weight: 900; line-height: 1; color: #111827; }
-.scores-table td small { display: block; font-family: 'Rajdhani', sans-serif; font-size: 11px; font-weight: 700; color: #94a3b8; }
+.scores-average-marker td { height: auto; padding: 9px 18px; background: #fff4f5 !important; border-top: 1px dashed #e9a5af; border-bottom: 1px dashed #e9a5af; border-left: 5px solid #c8102e !important; }
+.scores-average-content { display: flex; align-items: center; justify-content: center; gap: 13px; font-family: 'Rajdhani', sans-serif; color: #9f1239; }
+.scores-average-content::before, .scores-average-content::after { content: ""; flex: 1; height: 1px; background: #e9a5af; }
+.scores-average-content span { font-size: 12px; font-weight: 900; letter-spacing: 1.8px; text-transform: uppercase; white-space: nowrap; }
+.scores-average-content strong { font-family: 'Barlow Condensed', sans-serif; font-size: 18px; font-weight: 900; white-space: nowrap; }
+.scores-average-content small { font-size: 11px !important; font-weight: 800 !important; color: #b45366 !important; white-space: nowrap; }
 .scores-no-results { padding: 34px !important; text-align: center !important; font-family: 'Rajdhani', sans-serif; font-size: 17px; font-weight: 800; color: #64748b !important; }
+.scores-chart-heading { padding: 7px 7px 0; border-left: 5px solid #c8102e; margin: 5px 0 12px; }
+.scores-chart-heading span { display: block; margin-left: 12px; font-family: 'Rajdhani', sans-serif; font-size: 12px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; color: #c8102e; }
+.scores-chart-heading h3 { margin: 4px 0 2px 12px; font-family: 'Bebas Neue', sans-serif; font-size: 39px; font-weight: 400; line-height: 1; letter-spacing: 1.4px; color: #111827; }
+.scores-chart-heading p { margin: 7px 0 8px 12px; font-family: 'Rajdhani', sans-serif; font-size: 15px; font-weight: 700; color: #64748b; }
 @media (max-width: 820px) {
   .scores-hero { padding: 23px 20px 19px; }
   .scores-hero-heading { flex-direction: column; gap: 8px; }
@@ -3720,7 +3729,8 @@ div[data-testid="stButton"] button {
   .scores-feature strong { font-size: 25px; }
   .scores-board-label { padding: 13px 15px; }
   .scores-board-label small { text-align: right; }
-  .scores-board-scroll { max-height: 72vh; }
+  .scores-board-scroll { overflow-x: auto; }
+  .scores-average-content small { display: none; }
 }
 </style>
 """
@@ -5245,6 +5255,15 @@ def render_scores_board(
         display = display.sort_values(["Pts", "Team"], ascending=[True, True], na_position="last")
 
     max_points = float(scored["Pts"].max()) if not scored.empty else 0.0
+    average_points = float(scored["Pts"].mean()) if not scored.empty else None
+    average_marker = (
+        '<tr class="scores-average-marker"><td colspan="5">'
+        '<div class="scores-average-content"><span>League average</span>'
+        f'<strong>{average_points:,.2f} pts</strong><small>{len(scored)} scored teams</small>'
+        '</div></td></tr>'
+        if average_points is not None and not query else ""
+    )
+    marker_inserted = False
     rows = []
     for _, row in display.iterrows():
         team = clean_text(row["Team"])
@@ -5252,6 +5271,13 @@ def render_scores_board(
         rank = int(row["Rk"]) if pd.notna(row["Rk"]) else None
         rank_class = f"scores-rank-{rank}" if rank is not None and rank <= 3 else ""
         points = float(row["Pts"]) if pd.notna(row["Pts"]) else None
+        if average_marker and not marker_inserted and (
+            points is None
+            or (order == "Lowest first" and points > average_points)
+            or (order != "Lowest first" and points < average_points)
+        ):
+            rows.append(average_marker)
+            marker_inserted = True
         points_label = f"{points:,.2f}" if points is not None else "—"
         bar_width = max(0.0, min(100.0, points / max_points * 100)) if points is not None and max_points else 0.0
         conf_rank = str(int(row["Conf Rk"])) if pd.notna(row["Conf Rk"]) else "—"
@@ -5268,10 +5294,12 @@ def render_scores_board(
     </div>
   </div></td>
   <td><div class="scores-points"><strong>{points_label}</strong><span class="scores-points-bar"><i style="width:{bar_width:.1f}%"></i></span></div></td>
-  <td><span class="scores-scope-rank">{conf_rank}</span><small>of 12</small></td>
-  <td><span class="scores-scope-rank">{group_rank}</span><small>of 72</small></td>
+  <td><span class="scores-scope-rank">{conf_rank}</span></td>
+  <td><span class="scores-scope-rank">{group_rank}</span></td>
 </tr>'''
         )
+    if average_marker and not marker_inserted:
+        rows.append(average_marker)
     body = "".join(rows) if rows else '<tr><td class="scores-no-results" colspan="5">No teams match that search.</td></tr>'
     st.html(
         f'''
@@ -5297,6 +5325,171 @@ def render_scores_board(
   </div>
 </section>'''
     )
+
+
+def render_scores_charts(score_table: pd.DataFrame, schools: pd.DataFrame) -> None:
+    """Compare the scoring curves within each group and conference."""
+    school_conferences = schools[["School", "Conference"]].drop_duplicates("School")
+    chart_data = score_table.merge(
+        school_conferences,
+        left_on="Team",
+        right_on="School",
+        how="left",
+    ).drop(columns="School")
+    chart_data = chart_data.dropna(subset=["Pts", "Conf Rk", "Group Rk", "Conference"]).copy()
+    if chart_data.empty:
+        st.info("Scoring curves will appear once teams have scored this week.")
+        return
+
+    chart_data["Pts"] = chart_data["Pts"].astype(float)
+    chart_data["Conf Rk"] = chart_data["Conf Rk"].astype(int)
+    chart_data["Group Rk"] = chart_data["Group Rk"].astype(int)
+    chart_data["Group"] = np.where(
+        chart_data["Conference"].isin(SUPERFLEX_CONFERENCES), "Power 6", "Group of 6"
+    )
+    chart_data["PointLabel"] = chart_data.apply(
+        lambda row: f'{row["Team"]} · {row["Pts"]:,.2f} pts', axis=1
+    )
+    y_max = max(20, int(np.ceil(chart_data["Pts"].max() / 20) * 20) + 20)
+    y_axis = alt.Axis(
+        title="Points scored",
+        labelFont="Rajdhani",
+        labelFontSize=13,
+        titleFont="Barlow Condensed",
+        titleFontSize=16,
+        titlePadding=14,
+        labelColor="#475569",
+        titleColor="#334155",
+        gridColor="#e9edf3",
+        domain=False,
+        tickColor="#cbd5e1",
+    )
+    x_axis_style = dict(
+        labelFont="Rajdhani",
+        labelFontSize=13,
+        titleFont="Barlow Condensed",
+        titleFontSize=16,
+        titlePadding=12,
+        labelColor="#475569",
+        titleColor="#334155",
+        grid=False,
+        tickColor="#cbd5e1",
+        domainColor="#cbd5e1",
+    )
+
+    def chart_base(rank_field: str, rank_max: int, rank_ticks: list[int], tooltip_label: str) -> alt.Chart:
+        return alt.Chart(chart_data).encode(
+            x=alt.X(
+                f"{rank_field}:Q",
+                title=tooltip_label,
+                scale=alt.Scale(domain=[1, rank_max], nice=False),
+                axis=alt.Axis(values=rank_ticks, **x_axis_style),
+            ),
+            y=alt.Y("Pts:Q", scale=alt.Scale(domain=[0, y_max]), axis=y_axis),
+            tooltip=[
+                alt.Tooltip("Team:N", title="Team"),
+                alt.Tooltip("Pts:Q", title="Points", format=",.2f"),
+                alt.Tooltip("Conference:N", title="Conference"),
+                alt.Tooltip("Group:N", title="Group"),
+                alt.Tooltip(f"{rank_field}:Q", title=tooltip_label),
+            ],
+        )
+
+    average_rule = alt.Chart(
+        pd.DataFrame({"LeagueAverage": [float(chart_data["Pts"].mean())]})
+    ).mark_rule(color="#c8102e", strokeDash=[5, 5], strokeWidth=1.5, opacity=0.55).encode(
+        y="LeagueAverage:Q"
+    )
+
+    group_base = chart_base("Group Rk", 72, [1, 12, 24, 36, 48, 60, 72], "Group rank")
+    group_color = alt.Color(
+        "Group:N",
+        scale=alt.Scale(domain=["Power 6", "Group of 6"], range=["#c8102e", "#2563eb"]),
+        legend=alt.Legend(
+            title=None, orient="bottom", labelFont="Barlow Condensed", labelFontSize=16,
+            labelColor="#334155", symbolStrokeWidth=4, symbolSize=150,
+        ),
+    )
+    group_hover = alt.selection_point(
+        name="group_score_hover", fields=["Team"], on="pointerover", nearest=True,
+        empty=False, clear="pointerout",
+    )
+    group_line = group_base.mark_line(strokeWidth=4, interpolate="monotone").encode(
+        color=group_color, detail="Group:N", order=alt.Order("Group Rk:Q")
+    )
+    group_points = group_base.mark_circle(size=72, stroke="white", strokeWidth=1.5).encode(
+        color=group_color,
+        size=alt.condition(group_hover, alt.value(190), alt.value(72)),
+    ).add_params(group_hover)
+    group_labels = group_base.mark_text(
+        dy=-16, font="Barlow Condensed", fontSize=15, fontWeight="bold", color="#111827"
+    ).encode(
+        text="PointLabel:N",
+        opacity=alt.condition(group_hover, alt.value(1), alt.value(0)),
+    )
+    group_chart = (average_rule + group_line + group_points + group_labels).properties(
+        height=430, background="#ffffff"
+    ).configure_view(stroke=None)
+
+    conference_colors = [
+        "#b7791f", "#334d85", "#6d28d9", "#0f766e", "#c8102e", "#e45d36",
+        "#15803d", "#a85516", "#0e7490", "#9333ea", "#db2777", "#475569",
+    ]
+    conference_color = alt.Color(
+        "Conference:N",
+        scale=alt.Scale(domain=LEAGUE_ROSTER_ORDER, range=conference_colors),
+        legend=alt.Legend(
+            title=None, orient="bottom", columns=4,
+            labelFont="Barlow Condensed", labelFontSize=14,
+            labelColor="#334155", symbolStrokeWidth=3, symbolSize=125,
+        ),
+    )
+    conference_hover = alt.selection_point(
+        name="conference_score_hover", fields=["Team"], on="pointerover", nearest=True,
+        empty=False, clear="pointerout",
+    )
+    conference_focus = alt.selection_point(
+        name="conference_score_focus", fields=["Conference"], bind="legend"
+    )
+    conference_base = chart_base("Conf Rk", 12, list(range(1, 13)), "Conference rank")
+    conference_line = conference_base.mark_line(strokeWidth=3, interpolate="monotone").encode(
+        color=conference_color,
+        detail="Conference:N",
+        order=alt.Order("Conf Rk:Q"),
+        opacity=alt.condition(conference_focus, alt.value(0.95), alt.value(0.15)),
+    ).add_params(conference_focus)
+    conference_points = conference_base.mark_circle(
+        size=78, stroke="white", strokeWidth=1.2
+    ).encode(
+        color=conference_color,
+        size=alt.condition(conference_hover, alt.value(200), alt.value(78)),
+        opacity=alt.condition(conference_focus, alt.value(1), alt.value(0.16)),
+    ).add_params(conference_hover)
+    conference_labels = conference_base.mark_text(
+        dy=-16, font="Barlow Condensed", fontSize=15, fontWeight="bold", color="#111827"
+    ).encode(
+        text="PointLabel:N",
+        opacity=alt.condition(conference_hover, alt.value(1), alt.value(0)),
+    )
+    conference_chart = (
+        average_rule + conference_line + conference_points + conference_labels
+    ).properties(height=560, background="#ffffff").configure_view(stroke=None)
+
+    with st.container(border=True):
+        st.html(
+            '<div class="scores-chart-heading"><span>01 / Group scoring curves</span>'
+            '<h3>Power 6 vs Group of 6</h3>'
+            '<p>Rank 1 through 72 in each group. Hover a dot to see its team and exact score.</p></div>'
+        )
+        st.altair_chart(group_chart, width="stretch")
+    with st.container(border=True):
+        st.html(
+            '<div class="scores-chart-heading"><span>02 / Conference scoring curves</span>'
+            '<h3>Twelve conferences, rank by rank</h3>'
+            '<p>Rank 1 through 12 in each conference. Hover a dot for the team and points; '
+            'click a conference in the legend to focus its line.</p></div>'
+        )
+        st.altair_chart(conference_chart, width="stretch")
 
 
 def filter_conference_schedule(
@@ -9827,6 +10020,7 @@ with scores_tab:
         )
     score_table = build_scores_table(scores, schools, selected_score_week)
     render_scores_board(score_table, schools, selected_score_week, score_search, score_order)
+    render_scores_charts(score_table, schools)
 
 with players_tab:
     player_options = all_time_player_options(all_rosters, full_starters, full_drafts)
