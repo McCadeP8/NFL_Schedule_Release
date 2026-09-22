@@ -6,6 +6,7 @@ import re
 import unicodedata
 from datetime import date, datetime, timedelta
 from functools import wraps
+from pathlib import Path
 from typing import Optional
 from zoneinfo import ZoneInfo
 
@@ -65,7 +66,7 @@ SCHEDULE_STATUS_COLORS = {
 }
 CACHE_TTL_SECONDS = 60 * 60 * 24
 LIVE_WEEK_CACHE_KEY = "live_weekly_starters"
-DATA_CACHE_VERSION = "npl-score-name-canonical-v1"
+DATA_CACHE_VERSION = "week-two-published-scores-v1"
 STANDINGS_CACHE_VERSION = "npl-resilient-team-lookup-v1"
 NPL_SEASON = 2026
 NPL_TIER_DIVISIONS = {
@@ -3800,8 +3801,9 @@ def under_construction(label: str) -> None:
 @st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner="Loading team branding...")
 def load_branding_data(
     cache_version: str,
+    starters_modified_ns: int,
 ) -> tuple[pd.DataFrame, ...]:
-    del cache_version
+    del cache_version, starters_modified_ns
     return fetch_branding_data()
 
 
@@ -5019,6 +5021,43 @@ def aggregate_scores_from_starters(
     scores = scores.dropna(subset=["Points"]).copy()
     scores = scores.loc[pd.to_numeric(scores["Points"], errors="coerce").fillna(0).ne(0)]
     return scores.reset_index(drop=True)
+
+
+def build_scores_table(scores: pd.DataFrame, schools: pd.DataFrame, week: int | str) -> pd.DataFrame:
+    """Rank every school by its selected weekly or season-to-date score."""
+    teams = (
+        schools[["School", "Conference"]]
+        .dropna(subset=["School", "Conference"])
+        .drop_duplicates("School")
+        .rename(columns={"School": "Team"})
+        .copy()
+    )
+    teams["Group"] = np.where(
+        teams["Conference"].isin(SUPERFLEX_CONFERENCES), "Power 6", "Group of 6"
+    )
+    available = scores.copy()
+    available["Week"] = pd.to_numeric(available["Week"], errors="coerce")
+    available["Points"] = pd.to_numeric(available["Points"], errors="coerce")
+    if week == "Total":
+        available = available.loc[available["Week"].between(1, 17)]
+        points = available.groupby("Team")["Points"].sum(min_count=1)
+    else:
+        available = available.loc[available["Week"].eq(int(week))]
+        points = available.groupby("Team")["Points"].first()
+    teams["Pts"] = teams["Team"].map(points)
+    teams = teams.sort_values(["Pts", "Team"], ascending=[False, True], na_position="last")
+    scored = teams["Pts"].notna()
+    teams["Rk"] = pd.Series(pd.NA, index=teams.index, dtype="Int64")
+    teams.loc[scored, "Rk"] = range(1, int(scored.sum()) + 1)
+    teams["Conf Rk"] = pd.Series(pd.NA, index=teams.index, dtype="Int64")
+    teams["Group Rk"] = pd.Series(pd.NA, index=teams.index, dtype="Int64")
+    teams.loc[scored, "Conf Rk"] = (
+        teams.loc[scored].groupby("Conference").cumcount() + 1
+    ).to_numpy()
+    teams.loc[scored, "Group Rk"] = (
+        teams.loc[scored].groupby("Group").cumcount() + 1
+    ).to_numpy()
+    return teams[["Team", "Pts", "Rk", "Conf Rk", "Group Rk"]].reset_index(drop=True)
 
 
 def filter_conference_schedule(
@@ -9124,12 +9163,12 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-render_data_controls()
 inject_css()
 selected_season = masthead()
 
 with st.spinner("Loading league datasets...", show_time=True):
-    branding_data = load_branding_data(DATA_CACHE_VERSION)
+    starters_modified_ns = Path(__file__).with_name("weekly_starters.csv").stat().st_mtime_ns
+    branding_data = load_branding_data(DATA_CACHE_VERSION, starters_modified_ns)
 if len(branding_data) == 9:
     schools, conferences, schedule, scores, rankings, drafts, starters, bowls, player_pictures = branding_data
     npl_schedule = pd.DataFrame(columns=["Year", "Week", "Tier", "Division", "TeamA", "TeamB", "TeamASeed", "TeamBSeed", "Notes", "Rivalry"])
@@ -9150,7 +9189,19 @@ else:
         "Confirm the published app.py and data.py are from the same version."
     )
 static_starters_all = starters.copy()
-live_starters_all = apply_live_week_cache(static_starters_all)
+current_season_rows = pd.to_numeric(static_starters_all["Year"], errors="coerce").eq(current_roster_season())
+scored_current_rows = current_season_rows & pd.to_numeric(
+    static_starters_all["TeamPoints"], errors="coerce"
+).gt(0)
+latest_published_week = pd.to_numeric(
+    static_starters_all.loc[scored_current_rows, "Week"], errors="coerce"
+).max()
+if pd.notna(latest_published_week):
+    static_starters_all = static_starters_all.loc[
+        ~current_season_rows
+        | pd.to_numeric(static_starters_all["Week"], errors="coerce").le(latest_published_week)
+    ].copy()
+live_starters_all = static_starters_all
 PLAYER_PICTURE_LOOKUP = {
     player_picture_key(row["Player"]): clean_text(row["Picture"])
     for _, row in player_pictures.iterrows()
@@ -9175,7 +9226,7 @@ with st.spinner(f"Preparing the {selected_season} season...", show_time=True):
     static_starters = filter_by_season(static_starters_all, selected_season)
     live_starters = filter_by_season(live_starters_all, selected_season)
     static_scores = aggregate_scores_from_starters(static_starters, published_scores)
-    live_scores = aggregate_scores_from_starters(live_starters, static_scores)
+    live_scores = static_scores
     starters = static_starters
     scores = static_scores
     all_rosters = load_all_rosters(schools)
@@ -9188,10 +9239,8 @@ with st.spinner(f"Preparing the {selected_season} season...", show_time=True):
     )
     history_ledger = build_history_ledger(full_history_schedule, full_scores, schools, full_rankings)
 
-render_live_week_refresh(selected_season, schools)
-
-league_tab, npl_tab, conference_tab, team_tab, players_tab, rules_tab = st.tabs(
-    ["🏆 NCAA", "🏆 NPL", "🏟️ Conference", "🎓 Team", "🏈 Players", "📘 Rules"]
+league_tab, npl_tab, conference_tab, team_tab, scores_tab, players_tab, rules_tab = st.tabs(
+    ["🏆 NCAA", "🏆 NPL", "🏟️ Conference", "🎓 Team", "📊 Scores", "🏈 Players", "📘 Rules"]
 )
 
 with league_tab:
@@ -9248,10 +9297,8 @@ with league_tab:
                 key_prefix="league_schedule_empty",
             )
     with league_standings_tab:
-        league_mode = standings_score_mode("ncaa_standings_score_mode")
-        league_standings_scores = live_scores if league_mode == "Live" else static_scores
         render_league_standings(
-            schedule, league_standings_scores, schools, conferences, rankings
+            schedule, scores, schools, conferences, rankings
         )
     with league_rankings_tab:
         render_rankings(
@@ -9302,9 +9349,7 @@ with npl_tab:
             bowls,
         )
     with npl_standings_tab:
-        npl_mode = standings_score_mode("npl_standings_score_mode")
-        npl_standings_scores = live_scores if npl_mode == "Live" else static_scores
-        render_npl_standings(npl_schedule, npl_standings_scores, schools, rankings)
+        render_npl_standings(npl_schedule, scores, schools, rankings)
     with npl_league_schedule_tab:
         render_npl_schedule_matrices(
             npl_schedule, live_scores, schools, live_starters
@@ -9348,13 +9393,9 @@ with conference_tab:
     with conf_history_tab:
         render_conference_history(history_ledger, schools, conferences, bowls, selected_conference)
     with conf_standings_tab:
-        conference_mode = standings_score_mode("conference_standings_score_mode")
-        conference_standings_scores = (
-            live_scores if conference_mode == "Live" else static_scores
-        )
         render_conference_standings(
             schedule,
-            conference_standings_scores,
+            scores,
             schools,
             conferences,
             rankings,
@@ -9511,6 +9552,32 @@ with team_tab:
         )
     with team_history_tab:
         render_team_history(history_ledger, full_history_schedule, schools, full_starters, selected_team)
+
+with scores_tab:
+    scored_weeks = pd.to_numeric(scores.get("Week", pd.Series(dtype=float)), errors="coerce")
+    latest_scored_week = int(scored_weeks.dropna().max()) if not scored_weeks.dropna().empty else 1
+    score_week_options: list[int | str] = ["Total", *range(1, 18)]
+    selected_score_week = st.selectbox(
+        "Week",
+        score_week_options,
+        index=min(latest_scored_week, 17),
+        format_func=lambda value: "Total" if value == "Total" else f"Week {value}",
+        key="scores_week",
+    )
+    score_table = build_scores_table(scores, schools, selected_score_week)
+    st.dataframe(
+        score_table,
+        hide_index=True,
+        width="stretch",
+        height=650,
+        column_config={
+            "Team": st.column_config.TextColumn("Team", width="large"),
+            "Pts": st.column_config.NumberColumn("Pts", format="%.2f"),
+            "Rk": st.column_config.NumberColumn("Rk", help="Overall rank among all teams"),
+            "Conf Rk": st.column_config.NumberColumn("Conf Rk", help="Rank within conference"),
+            "Group Rk": st.column_config.NumberColumn("Group Rk", help="Rank within Power 6 or Group of 6"),
+        },
+    )
 
 with players_tab:
     player_options = all_time_player_options(all_rosters, full_starters, full_drafts)

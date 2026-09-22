@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import argparse
 import sys
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable, Iterable
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import requests
@@ -662,7 +664,7 @@ def _merge_weekly_starters(
 
     replace_years = {int(year) for year in years or new_rows["Year"].dropna().astype(int).unique()}
     replace_conferences = {
-        _export_conference(str(conference)).casefold()
+        _clean_conference(str(conference)).casefold()
         for conference in (conferences or new_rows["Conference"].dropna().astype(str).unique())
     }
     replace_weeks = {int(week) for week in weeks or new_rows["Week"].dropna().astype(int).unique()}
@@ -671,7 +673,7 @@ def _merge_weekly_starters(
     existing["Week"] = pd.to_numeric(existing["Week"], errors="coerce")
     keep_mask = ~(
         existing["Year"].isin(replace_years)
-        & existing["Conference"].astype(str).str.casefold().isin(replace_conferences)
+        & existing["Conference"].astype(str).map(_clean_conference).str.casefold().isin(replace_conferences)
         & existing["Week"].isin(replace_weeks)
     )
     merged = pd.concat([existing.loc[keep_mask], new_rows], ignore_index=True)
@@ -681,20 +683,61 @@ def _merge_weekly_starters(
     ).reset_index(drop=True)
 
 
+def latest_completed_week(season: int, today: date | None = None) -> int:
+    """The fantasy week ends after Monday night; Tuesday morning can publish it."""
+    today = today or datetime.now(ZoneInfo("America/Denver")).date()
+    september_first = date(season, 9, 1)
+    labor_day = september_first + timedelta(days=(7 - september_first.weekday()) % 7)
+    week_one_start = labor_day + timedelta(days=2)
+    current_week = ((today - week_one_start).days // 7) + 1
+    if current_week > 17:
+        return 0
+    completed = current_week if today.weekday() == 1 else current_week - 1
+    return max(0, min(17, completed))
+
+
+def validate_completed_week_rows(rows: pd.DataFrame, year: int, weeks: Iterable[int]) -> None:
+    """Never publish a partial or all-zero weekly refresh."""
+    expected_conferences = set(LEAGUE_IDS_BY_YEAR[year])
+    for week in weeks:
+        week_rows = rows.loc[rows["Week"].eq(week)].copy()
+        counts = week_rows.groupby("Conference")["RosterID"].nunique()
+        missing = expected_conferences - set(counts.index)
+        wrong = {name: int(count) for name, count in counts.items() if count != 12}
+        team_scores = week_rows.groupby(["Conference", "RosterID"])["TeamPoints"].first()
+        if missing or wrong or team_scores.isna().any() or team_scores.sum() <= 0:
+            raise ValueError(
+                f"Incomplete {year} Week {week}: missing conferences={sorted(missing)}, "
+                f"wrong roster counts={wrong}, missing scores={int(team_scores.isna().sum())}"
+            )
+
+
 def run_export(
     export: str = "images",
     years: Iterable[int] | None = None,
     conferences: Iterable[str] | None = None,
     weeks: Iterable[int] | None = None,
     merge: bool = False,
+    completed_weeks: bool = False,
 ) -> None:
     """Write an NCFL export CSV beside data.py; defaults to player images."""
     if export == "starters":
+        if completed_weeks:
+            if not years or len(set(years)) != 1:
+                raise ValueError("--completed-weeks requires exactly one --year")
+            season = int(next(iter(years)))
+            through_week = latest_completed_week(season)
+            if through_week == 0:
+                print(f"No completed {season} fantasy weeks to refresh yet.")
+                return
+            weeks = range(1, through_week + 1)
         starters = get_weekly_starters(
             years=years,
             conferences=conferences,
             weeks=weeks or range(1, 19),
         )
+        if completed_weeks:
+            validate_completed_week_rows(starters, season, weeks)
         if merge:
             starters = _merge_weekly_starters(
                 starters,
@@ -755,6 +798,11 @@ if __name__ == "__main__":
         action="store_true",
         help="For starters, replace the selected year/conference/week slice in weekly_starters.csv.",
     )
+    parser.add_argument(
+        "--completed-weeks",
+        action="store_true",
+        help="Refresh all finished weeks through Tuesday morning, validating all 144 teams.",
+    )
     args = parser.parse_args()
     run_export(
         args.export,
@@ -762,4 +810,5 @@ if __name__ == "__main__":
         conferences=args.conferences,
         weeks=args.weeks,
         merge=args.merge,
+        completed_weeks=args.completed_weeks,
     )
