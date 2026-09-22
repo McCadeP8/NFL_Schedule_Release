@@ -2562,6 +2562,7 @@ div[data-testid="stButton"] button {
 .poll-table.coaches th:nth-child(5),
 .poll-table.coaches td:nth-child(5) {
   width: 88px;
+  text-align: center;
 }
 .poll-table th {
   background: #fbfcff;
@@ -8710,9 +8711,11 @@ def pearson_poll_rows_html(
         conference = clean_text(item.get("Conference"), clean_text(info.get("conference")))
         conference_badge = conference_logo(conferences, conference)
         team_logo = clean_text(info.get("logo"))
-        weighted_wins = float(item["WeightedWins"])
-        weighted_wins_label = f"{weighted_wins:.1f}".rstrip("0").rstrip(".")
-        total_record = f'{weighted_wins_label}/{int(item["Games"])}'
+        total_record = record_text(
+            int(item["Wins"]),
+            int(item["Losses"]),
+            int(item["Ties"]),
+        )
         conference_record = team_stats_for_week(ncaa_standings, team)["conf_record"]
         npl_row = npl_standings.loc[npl_standings["team"].eq(team)]
         npl_record = (
