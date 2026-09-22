@@ -2507,7 +2507,7 @@ div[data-testid="stButton"] button {
 .poll-table {
   border-collapse: collapse;
   width: 100%;
-  min-width: 1080px;
+  min-width: 1000px;
   table-layout: fixed;
 }
 .poll-table.ap th:nth-child(1),
@@ -2521,7 +2521,7 @@ div[data-testid="stButton"] button {
 }
 .poll-table.ap th:nth-child(3),
 .poll-table.ap td:nth-child(3) {
-  width: 320px;
+  width: 260px;
 }
 .poll-table.ap th:nth-child(4),
 .poll-table.ap td:nth-child(4),
@@ -2540,7 +2540,7 @@ div[data-testid="stButton"] button {
   width: 170px;
 }
 .poll-table.coaches {
-  min-width: 700px;
+  min-width: 620px;
 }
 .poll-table.coaches th:nth-child(1),
 .poll-table.coaches td:nth-child(1) {
@@ -2553,7 +2553,7 @@ div[data-testid="stButton"] button {
 }
 .poll-table.coaches th:nth-child(3),
 .poll-table.coaches td:nth-child(3) {
-  min-width: 210px;
+  width: 170px;
 }
 .poll-table.coaches th:nth-child(4),
 .poll-table.coaches td:nth-child(4),
@@ -2626,6 +2626,7 @@ div[data-testid="stButton"] button {
   align-items: center;
   gap: 10px;
 }
+.poll-team > div { min-width: 0; }
 .poll-team-logo {
   width: 38px;
   height: 38px;
@@ -2640,6 +2641,8 @@ div[data-testid="stButton"] button {
   color: #1a2030;
   line-height: 1.05;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .poll-team-sub {
   font-family: 'Rajdhani', sans-serif;
@@ -8166,7 +8169,7 @@ def render_rules() -> None:
       <table class="rules-table rules-table-ranking">
         <thead><tr><th>Category</th><th>Weight</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td>Combined Win Percentage</td><td>50%</td><td>NCAA and NPL wins, losses, and ties through the selected week</td></tr>
+          <tr><td>Weighted Win Percentage</td><td>50%</td><td>NCAA wins are worth 1.0; NPL wins are worth 2.0, 1.5, 1.0, or 0.5 in Tiers 1-4. Credits are divided by total games played.</td></tr>
           <tr><td>Season Points Forecast</td><td>50%</td><td>Actual weekly scores plus best-ball Sleeper projections for every remaining week</td></tr>
         </tbody>
       </table>
@@ -8275,8 +8278,9 @@ def build_pearson_poll(
 ) -> pd.DataFrame:
     columns = [
         "Rank", "ConferenceRank", "Team", "Conference", "PearsonRating",
-        "WinRating", "ScoringRating", "Wins", "Losses", "Ties", "Games",
-        "WinPct", "ActualPoints", "ProjectedPoints", "SeasonForecast",
+        "WinRating", "ScoringRating", "WeightedWins", "Wins", "Losses",
+        "Ties", "Games", "WinPct", "ActualPoints", "ProjectedPoints",
+        "SeasonForecast",
     ]
     teams = (
         schools[["School", "Conference"]]
@@ -8288,14 +8292,21 @@ def build_pearson_poll(
     if teams.empty:
         return pd.DataFrame(columns=columns)
 
+    completed_ncaa_schedule = schedule.loc[
+        pd.to_numeric(schedule["Week"], errors="coerce").le(selected_week)
+    ].copy()
+    completed_npl_schedule = npl_schedule.loc[
+        pd.to_numeric(npl_schedule["Week"], errors="coerce").le(selected_week)
+    ].copy()
     completed_schedule = combine_schedule_frames(
-        schedule.loc[pd.to_numeric(schedule["Week"], errors="coerce").le(selected_week)],
-        npl_schedule.loc[pd.to_numeric(npl_schedule["Week"], errors="coerce").le(selected_week)],
+        completed_ncaa_schedule,
+        completed_npl_schedule,
     )
     completed_scores = scores.loc[
         pd.to_numeric(scores["Week"], errors="coerce").le(selected_week)
     ].copy()
     combined_standings = build_standings(completed_schedule, completed_scores, schools)
+    ncaa_standings = build_standings(completed_ncaa_schedule, completed_scores, schools)
     standing_columns = [
         "team", "league_wins", "league_losses", "league_ties",
         "league_games", "league_win_pct",
@@ -8317,6 +8328,45 @@ def build_pearson_poll(
     )
     for column in ("Wins", "Losses", "Ties", "Games", "WinPct"):
         teams[column] = pd.to_numeric(teams[column], errors="coerce").fillna(0.0)
+
+    ncaa_credit = {}
+    if not ncaa_standings.empty:
+        ncaa_credit = {
+            clean_text(row["team"]): float(row["league_wins"]) + 0.5 * float(row["league_ties"])
+            for _, row in ncaa_standings.iterrows()
+        }
+    npl_credit: dict[str, float] = {}
+    scores_by_team_week = score_lookup(completed_scores)
+    tier_win_values = {1: 2.0, 2: 1.5, 3: 1.0, 4: 0.5}
+    for _, game in completed_npl_schedule.iterrows():
+        week = pd.to_numeric(game.get("Week"), errors="coerce")
+        tier = pd.to_numeric(game.get("Tier"), errors="coerce")
+        team_a = clean_text(game.get("TeamA"))
+        team_b = clean_text(game.get("TeamB"))
+        if pd.isna(week) or not team_a or not team_b:
+            continue
+        score_a = scores_by_team_week.get((match_key(team_a), int(week)))
+        score_b = scores_by_team_week.get((match_key(team_b), int(week)))
+        if not is_completed_score(score_a, score_b):
+            continue
+        win_value = tier_win_values.get(int(tier), 1.0) if not pd.isna(tier) else 1.0
+        npl_credit.setdefault(team_a, 0.0)
+        npl_credit.setdefault(team_b, 0.0)
+        if score_a > score_b:
+            npl_credit[team_a] += win_value
+        elif score_b > score_a:
+            npl_credit[team_b] += win_value
+        else:
+            npl_credit[team_a] += win_value / 2.0
+            npl_credit[team_b] += win_value / 2.0
+    teams["WeightedWins"] = teams["Team"].map(
+        lambda team: ncaa_credit.get(clean_text(team), 0.0) + npl_credit.get(clean_text(team), 0.0)
+    )
+    teams["WinPct"] = np.where(
+        teams["Games"].gt(0),
+        teams["WeightedWins"] / teams["Games"],
+        0.0,
+    )
 
     score_rows = completed_scores.copy()
     score_rows["Points"] = pd.to_numeric(score_rows["Points"], errors="coerce")
@@ -8588,9 +8638,9 @@ def pearson_poll_rows_html(
         conference = clean_text(item.get("Conference"), clean_text(info.get("conference")))
         conference_badge = conference_logo(conferences, conference)
         team_logo = clean_text(info.get("logo"))
-        total_record = f'{int(item["Wins"])}-{int(item["Losses"])}'
-        if int(item["Ties"]):
-            total_record += f'-{int(item["Ties"])}'
+        weighted_wins = float(item["WeightedWins"])
+        weighted_wins_label = f"{weighted_wins:.1f}".rstrip("0").rstrip(".")
+        total_record = f'{weighted_wins_label}/{int(item["Games"])}'
         conference_record = team_stats_for_week(ncaa_standings, team)["conf_record"]
         npl_row = npl_standings.loc[npl_standings["team"].eq(team)]
         npl_record = (
@@ -8630,7 +8680,7 @@ def rankings_detail_table_html(frame: pd.DataFrame) -> str:
     numeric_columns = {
         "Rank", "Conf Rank", "Teams", "Total Value", "Player Value",
         "Draft Pick Value", "Matched Players", "Unmatched Players", "Games",
-        "Wins", "Losses", "Ties", "Pearson Rating", "Win Rating",
+        "Wins", "Weighted Wins", "Losses", "Ties", "Pearson Rating", "Win Rating",
         "Scoring Rating", "Win %", "Actual Points", "Projected Points",
         "Season Forecast",
     }
@@ -8648,7 +8698,7 @@ def rankings_detail_table_html(frame: pd.DataFrame) -> str:
             } and not pd.isna(value):
                 label = f"{float(value):,.0f}"
             elif column in {
-                "Pearson Rating", "Win Rating", "Scoring Rating", "Win %",
+                "Pearson Rating", "Win Rating", "Scoring Rating", "Win %", "Weighted Wins",
                 "Actual Points", "Projected Points", "Season Forecast",
             } and not pd.isna(value):
                 label = f"{float(value):,.2f}"
@@ -8677,7 +8727,19 @@ def render_rankings(
     rosters: pd.DataFrame,
     season: int,
 ) -> None:
-    weeks = ranking_weeks(rankings)
+    scored_week_rows = scores.copy()
+    scored_week_rows["Week"] = pd.to_numeric(scored_week_rows.get("Week"), errors="coerce")
+    scored_week_rows["Points"] = pd.to_numeric(scored_week_rows.get("Points"), errors="coerce")
+    score_weeks = {
+        int(week)
+        for week in scored_week_rows.loc[
+            scored_week_rows["Week"].between(1, 17, inclusive="both")
+            & scored_week_rows["Points"].notna()
+            & scored_week_rows["Points"].ne(0),
+            "Week",
+        ].dropna()
+    }
+    weeks = sorted(set(ranking_weeks(rankings)) | score_weeks)
     if not weeks:
         weeks = [0]
 
@@ -8825,7 +8887,7 @@ def render_rankings(
     full_poll = pearson_poll[
         [
             "Rank", "ConferenceRank", "Team", "Conference", "PearsonRating",
-            "WinRating", "ScoringRating", "Wins", "Losses", "Ties", "Games",
+            "WinRating", "ScoringRating", "WeightedWins", "Wins", "Losses", "Ties", "Games",
             "WinPct", "ActualPoints", "ProjectedPoints", "SeasonForecast",
         ]
     ].rename(
@@ -8834,6 +8896,7 @@ def render_rankings(
             "PearsonRating": "Pearson Rating",
             "WinRating": "Win Rating",
             "ScoringRating": "Scoring Rating",
+            "WeightedWins": "Weighted Wins",
             "WinPct": "Win %",
             "ActualPoints": "Actual Points",
             "ProjectedPoints": "Projected Points",
