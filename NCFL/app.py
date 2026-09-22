@@ -17,6 +17,7 @@ import streamlit as st
 
 from data import LEAGUES, POSITIONS, load_all_rosters as fetch_all_rosters
 from data import get_future_draft_picks as fetch_future_draft_picks
+from data import get_weekly_projections as fetch_weekly_projections
 from data import load_branding_data as fetch_branding_data
 from play import get_weekly_starters as fetch_weekly_starters
 
@@ -2539,7 +2540,7 @@ div[data-testid="stButton"] button {
   width: 170px;
 }
 .poll-table.coaches {
-  min-width: 560px;
+  min-width: 700px;
 }
 .poll-table.coaches th:nth-child(1),
 .poll-table.coaches td:nth-child(1) {
@@ -2559,7 +2560,9 @@ div[data-testid="stButton"] button {
 .poll-table.coaches th:nth-child(5),
 .poll-table.coaches td:nth-child(5),
 .poll-table.coaches th:nth-child(6),
-.poll-table.coaches td:nth-child(6) {
+.poll-table.coaches td:nth-child(6),
+.poll-table.coaches th:nth-child(7),
+.poll-table.coaches td:nth-child(7) {
   width: 76px;
 }
 .poll-table th {
@@ -3899,6 +3902,7 @@ def render_live_week_refresh(season: int, schools: pd.DataFrame) -> None:
                     state="complete",
                     expanded=False,
                 )
+                load_weekly_projections.clear()
                 st.rerun()
 
     if current_week is not None:
@@ -3950,6 +3954,11 @@ def load_all_rosters(schools: pd.DataFrame) -> pd.DataFrame:
 @st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner="Loading future draft picks...")
 def load_future_draft_picks() -> pd.DataFrame:
     return fetch_future_draft_picks()
+
+
+@st.cache_data(ttl=60 * 60, show_spinner="Loading Sleeper projections...", max_entries=16)
+def load_weekly_projections(season: int, weeks: tuple[int, ...]) -> pd.DataFrame:
+    return fetch_weekly_projections(int(season), weeks)
 
 
 @st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner="Loading dynasty asset values...")
@@ -8152,18 +8161,17 @@ def render_rules() -> None:
 <div class="rules-grid">
   <div class="rules-card rules-card-wide" style="--accent:#2563eb;">
     <div class="rules-card-title">Ranking System</div>
-    <p>Work in progress. Current ranking framework:</p>
+    <p>The live Pearson Poll balances results with expected full-season scoring:</p>
     <div class="rules-table-wrap">
       <table class="rules-table rules-table-ranking">
         <thead><tr><th>Category</th><th>Weight</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td>Wins</td><td>30%</td><td>Wins compared to the other 143 teams</td></tr>
-          <tr><td>Points For</td><td>30%</td><td>PF compared to the other 143 teams</td></tr>
-          <tr><td>SOS</td><td>10%</td><td>Quality of opponents; teams 51-144 are weighted the same</td></tr>
-          <tr><td>Last Week</td><td>30%</td><td>Prior week ranking to reduce massive week-to-week fluctuations</td></tr>
+          <tr><td>Combined Win Percentage</td><td>50%</td><td>NCAA and NPL wins, losses, and ties through the selected week</td></tr>
+          <tr><td>Season Points Forecast</td><td>50%</td><td>Actual weekly scores plus best-ball Sleeper projections for every remaining week</td></tr>
         </tbody>
       </table>
     </div>
+    <p>Each category is converted to a tie-aware percentile across all 144 teams. As games finish, actual scores automatically replace that week's projection.</p>
   </div>
 </div>
 
@@ -8197,6 +8205,159 @@ def through_week(schedule: pd.DataFrame, scores: pd.DataFrame, week: int) -> tup
     schedule_part = schedule.loc[schedule["Week"].le(week)].copy()
     scores_part = scores.loc[scores["Week"].le(week)].copy()
     return schedule_part, scores_part
+
+
+def percentile_rating(values: pd.Series) -> pd.Series:
+    """Map a league-wide metric to a tie-aware 0-100 empirical percentile."""
+    numeric = pd.to_numeric(values, errors="coerce").fillna(0.0)
+    if len(numeric) <= 1:
+        return pd.Series(50.0, index=numeric.index)
+    ranks = numeric.rank(method="average", ascending=True)
+    return (ranks - 1.0) / (len(numeric) - 1.0) * 100.0
+
+
+def best_ball_projection(roster: pd.DataFrame, superflex: bool) -> float:
+    """Return the optimal legal projected lineup total for one team-week."""
+    if roster.empty:
+        return 0.0
+    available = roster.copy()
+    available["ProjectedPoints"] = pd.to_numeric(
+        available["ProjectedPoints"], errors="coerce"
+    ).fillna(0.0).clip(lower=0.0)
+    available["position"] = available["position"].astype(str).str.upper()
+    available = available.loc[available["position"].isin(POSITIONS)].copy()
+    available = available.sort_values("ProjectedPoints", ascending=False)
+
+    used: set[object] = set()
+    total = 0.0
+    for position, count in (("QB", 1), ("RB", 2), ("WR", 2), ("TE", 1)):
+        choices = available.loc[
+            available["position"].eq(position) & ~available.index.isin(used)
+        ].head(count)
+        used.update(choices.index)
+        total += float(choices["ProjectedPoints"].sum())
+
+    remaining = available.loc[~available.index.isin(used)].copy()
+    if superflex:
+        best_extra = 0.0
+        flex_candidates = remaining.loc[remaining["position"].isin(["RB", "WR", "TE"])]
+        for flex_index, flex_player in flex_candidates.iterrows():
+            superflex_pool = remaining.drop(index=flex_index)
+            superflex_points = (
+                float(superflex_pool.iloc[0]["ProjectedPoints"])
+                if not superflex_pool.empty
+                else 0.0
+            )
+            best_extra = max(
+                best_extra,
+                float(flex_player["ProjectedPoints"]) + superflex_points,
+            )
+        total += best_extra
+    else:
+        total += float(
+            remaining.loc[remaining["position"].isin(["RB", "WR", "TE"])]
+            .head(2)["ProjectedPoints"]
+            .sum()
+        )
+    return total
+
+
+@st.cache_data(show_spinner="Calculating the Pearson Poll...", max_entries=32)
+def build_pearson_poll(
+    season: int,
+    selected_week: int,
+    schedule: pd.DataFrame,
+    npl_schedule: pd.DataFrame,
+    scores: pd.DataFrame,
+    schools: pd.DataFrame,
+    rosters: pd.DataFrame,
+    projections: pd.DataFrame,
+) -> pd.DataFrame:
+    columns = [
+        "Rank", "ConferenceRank", "Team", "Conference", "PearsonRating",
+        "WinRating", "ScoringRating", "Wins", "Losses", "Ties", "Games",
+        "WinPct", "ActualPoints", "ProjectedPoints", "SeasonForecast",
+    ]
+    teams = (
+        schools[["School", "Conference"]]
+        .dropna(subset=["School", "Conference"])
+        .drop_duplicates("School")
+        .rename(columns={"School": "Team"})
+        .reset_index(drop=True)
+    )
+    if teams.empty:
+        return pd.DataFrame(columns=columns)
+
+    completed_schedule = combine_schedule_frames(
+        schedule.loc[pd.to_numeric(schedule["Week"], errors="coerce").le(selected_week)],
+        npl_schedule.loc[pd.to_numeric(npl_schedule["Week"], errors="coerce").le(selected_week)],
+    )
+    completed_scores = scores.loc[
+        pd.to_numeric(scores["Week"], errors="coerce").le(selected_week)
+    ].copy()
+    combined_standings = build_standings(completed_schedule, completed_scores, schools)
+    standing_columns = [
+        "team", "league_wins", "league_losses", "league_ties",
+        "league_games", "league_win_pct",
+    ]
+    if combined_standings.empty:
+        records = pd.DataFrame(columns=standing_columns)
+    else:
+        records = combined_standings[standing_columns].copy()
+    teams = teams.merge(records, left_on="Team", right_on="team", how="left")
+    teams = teams.drop(columns=["team"], errors="ignore")
+    teams = teams.rename(
+        columns={
+            "league_wins": "Wins",
+            "league_losses": "Losses",
+            "league_ties": "Ties",
+            "league_games": "Games",
+            "league_win_pct": "WinPct",
+        }
+    )
+    for column in ("Wins", "Losses", "Ties", "Games", "WinPct"):
+        teams[column] = pd.to_numeric(teams[column], errors="coerce").fillna(0.0)
+
+    score_rows = completed_scores.copy()
+    score_rows["Points"] = pd.to_numeric(score_rows["Points"], errors="coerce")
+    actual_points = score_rows.groupby("Team")["Points"].sum(min_count=1)
+    teams["ActualPoints"] = teams["Team"].map(actual_points).fillna(0.0)
+
+    projected_totals: dict[str, float] = {}
+    if not rosters.empty and not projections.empty:
+        roster_rows = rosters.copy()
+        roster_rows = roster_rows.loc[
+            ~roster_rows["roster_spot"].astype(str).str.casefold().eq("taxi")
+        ].copy()
+        roster_rows["player_id"] = roster_rows["player_id"].astype(str)
+        projection_rows = projections.copy()
+        projection_rows["PlayerID"] = projection_rows["PlayerID"].astype(str)
+        projected_rosters = roster_rows.merge(
+            projection_rows,
+            left_on="player_id",
+            right_on="PlayerID",
+            how="inner",
+        )
+        for (team, _week), team_week in projected_rosters.groupby(
+            ["team_name", "Week"], dropna=False
+        ):
+            conference = clean_text(team_week["league_name"].iloc[0])
+            projected_totals[clean_text(team)] = projected_totals.get(clean_text(team), 0.0) + best_ball_projection(
+                team_week,
+                superflex=conference in SUPERFLEX_CONFERENCES,
+            )
+    teams["ProjectedPoints"] = teams["Team"].map(projected_totals).fillna(0.0)
+    teams["SeasonForecast"] = teams["ActualPoints"] + teams["ProjectedPoints"]
+    teams["WinRating"] = percentile_rating(teams["WinPct"])
+    teams["ScoringRating"] = percentile_rating(teams["SeasonForecast"])
+    teams["PearsonRating"] = 0.5 * teams["WinRating"] + 0.5 * teams["ScoringRating"]
+    teams = teams.sort_values(
+        ["PearsonRating", "WinPct", "SeasonForecast", "Team"],
+        ascending=[False, False, False, True],
+    ).reset_index(drop=True)
+    teams["Rank"] = range(1, len(teams) + 1)
+    teams["ConferenceRank"] = teams.groupby("Conference").cumcount() + 1
+    return teams[columns]
 
 
 def rank_map(rankings: pd.DataFrame, poll_type: str, week: int) -> dict[str, int]:
@@ -8413,10 +8574,65 @@ def poll_rows_html(
     return "".join(rows)
 
 
+def pearson_poll_rows_html(
+    poll: pd.DataFrame,
+    teams: dict[str, dict[str, str]],
+    conferences: pd.DataFrame,
+    ncaa_standings: pd.DataFrame,
+    npl_standings: pd.DataFrame,
+) -> str:
+    rows = []
+    for _, item in poll.sort_values(["Rank", "Team"]).iterrows():
+        team = clean_text(item["Team"])
+        info = teams.get(team, {})
+        conference = clean_text(item.get("Conference"), clean_text(info.get("conference")))
+        conference_badge = conference_logo(conferences, conference)
+        team_logo = clean_text(info.get("logo"))
+        total_record = f'{int(item["Wins"])}-{int(item["Losses"])}'
+        if int(item["Ties"]):
+            total_record += f'-{int(item["Ties"])}'
+        conference_record = team_stats_for_week(ncaa_standings, team)["conf_record"]
+        npl_row = npl_standings.loc[npl_standings["team"].eq(team)]
+        npl_record = (
+            record_text(
+                int(npl_row.iloc[0]["wins"]),
+                int(npl_row.iloc[0]["losses"]),
+                int(npl_row.iloc[0]["ties"]),
+            )
+            if not npl_row.empty
+            else "0-0"
+        )
+        rows.append(
+            f"""
+<tr>
+  <td class="poll-rank-cell"><span class="poll-rank">{int(item["Rank"])}</span></td>
+  <td class="poll-logo-cell">{img_tag(conference_badge, conference, "poll-logo") if conference_badge else ''}</td>
+  <td>
+    <div class="poll-team">
+      {f'<img class="poll-team-logo" src="{esc(team_logo)}" alt="{esc(team)}">' if team_logo else ''}
+      <div>
+        <div class="poll-team-name">{esc(team)}</div>
+        <div class="poll-team-sub">{esc(nickname_owner(info.get("nickname"), info.get("owner")))}</div>
+      </div>
+    </div>
+  </td>
+  <td class="poll-metric">{esc(total_record)}</td>
+  <td class="poll-metric">{esc(conference_record)}</td>
+  <td class="poll-metric">{esc(npl_record)}</td>
+  <td class="poll-metric">{float(item["ActualPoints"]):,.2f}</td>
+</tr>
+"""
+        )
+    return "".join(rows)
+
+
 def rankings_detail_table_html(frame: pd.DataFrame) -> str:
     numeric_columns = {
         "Rank", "Conf Rank", "Teams", "Total Value", "Player Value",
-        "Draft Pick Value", "Matched Players", "Unmatched Players",
+        "Draft Pick Value", "Matched Players", "Unmatched Players", "Games",
+        "Wins", "Losses", "Ties", "Pearson Rating", "Win Rating",
+        "Scoring Rating", "Win %", "Actual Points", "Projected Points",
+        "Season Forecast",
     }
     headers = "".join(
         f'<th class="{"numeric" if column in numeric_columns else ""}">{esc(column)}</th>'
@@ -8427,8 +8643,15 @@ def rankings_detail_table_html(frame: pd.DataFrame) -> str:
         cells = []
         for column in frame.columns:
             value = row[column]
-            if column in {"Total Value", "Player Value", "Draft Pick Value"} and not pd.isna(value):
+            if column in {
+                "Total Value", "Player Value", "Draft Pick Value",
+            } and not pd.isna(value):
                 label = f"{float(value):,.0f}"
+            elif column in {
+                "Pearson Rating", "Win Rating", "Scoring Rating", "Win %",
+                "Actual Points", "Projected Points", "Season Forecast",
+            } and not pd.isna(value):
+                label = f"{float(value):,.2f}"
             elif column in numeric_columns and not pd.isna(value):
                 label = f"{int(value):,}"
             else:
@@ -8447,11 +8670,12 @@ def rankings_detail_table_html(frame: pd.DataFrame) -> str:
 def render_rankings(
     rankings: pd.DataFrame,
     schedule: pd.DataFrame,
+    npl_schedule: pd.DataFrame,
     scores: pd.DataFrame,
     schools: pd.DataFrame,
     conferences: pd.DataFrame,
     rosters: pd.DataFrame,
-    draft_picks: pd.DataFrame,
+    season: int,
 ) -> None:
     weeks = ranking_weeks(rankings)
     if not weeks:
@@ -8467,6 +8691,10 @@ def render_rankings(
     selected_week = int(selected_week)
     schedule_part, scores_part = through_week(schedule, scores, selected_week)
     standings = build_standings(schedule_part, scores_part, schools)
+    npl_schedule_part = npl_schedule.loc[
+        pd.to_numeric(npl_schedule["Week"], errors="coerce").le(selected_week)
+    ].copy()
+    npl_standings = build_npl_standings(npl_schedule_part, scores_part, schools)
     teams = team_lookup(schools)
 
     ap_poll = rankings.loc[
@@ -8474,8 +8702,19 @@ def render_rankings(
         & rankings["Week"].eq(selected_week)
         & rankings["Rank"].notna()
     ].copy()
-    dynasty_poll = build_dynasty_coaches_poll(rosters, draft_picks, schools)
-    coaches_poll = dynasty_poll[["Team", "Rank"]].copy()
+    future_weeks = tuple(range(max(1, selected_week + 1), 18))
+    projections = load_weekly_projections(season, future_weeks) if future_weeks else pd.DataFrame()
+    pearson_poll = build_pearson_poll(
+        season,
+        selected_week,
+        schedule,
+        npl_schedule,
+        scores,
+        schools,
+        rosters,
+        projections,
+    )
+    coaches_poll = pearson_poll.copy()
     previous_ap = rank_map(rankings, "AP Poll", selected_week - 1)
 
     ap_top = ap_poll.loc[ap_poll["Rank"].le(25)].copy()
@@ -8505,18 +8744,12 @@ def render_rankings(
         selected_week,
         include_last_game=True,
     )
-    coaches_rows = poll_rows_html(
+    coaches_rows = pearson_poll_rows_html(
         coaches_top,
-        standings,
-        {},
         teams,
         conferences,
-        schedule,
-        scores,
-        selected_week,
-        include_last_game=False,
-        dynasty_values=dict(zip(dynasty_poll["Team"], dynasty_poll["TotalValue"])),
-        show_final_metric=False,
+        standings,
+        npl_standings,
     )
     orv_text = ", ".join(ap_orv) if ap_orv else "None"
     coaches_panel = ""
@@ -8525,8 +8758,8 @@ def render_rankings(
   <div class="poll-panel">
     <div class="poll-header">
       <div>
-        <div class="poll-title">Coaches Poll</div>
-        <div class="poll-subtitle">{esc(title_week)} Rankings</div>
+        <div class="poll-title">Pearson Poll</div>
+        <div class="poll-subtitle">{esc(title_week)} · 50% Wins + 50% Season Points Forecast</div>
       </div>
     </div>
     <div class="poll-table-wrap">
@@ -8538,6 +8771,8 @@ def render_rankings(
             <th>Team</th>
             <th>Total</th>
             <th>Conf</th>
+            <th>NPL</th>
+            <th>PF</th>
           </tr>
         </thead>
         <tbody>{coaches_rows}</tbody>
@@ -8587,63 +8822,59 @@ def render_rankings(
 </div>
 """
     )
-    full_poll = dynasty_poll[
+    full_poll = pearson_poll[
         [
-            "Rank", "ConferenceRank", "Team", "Conference", "Format",
-            "TotalValue", "PlayerValue", "DraftPickValue",
-            "MatchedPlayers", "UnmatchedPlayers",
+            "Rank", "ConferenceRank", "Team", "Conference", "PearsonRating",
+            "WinRating", "ScoringRating", "Wins", "Losses", "Ties", "Games",
+            "WinPct", "ActualPoints", "ProjectedPoints", "SeasonForecast",
         ]
     ].rename(
         columns={
             "ConferenceRank": "Conf Rank",
-            "TotalValue": "Total Value",
-            "PlayerValue": "Player Value",
-            "DraftPickValue": "Draft Pick Value",
-            "MatchedPlayers": "Matched Players",
-            "UnmatchedPlayers": "Unmatched Players",
+            "PearsonRating": "Pearson Rating",
+            "WinRating": "Win Rating",
+            "ScoringRating": "Scoring Rating",
+            "WinPct": "Win %",
+            "ActualPoints": "Actual Points",
+            "ProjectedPoints": "Projected Points",
+            "SeasonForecast": "Season Forecast",
         }
     )
     conference_poll = (
-        dynasty_poll.groupby("Conference", as_index=False)
+        pearson_poll.groupby("Conference", as_index=False)
         .agg(
             Teams=("Team", "count"),
-            PlayerValue=("PlayerValue", "sum"),
-            DraftPickValue=("DraftPickValue", "sum"),
-            TotalValue=("TotalValue", "sum"),
-            MatchedPlayers=("MatchedPlayers", "sum"),
-            UnmatchedPlayers=("UnmatchedPlayers", "sum"),
+            PearsonRating=("PearsonRating", "mean"),
+            WinRating=("WinRating", "mean"),
+            ScoringRating=("ScoringRating", "mean"),
+            ActualPoints=("ActualPoints", "sum"),
+            ProjectedPoints=("ProjectedPoints", "sum"),
+            SeasonForecast=("SeasonForecast", "sum"),
         )
-        .sort_values("TotalValue", ascending=False)
+        .sort_values("PearsonRating", ascending=False)
         .reset_index(drop=True)
     )
     conference_poll["Rank"] = range(1, len(conference_poll) + 1)
     conference_poll = conference_poll[
         [
-            "Rank", "Conference", "Teams", "TotalValue", "PlayerValue",
-            "DraftPickValue", "MatchedPlayers", "UnmatchedPlayers",
+            "Rank", "Conference", "Teams", "PearsonRating", "WinRating",
+            "ScoringRating", "ActualPoints", "ProjectedPoints", "SeasonForecast",
         ]
     ].rename(
         columns={
-            "TotalValue": "Total Value",
-            "PlayerValue": "Player Value",
-            "DraftPickValue": "Draft Pick Value",
-            "MatchedPlayers": "Matched Players",
-            "UnmatchedPlayers": "Unmatched Players",
+            "PearsonRating": "Pearson Rating",
+            "WinRating": "Win Rating",
+            "ScoringRating": "Scoring Rating",
+            "ActualPoints": "Actual Points",
+            "ProjectedPoints": "Projected Points",
+            "SeasonForecast": "Season Forecast",
         }
     )
 
     with st.expander("Conference Totals", expanded=False):
         st.html(rankings_detail_table_html(conference_poll))
-    with st.expander("Full 144-Team Coaches Poll", expanded=False):
+    with st.expander("Full 144-Team Pearson Poll", expanded=False):
         st.html(rankings_detail_table_html(full_poll))
-    unmatched = unmatched_dynasty_players(rosters)
-    if not unmatched.empty:
-        with st.expander(f"Review {len(unmatched):,} Unmatched Players"):
-            st.caption(
-                "These rostered players receive zero dynasty value because their names "
-                "did not match the current DynastyProcess player file."
-            )
-            st.html(rankings_detail_table_html(unmatched))
 
 
 @loading_spinner("Loading conference draft board...")
@@ -9673,15 +9904,14 @@ with st.spinner(f"Preparing the {selected_season} season...", show_time=True):
 
 render_live_week_refresh(selected_season, schools)
 
-league_tab, npl_tab, conference_tab, team_tab, scores_tab, players_tab, rules_tab = st.tabs(
-    ["🏆 NCAA", "🏆 NPL", "🏟️ Conference", "🎓 Team", "📊 Scores", "🏈 Players", "📘 Rules"]
+league_tab, npl_tab, conference_tab, team_tab, scores_tab, rankings_tab, players_tab, rules_tab = st.tabs(
+    ["🏆 NCAA", "🏆 NPL", "🏟️ Conference", "🎓 Team", "📊 Scores", "⭐ Rankings", "🏈 Players", "📘 Rules"]
 )
 
 with league_tab:
     (
         league_schedule_tab,
         league_standings_tab,
-        league_rankings_tab,
         league_rosters_tab,
         league_drafts_tab,
         league_history_tab,
@@ -9689,7 +9919,6 @@ with league_tab:
         [
             "📅 Schedule",
             "📊 Standings",
-            "⭐ Rankings",
             "👥 Rosters",
             "🧾 Drafts",
         ] + ["🕰️ History"]
@@ -9733,16 +9962,6 @@ with league_tab:
     with league_standings_tab:
         render_league_standings(
             schedule, scores, schools, conferences, rankings
-        )
-    with league_rankings_tab:
-        render_rankings(
-            rankings,
-            schedule,
-            scores,
-            schools,
-            conferences,
-            all_rosters,
-            future_draft_picks,
         )
     with league_rosters_tab:
         # player_download = unique_player_download(all_rosters)
@@ -10021,6 +10240,18 @@ with scores_tab:
     score_table = build_scores_table(scores, schools, selected_score_week)
     render_scores_board(score_table, schools, selected_score_week, score_search, score_order)
     render_scores_charts(score_table, schools)
+
+with rankings_tab:
+    render_rankings(
+        rankings,
+        schedule,
+        npl_schedule,
+        scores,
+        schools,
+        conferences,
+        roster_snapshot,
+        selected_season,
+    )
 
 with players_tab:
     player_options = all_time_player_options(all_rosters, full_starters, full_drafts)

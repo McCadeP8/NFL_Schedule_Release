@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from io import StringIO
 from pathlib import Path
 import re
@@ -110,6 +111,38 @@ def get_players() -> pd.DataFrame:
         )
 
     return pd.DataFrame(rows)
+
+
+def get_weekly_projections(season: int, weeks: list[int] | tuple[int, ...]) -> pd.DataFrame:
+    """Return Sleeper PPR projections for the requested regular-season weeks."""
+    requested_weeks = sorted({int(value) for value in weeks if 1 <= int(value) <= 17})
+
+    def projection_rows(week: int) -> list[dict[str, object]]:
+        try:
+            projections = _get_json(f"/projections/nfl/regular/{int(season)}/{week}") or {}
+        except requests.RequestException:
+            return []
+        week_rows = []
+        for player_id, projection in projections.items():
+            projected_points = pd.to_numeric(
+                (projection or {}).get("pts_ppr"), errors="coerce"
+            )
+            if pd.isna(projected_points):
+                continue
+            week_rows.append(
+                {
+                    "PlayerID": str(player_id),
+                    "Week": week,
+                    "ProjectedPoints": float(projected_points),
+                }
+            )
+        return week_rows
+
+    rows = []
+    with ThreadPoolExecutor(max_workers=min(6, max(1, len(requested_weeks)))) as pool:
+        for week_rows in pool.map(projection_rows, requested_weeks):
+            rows.extend(week_rows)
+    return pd.DataFrame(rows, columns=["PlayerID", "Week", "ProjectedPoints"])
 
 
 def get_rosters(league_id: Any) -> list[dict[str, Any]]:
