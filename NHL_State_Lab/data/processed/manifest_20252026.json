@@ -1,0 +1,10 @@
+{
+  "season": 20252026,
+  "game_types": [
+    2,
+    3
+  ],
+  "scheduled_games": 1394,
+  "completed_games": 1394,
+  "failures": []
+}

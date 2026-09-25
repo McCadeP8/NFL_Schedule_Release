@@ -208,3 +208,13 @@ __marimo__/
 .claude/settings.local.json
 Schedule_App/discord_bot.py
 .claude/settings.local.json
+
+# Local/generated NCFL artifacts
+NCFL/artifact_work/
+NCFL/outputs/
+NCFL/build_nba_rankings.py
+NCFL/nba_rankings_2026_27.json
+
+# NHL State Lab local cache
+NHL_State_Lab/data/raw/
+NHL_State_Lab/data/processed/*.csv
