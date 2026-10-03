@@ -640,10 +640,10 @@ def render_league_overview_table(frame: pd.DataFrame) -> None:
         st.info("No completed games match the current league overview filters.")
         return
     columns = [
-        "Rank", "Team", "Record", "Points Percentage", "Goals Scored", "Goals Allowed", "Goals Difference",
-        "Even GF/60", "Even GA/60", "Even GD/60",
-        "Advantage GF/60", "Advantage GA/60", "Advantage GD/60",
-        "Disadvantage GF/60", "Disadvantage GA/60", "Disadvantage GD/60",
+        "Rank", "Team", "GP", "W", "L", "OTL", "Points Percentage", "Goals Scored", "Goals Allowed", "Goals Difference",
+        "Even GF Time", "Even GA Time", "Even GD/60",
+        "Advantage GF Time", "Advantage GA Time", "Advantage GD/60",
+        "Disadvantage GF Time", "Disadvantage GA Time", "Disadvantage GD/60",
         "Weighted GF", "Weighted GA", "Weighted GD",
     ]
     rows = []
@@ -657,7 +657,7 @@ def render_league_overview_table(frame: pd.DataFrame) -> None:
                 classes.append("primary")
             if column == "Rank":
                 classes.append("rank-cell")
-            if column not in {"Team", "Record"}:
+            if column != "Team":
                 classes.append("numeric")
             cell_class = frame.at[row.name, f"__class_{column}"] if f"__class_{column}" in frame else ""
             if cell_class:
@@ -669,15 +669,15 @@ def render_league_overview_table(frame: pd.DataFrame) -> None:
         '<div class="nhl-table-shell"><div class="nhl-table-scroll" style="max-height:760px">'
         '<table class="nhl-table league-overview-table"><thead>'
         '<tr class="group-row"><th rowspan="2">Rank</th><th rowspan="2">Team</th>'
-        '<th colspan="5" class="group-neutral">Standings Context</th>'
+        '<th colspan="8" class="group-neutral">Standings Context</th>'
         '<th colspan="3" class="group-actual">Even Strength</th>'
         '<th colspan="3" class="group-actual">All Advantages</th>'
         '<th colspan="3" class="group-actual">All Disadvantages</th>'
         '<th colspan="3" class="group-difference">League-Mix Weighted</th></tr>'
-        '<tr class="subhead-row"><th>Record</th><th>Pts %</th><th>GF</th><th>GA</th><th>GD</th>'
-        '<th>GF/60</th><th>GA/60</th><th>GD/60</th>'
-        '<th>GF/60</th><th>GA/60</th><th>GD/60</th>'
-        '<th>GF/60</th><th>GA/60</th><th>GD/60</th>'
+        '<tr class="subhead-row"><th>GP</th><th>W</th><th>L</th><th>OTL</th><th>Pts %</th><th>GF</th><th>GA</th><th>GD</th>'
+        '<th>GF Time</th><th>GA Time</th><th>GD/60</th>'
+        '<th>GF Time</th><th>GA Time</th><th>GD/60</th>'
+        '<th>GF Time</th><th>GA Time</th><th>GD/60</th>'
         '<th>GF</th><th>GA</th><th>GD</th></tr></thead>'
         f'<tbody>{"".join(rows)}</tbody></table></div></div>'
     )
@@ -698,6 +698,13 @@ def league_overview_display(table: pd.DataFrame, total_teams: int) -> pd.DataFra
         "Disadvantage_gf60", "Disadvantage_ga60", "Disadvantage_gd60",
     ]:
         league_values[column] = table[column].mean() if column in table else np.nan
+    league_goal_average = (
+        (table["weighted_gf"].mean() + table["weighted_ga"].mean()) / 2
+        if total_teams else np.nan
+    )
+    league_values["weighted_gf"] = league_goal_average
+    league_values["weighted_ga"] = league_goal_average
+    league_values["weighted_gd"] = 0.0 if pd.notna(league_goal_average) else np.nan
     table = pd.concat([table, pd.DataFrame([league_values])], ignore_index=True)
 
     def number_count(value: float) -> str:
@@ -706,32 +713,40 @@ def league_overview_display(table: pd.DataFrame, total_teams: int) -> pd.DataFra
     def plus_count(value: float) -> str:
         return "—" if pd.isna(value) else f"{value:+.1f}" if abs(value - round(value)) > 0.05 else f"{int(round(value)):+d}"
 
+    def decimal_count(value: float) -> str:
+        return "—" if pd.isna(value) else f"{value:.2f}"
+
     def rate_text(value: float) -> str:
         return "—" if pd.isna(value) else f"{value:+.2f}" if value < 0 else f"{value:.2f}"
+
+    def pace_text(value: float) -> str:
+        if pd.isna(value) or value <= 0:
+            return "—"
+        return seconds_clock(3600 / value)
 
     display = pd.DataFrame({
         "Rank": table["overview_rank"].map(lambda value: "League" if pd.isna(value) else f"#{int(value)} / {total_teams}"),
         "Team": table["team"].map(lambda value: "League Average" if value == "League Average" else TEAM_NAMES.get(value, value)),
-        "Record": [
-            f"{gp:.1f} GP; {w:.1f}-{l:.1f}-{otl:.1f}" if team_name == "League Average" else f"{int(gp)} GP; {int(w)}-{int(l)}-{int(otl)}"
-            for team_name, gp, w, l, otl in zip(table["team"], table["games_played"], table["wins"], table["losses"], table["overtime_losses"])
-        ],
+        "GP": table["games_played"].map(number_count),
+        "W": table["wins"].map(number_count),
+        "L": table["losses"].map(number_count),
+        "OTL": table["overtime_losses"].map(number_count),
         "Points Percentage": table["points_pct"].map(lambda value: "—" if pd.isna(value) else f"{value:.2%}"),
         "Goals Scored": table["raw_goals"].map(number_count),
         "Goals Allowed": table["raw_goals_allowed"].map(number_count),
         "Goals Difference": table["raw_goal_difference"].map(plus_count),
-        "Even GF/60": table["Even_gf60"].map(rate_text),
-        "Even GA/60": table["Even_ga60"].map(rate_text),
+        "Even GF Time": table["Even_gf60"].map(pace_text),
+        "Even GA Time": table["Even_ga60"].map(pace_text),
         "Even GD/60": table["Even_gd60"].map(rate_text),
-        "Advantage GF/60": table["Advantage_gf60"].map(rate_text),
-        "Advantage GA/60": table["Advantage_ga60"].map(rate_text),
+        "Advantage GF Time": table["Advantage_gf60"].map(pace_text),
+        "Advantage GA Time": table["Advantage_ga60"].map(pace_text),
         "Advantage GD/60": table["Advantage_gd60"].map(rate_text),
-        "Disadvantage GF/60": table["Disadvantage_gf60"].map(rate_text),
-        "Disadvantage GA/60": table["Disadvantage_ga60"].map(rate_text),
+        "Disadvantage GF Time": table["Disadvantage_gf60"].map(pace_text),
+        "Disadvantage GA Time": table["Disadvantage_ga60"].map(pace_text),
         "Disadvantage GD/60": table["Disadvantage_gd60"].map(rate_text),
-        "Weighted GF": table["weighted_gf"].map(number_count),
-        "Weighted GA": table["weighted_ga"].map(number_count),
-        "Weighted GD": table["weighted_gd"].map(plus_count),
+        "Weighted GF": table["weighted_gf"].map(decimal_count),
+        "Weighted GA": table["weighted_ga"].map(decimal_count),
+        "Weighted GD": table["weighted_gd"].map(lambda value: "—" if pd.isna(value) else f"{value:+.2f}"),
     })
 
     def overview_rank_class(rank_value: float) -> str:
@@ -751,14 +766,14 @@ def league_overview_display(table: pd.DataFrame, total_teams: int) -> pd.DataFra
         "Goals Scored": ("raw_goals", False),
         "Goals Allowed": ("raw_goals_allowed", True),
         "Goals Difference": ("raw_goal_difference", False),
-        "Even GF/60": ("Even_gf60", False),
-        "Even GA/60": ("Even_ga60", True),
+        "Even GF Time": ("Even_gf60", False),
+        "Even GA Time": ("Even_ga60", True),
         "Even GD/60": ("Even_gd60", False),
-        "Advantage GF/60": ("Advantage_gf60", False),
-        "Advantage GA/60": ("Advantage_ga60", True),
+        "Advantage GF Time": ("Advantage_gf60", False),
+        "Advantage GA Time": ("Advantage_ga60", True),
         "Advantage GD/60": ("Advantage_gd60", False),
-        "Disadvantage GF/60": ("Disadvantage_gf60", False),
-        "Disadvantage GA/60": ("Disadvantage_ga60", True),
+        "Disadvantage GF Time": ("Disadvantage_gf60", False),
+        "Disadvantage GA Time": ("Disadvantage_ga60", True),
         "Disadvantage GD/60": ("Disadvantage_gd60", False),
         "Weighted GF": ("weighted_gf", False),
         "Weighted GA": ("weighted_ga", True),
@@ -769,6 +784,69 @@ def league_overview_display(table: pd.DataFrame, total_teams: int) -> pd.DataFra
         ranks = table.loc[team_rows, source_column].rank(method="min", ascending=ascending, na_option="bottom")
         display[f"__class_{display_column}"] = ""
         display.loc[team_rows, f"__class_{display_column}"] = ranks.map(overview_rank_class).values
+    return display
+
+
+def league_time_mix_display(manpower_frame: pd.DataFrame) -> pd.DataFrame:
+    if manpower_frame.empty:
+        return pd.DataFrame()
+    scoped = manpower_frame.copy()
+    scoped["category"] = scoped["state"].map(state_category)
+    total = scoped.groupby("team", as_index=False)["seconds"].sum().rename(columns={"seconds": "total_seconds"})
+
+    def share_by(mask_frame: pd.DataFrame, label: str) -> pd.DataFrame:
+        return (
+            mask_frame.groupby("team", as_index=False)["seconds"].sum()
+            .rename(columns={"seconds": label})
+        )
+
+    pieces = [total]
+    core_states = ["5v5", "5v4", "4v5", "4v4", "3v3", "6v5", "5v6"]
+    for state in core_states:
+        pieces.append(share_by(scoped[scoped["state"].eq(state)], state))
+    for category, label in [
+        ("Even", "All Even"),
+        ("Advantage", "All Advantage"),
+        ("Disadvantage", "All Disadvantage"),
+    ]:
+        pieces.append(share_by(scoped[scoped["category"].eq(category)], label))
+    pieces.extend([
+        share_by(scoped[scoped["for_goalie"] & scoped["against_goalie"]], "Both Goalies On"),
+        share_by(scoped[scoped["for_goalie"] & ~scoped["against_goalie"]], "Attacking Empty Net"),
+        share_by(scoped[~scoped["for_goalie"]], "Own Goalie Off"),
+        share_by(scoped[~scoped["against_goalie"]], "Opponent Goalie Off"),
+        share_by(scoped[~(scoped["for_goalie"] & scoped["against_goalie"])], "Either Goalie Off"),
+    ])
+
+    table = pieces[0]
+    for piece in pieces[1:]:
+        table = table.merge(piece, on="team", how="left")
+    table = table.fillna(0)
+    share_columns = [column for column in table.columns if column not in {"team", "total_seconds"}]
+    table = table.sort_values("team", key=lambda series: series.map(lambda value: TEAM_NAMES.get(value, value)))
+
+    league_total = {"team": "League Average", "total_seconds": table["total_seconds"].sum()}
+    for column in share_columns:
+        league_total[column] = table[column].sum()
+    table = pd.concat([table, pd.DataFrame([league_total])], ignore_index=True)
+
+    display = pd.DataFrame({
+        "Team": table["team"].map(lambda value: "League Average" if value == "League Average" else TEAM_NAMES.get(value, value)),
+        "Tracked Time": table["total_seconds"].map(seconds_clock),
+    })
+    for column in share_columns:
+        table[f"{column}_share"] = np.where(
+            table["total_seconds"].gt(0),
+            table[column] / table["total_seconds"],
+            np.nan,
+        )
+        display[column] = table[f"{column}_share"].map(lambda value: "—" if pd.isna(value) else f"{value:.1%}")
+    table["Other_share"] = 1 - table[[f"{state}_share" for state in core_states]].sum(axis=1)
+    display.insert(
+        list(display.columns).index("All Even"),
+        "Other",
+        table["Other_share"].map(lambda value: "—" if pd.isna(value) else f"{max(0, value):.1%}"),
+    )
     return display
 
 
@@ -2006,7 +2084,8 @@ with tab4:
         render_league_overview_table(league_overview_display(overview_fast, len(overview_teams)))
         st.caption(
             "Using precomputed league overview metrics for the standard full-season view. "
-            "Weighted GF/GA normalizes every team to the league-average exact state mix."
+            "Weighted GF/GA normalizes every team to the league-average exact state mix. "
+            "The League Average weighted row is anchored to the balanced league goal environment, so GF and GA match."
         )
     elif overview_games.empty or plays.empty:
         st.info("No completed games match the current league overview filters.")
@@ -2169,109 +2248,34 @@ with tab4:
             fill_zero = ["games_played", "wins", "losses", "overtime_losses", "points", "raw_goals", "raw_goals_allowed", "total_seconds", "weighted_gf", "weighted_ga", "weighted_gd"]
             table[fill_zero] = table[fill_zero].fillna(0)
             table["raw_goal_difference"] = table["raw_goals"] - table["raw_goals_allowed"]
-            table["standings_sort"] = table["points_pct"].fillna(0)
-            table = table.sort_values(["standings_sort", "points", "raw_goal_difference", "team"], ascending=[False, False, False, True])
-            table["overview_rank"] = np.arange(1, len(table) + 1)
-
-            league_values = {"team": "League Average", "overview_rank": np.nan}
-            for column in [
-                "games_played", "wins", "losses", "overtime_losses", "points", "points_pct",
-                "raw_goals", "raw_goals_allowed", "raw_goal_difference", "weighted_gf", "weighted_ga", "weighted_gd",
-            ]:
-                league_values[column] = table[column].mean()
-            for metric in ["gf60", "ga60", "gd60"]:
-                for category in categories:
-                    source_column = f"{category}_{metric}"
-                    league_values[source_column] = category_table.groupby("category").apply(
-                        lambda group: (
-                            group["raw_goals"].sum() * 3600 / group["seconds"].sum()
-                            if metric == "gf60" and group["seconds"].sum()
-                            else group["raw_goals_allowed"].sum() * 3600 / group["seconds"].sum()
-                            if metric == "ga60" and group["seconds"].sum()
-                            else (group["raw_goals"].sum() - group["raw_goals_allowed"].sum()) * 3600 / group["seconds"].sum()
-                            if metric == "gd60" and group["seconds"].sum()
-                            else np.nan
-                        ),
-                        include_groups=False,
-                    ).get(category, np.nan)
-            table = pd.concat([table, pd.DataFrame([league_values])], ignore_index=True)
-
-            def number_count(value: float) -> str:
-                return "—" if pd.isna(value) else f"{value:.1f}" if abs(value - round(value)) > 0.05 else f"{int(round(value))}"
-
-            def plus_count(value: float) -> str:
-                return "—" if pd.isna(value) else f"{value:+.1f}" if abs(value - round(value)) > 0.05 else f"{int(round(value)):+d}"
-
-            def rate_text(value: float) -> str:
-                return "—" if pd.isna(value) else f"{value:+.2f}" if value < 0 else f"{value:.2f}"
-
-            display = pd.DataFrame({
-                "Rank": table["overview_rank"].map(lambda value: "League" if pd.isna(value) else f"#{int(value)} / {len(overview_teams)}"),
-                "Team": table["team"].map(lambda value: "League Average" if value == "League Average" else TEAM_NAMES.get(value, value)),
-                "Record": [
-                    f"{gp:.1f} GP; {w:.1f}-{l:.1f}-{otl:.1f}" if team_name == "League Average" else f"{int(gp)} GP; {int(w)}-{int(l)}-{int(otl)}"
-                    for team_name, gp, w, l, otl in zip(table["team"], table["games_played"], table["wins"], table["losses"], table["overtime_losses"])
-                ],
-                "Points Percentage": table["points_pct"].map(lambda value: "—" if pd.isna(value) else f"{value:.2%}"),
-                "Goals Scored": table["raw_goals"].map(number_count),
-                "Goals Allowed": table["raw_goals_allowed"].map(number_count),
-                "Goals Difference": table["raw_goal_difference"].map(plus_count),
-                "Even GF/60": table["Even_gf60"].map(rate_text),
-                "Even GA/60": table["Even_ga60"].map(rate_text),
-                "Even GD/60": table["Even_gd60"].map(rate_text),
-                "Advantage GF/60": table["Advantage_gf60"].map(rate_text),
-                "Advantage GA/60": table["Advantage_ga60"].map(rate_text),
-                "Advantage GD/60": table["Advantage_gd60"].map(rate_text),
-                "Disadvantage GF/60": table["Disadvantage_gf60"].map(rate_text),
-                "Disadvantage GA/60": table["Disadvantage_ga60"].map(rate_text),
-                "Disadvantage GD/60": table["Disadvantage_gd60"].map(rate_text),
-                "Weighted GF": table["weighted_gf"].map(number_count),
-                "Weighted GA": table["weighted_ga"].map(number_count),
-                "Weighted GD": table["weighted_gd"].map(plus_count),
-            })
-
-            def overview_rank_class(rank_value: float) -> str:
-                if pd.isna(rank_value):
-                    return ""
-                rank_number = int(rank_value)
-                total = len(overview_teams) or 32
-                if rank_number <= total / 4:
-                    return "cell-elite"
-                if rank_number <= total / 2:
-                    return "cell-soft-good"
-                if rank_number <= total * 3 / 4:
-                    return "cell-soft-low"
-                return "cell-low"
-
-            heatmap_columns = {
-                "Points Percentage": ("points_pct", False),
-                "Goals Scored": ("raw_goals", False),
-                "Goals Allowed": ("raw_goals_allowed", True),
-                "Goals Difference": ("raw_goal_difference", False),
-                "Even GF/60": ("Even_gf60", False),
-                "Even GA/60": ("Even_ga60", True),
-                "Even GD/60": ("Even_gd60", False),
-                "Advantage GF/60": ("Advantage_gf60", False),
-                "Advantage GA/60": ("Advantage_ga60", True),
-                "Advantage GD/60": ("Advantage_gd60", False),
-                "Disadvantage GF/60": ("Disadvantage_gf60", False),
-                "Disadvantage GA/60": ("Disadvantage_ga60", True),
-                "Disadvantage GD/60": ("Disadvantage_gd60", False),
-                "Weighted GF": ("weighted_gf", False),
-                "Weighted GA": ("weighted_ga", True),
-                "Weighted GD": ("weighted_gd", False),
-            }
-            team_rows = table["team"].ne("League Average")
-            for display_column, (source_column, ascending) in heatmap_columns.items():
-                ranks = table.loc[team_rows, source_column].rank(method="min", ascending=ascending, na_option="bottom")
-                display[f"__class_{display_column}"] = ""
-                display.loc[team_rows, f"__class_{display_column}"] = ranks.map(overview_rank_class).values
-
-            render_league_overview_table(display)
+            render_league_overview_table(league_overview_display(table, len(overview_teams)))
             st.caption(
                 "Weighted GF/GA estimates each team against the league-average exact state mix "
                 "(state plus goalie-on/off context), then scales it to that team's tracked time. "
-                "If a team has not played a rare exact state yet, the league rate for that state is used as the fallback."
+                "If a team has not played a rare exact state yet, the league rate for that state is used as the fallback. "
+                "The League Average weighted row is anchored to the balanced league goal environment, so GF and GA match."
+            )
+    st.subheader("League Time Mix")
+    st.caption(
+        "Percentage of tracked time each team spends in key manpower and goalie contexts. "
+        "This uses the selected season, competition, and date range."
+    )
+    if overview_games.empty:
+        st.info("No completed games match the current league time-mix filters.")
+    else:
+        mix_manpower = read_kinds("manpower", selected_seasons)
+        if mix_manpower.empty:
+            st.info("Lineup exposure is unavailable for the current time-mix filters.")
+        else:
+            mix_manpower["game_date"] = pd.to_datetime(mix_manpower["game_date"])
+            mix_manpower = mix_manpower[
+                mix_manpower["game_id"].isin(set(overview_games["game_id"]))
+                & mix_manpower["game_type"].isin(game_types)
+            ].copy()
+            render_table(
+                league_time_mix_display(mix_manpower),
+                height=620,
+                primary="Team",
             )
     data_footnote()
 
