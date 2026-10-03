@@ -9,6 +9,7 @@ import pandas as pd
 from .api import NHLClient
 from .config import NHL_STATS, NHL_WEB, PROCESSED_DIR, RAW_DIR, TEAM_ABBREVS
 from .moneypuck import load_moneypuck
+from .derived_metrics import build_league_overview_metrics
 from .transform import (
     add_state_transitions,
     aggregate_exposure,
@@ -108,6 +109,12 @@ def process_season(
     save_parquet(concat_frames(manpower_frames), PROCESSED_DIR / f"manpower_{season}.parquet")
     save_parquet(concat_frames(score_frames), PROCESSED_DIR / f"score_states_{season}.parquet")
     save_parquet(concat_frames(transition_frames), PROCESSED_DIR / f"score_transitions_{season}.parquet")
+    plays_all = concat_frames(play_frames)
+    manpower_all = concat_frames(manpower_frames)
+    if not plays_all.empty and not manpower_all.empty:
+        overview_metrics = build_league_overview_metrics(games, plays_all, manpower_all, carryover_seconds=5)
+        save_parquet(overview_metrics, PROCESSED_DIR / f"league_overview_{season}.parquet")
+        print(f"League overview: {len(overview_metrics):,} rows")
 
     if not skip_moneypuck:
         try:

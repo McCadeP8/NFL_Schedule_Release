@@ -2,25 +2,20 @@ from __future__ import annotations
 
 from pathlib import Path
 import html
+import subprocess
+import sys
 
 import altair as alt
 import numpy as np
 import pandas as pd
 import streamlit as st
 
+from nhl_state_lab.derived_metrics import state_category
+from nhl_state_lab.team_meta import TEAM_ABBREV_BY_NAME, TEAM_LOGOS, TEAM_NAMES
+
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data" / "processed"
-
-TEAM_NAMES = {
-    "ANA": "Anaheim", "BOS": "Boston", "BUF": "Buffalo", "CAR": "Carolina", "CBJ": "Columbus",
-    "CGY": "Calgary", "CHI": "Chicago", "COL": "Colorado", "DAL": "Dallas", "DET": "Detroit",
-    "EDM": "Edmonton", "FLA": "Florida", "LAK": "Los Angeles", "MIN": "Minnesota", "MTL": "Montreal",
-    "NJD": "New Jersey", "NSH": "Nashville", "NYI": "New York I", "NYR": "New York R", "OTT": "Ottawa",
-    "PHI": "Philadelphia", "PIT": "Pittsburgh", "SEA": "Seattle", "SJS": "San Jose", "STL": "St. Louis",
-    "TBL": "Tampa Bay", "TOR": "Toronto", "UTA": "Utah", "VAN": "Vancouver", "VGK": "Vegas",
-    "WPG": "Winnipeg", "WSH": "Washington",
-}
 
 st.set_page_config(page_title="NHL State Lab", page_icon="🏒", layout="wide")
 
@@ -84,6 +79,9 @@ st.markdown(
     .nhl-table td { padding:11px 14px; border-bottom:1px solid #1f3449; color:#dce7f3; white-space:nowrap; }
     .nhl-table td.numeric,.nhl-table th.numeric { text-align:right; font-variant-numeric:tabular-nums; }
     .nhl-table td.primary { color:#fff; font-weight:850; }
+    .team-cell { display:inline-flex; align-items:center; gap:9px; font-weight:850; }
+    .team-logo { width:26px; height:26px; object-fit:contain; filter:drop-shadow(0 2px 3px rgba(0,0,0,.35)); }
+    .team-logo-small { width:21px; height:21px; object-fit:contain; vertical-align:middle; margin-right:7px; }
     .table-pill { display:inline-flex; min-width:48px; justify-content:center; padding:4px 8px; border-radius:999px;
                   font-size:10px; font-weight:900; letter-spacing:.08em; }
     .pill-for { color:#8ff0ce; background:rgba(16,163,127,.17); border:1px solid rgba(38,201,154,.38); }
@@ -115,6 +113,18 @@ st.markdown(
     .league-balance-table td.cell-low { background:rgba(197,46,64,.40); color:#fff8f9; font-weight:900; }
     .league-balance-table .league-row td { background:#182b40; color:#ffffff; font-weight:900; border-top:2px solid #496983; }
     .league-balance-table .rank-cell { font-size:15px; font-weight:950; }
+    .league-overview-table { min-width:1880px; font-size:14px; }
+    .league-overview-table td { padding:13px 14px; font-size:14px; line-height:1.2; }
+    .league-overview-table td.primary { font-size:16px; }
+    .league-overview-table thead th { padding:13px 13px; font-size:12px; }
+    .league-overview-table .group-row th { font-size:14px; padding:11px 13px; }
+    .league-overview-table .subhead-row th { top:40px; font-size:12px; }
+    .league-overview-table td.cell-elite { background:rgba(7,132,95,.38); color:#f5fffb; font-weight:900; }
+    .league-overview-table td.cell-soft-good { background:rgba(104,148,123,.32); color:#f7fffa; font-weight:850; }
+    .league-overview-table td.cell-soft-low { background:rgba(164,107,117,.32); color:#fff7f8; font-weight:850; }
+    .league-overview-table td.cell-low { background:rgba(197,46,64,.40); color:#fff8f9; font-weight:900; }
+    .league-overview-table .league-row td { background:#182b40; color:#ffffff; font-weight:900; border-top:2px solid #496983; }
+    .league-overview-table .rank-cell { font-size:15px; font-weight:950; }
     .goals-split { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; align-items:start; }
     .goal-panel { min-width:0; }
     .goal-panel-title { display:flex; align-items:center; justify-content:space-between; margin:0 0 8px;
@@ -175,6 +185,51 @@ def read_kind(kind: str, season: int) -> pd.DataFrame:
     return pd.read_parquet(path) if path.exists() else pd.DataFrame()
 
 
+def read_kinds(kind: str, season_values: list[int]) -> pd.DataFrame:
+    frames = [read_kind(kind, value) for value in season_values]
+    frames = [frame for frame in frames if not frame.empty]
+    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+
+def run_data_update(season_values: list[int], game_type_values: list[int]) -> tuple[bool, str]:
+    output_blocks = []
+    success = True
+    for season_value in season_values:
+        command = [
+            sys.executable,
+            "-m",
+            "nhl_state_lab.pipeline",
+            "--season",
+            str(season_value),
+            "--game-types",
+            *[str(value) for value in game_type_values],
+            "--refresh",
+        ]
+        try:
+            result = subprocess.run(
+                command,
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                timeout=900,
+            )
+            command_output = "\n".join(part for part in [result.stdout, result.stderr] if part.strip())
+            output_blocks.append(
+                f"$ {' '.join(command)}\n\n{command_output.strip() or '(no output)'}"
+            )
+            if result.returncode != 0:
+                success = False
+        except subprocess.TimeoutExpired as exc:
+            success = False
+            timeout_output = "\n".join(part for part in [exc.stdout or "", exc.stderr or ""] if str(part).strip())
+            output_blocks.append(
+                f"$ {' '.join(command)}\n\nTimed out after 15 minutes.\n{timeout_output.strip()}"
+            )
+    read_kind.clear()
+    cached_score_flow_entries.clear()
+    return success, "\n\n---\n\n".join(output_blocks)
+
+
 season_files = sorted(DATA.glob("games_*.parquet"))
 seasons = [int(path.stem.split("_")[-1]) for path in season_files]
 if not seasons:
@@ -183,8 +238,11 @@ if not seasons:
 
 with st.sidebar:
     st.subheader("Analysis Controls")
-    season = st.selectbox("Season", seasons, index=len(seasons) - 1, format_func=lambda value: str(value)[-4:])
-    games = read_kind("games", season)
+    selected_seasons = st.multiselect("Season", seasons, default=[seasons[-1]], format_func=lambda value: str(value)[-4:])
+    if not selected_seasons:
+        st.info("Select at least one season.")
+        st.stop()
+    games = read_kinds("games", selected_seasons)
     all_teams = sorted(
         set(games["home_team"].dropna()) | set(games["away_team"].dropna()),
         key=lambda abbreviation: TEAM_NAMES.get(abbreviation, abbreviation),
@@ -194,6 +252,13 @@ with st.sidebar:
         ["All", *all_teams],
         format_func=lambda abbreviation: "All" if abbreviation == "All" else TEAM_NAMES.get(abbreviation, abbreviation),
     )
+    if team != "All" and team in TEAM_LOGOS:
+        st.markdown(
+            f'<div style="display:flex;align-items:center;gap:10px;margin:-2px 0 10px">'
+            f'<img src="{TEAM_LOGOS[team]}" alt="{TEAM_NAMES.get(team, team)} logo" style="width:38px;height:38px;object-fit:contain" />'
+            f'<strong>{TEAM_NAMES.get(team, team)}</strong></div>',
+            unsafe_allow_html=True,
+        )
     game_type = st.radio(
         "Competition",
         [2, 3, "all"],
@@ -250,12 +315,12 @@ def filtered(frame: pd.DataFrame, team_only: bool = True) -> pd.DataFrame:
     return out[out["game_date"].between(start_date, end_date)]
 
 
-plays = read_kind("plays", season)
-manpower_all = filtered(read_kind("manpower", season), team_only=False)
+plays = read_kinds("plays", selected_seasons)
+manpower_all = filtered(read_kinds("manpower", selected_seasons), team_only=False)
 manpower = manpower_all if team == "All" else manpower_all[manpower_all["team"].eq(team)].copy() if not manpower_all.empty else manpower_all
-score_states = filtered(read_kind("score_states", season))
-transitions = filtered(read_kind("score_transitions", season))
-moneypuck_all = read_kind("moneypuck_shots", season)
+score_states = filtered(read_kinds("score_states", selected_seasons))
+transitions = filtered(read_kinds("score_transitions", selected_seasons))
+moneypuck_all = read_kinds("moneypuck_shots", selected_seasons)
 if not moneypuck_all.empty:
     game_dates = games[["game_id", "game_date"]].drop_duplicates("game_id")
     moneypuck_all = moneypuck_all.merge(game_dates, on="game_id", how="left")
@@ -283,8 +348,8 @@ if not plays.empty:
 else:
     team_plays = plays
 
-tab1, tab2, tab3, tab4 = st.tabs(
-    ["Lineup Balance", "League Lineup Balance", "Score Flow", "Data Quality"]
+tab1, tab2, tab3, tab4, tab5 = st.tabs(
+    ["Lineup Balance", "League Lineup Balance", "Score Flow", "League Overview", "Data Quality"]
 )
 
 def diff_bucket(values: pd.Series) -> pd.Series:
@@ -357,6 +422,14 @@ def elapsed_start_clock(elapsed_seconds: float, game_type_value: int) -> str:
     return f"{seconds_clock(max(0, period_length - elapsed_in_period))} {period_label}"
 
 
+def period_time_left_to_elapsed(period: int, time_left: str, game_type_value: int = 2) -> int:
+    minute_part, second_part = str(time_left).strip().split(":", 1)
+    remaining = int(minute_part) * 60 + int(second_part)
+    period_length = 300 if int(period) > 3 and int(game_type_value) == 2 else 1200
+    elapsed_in_period = max(0, period_length - remaining)
+    return (int(period) - 1) * 1200 + elapsed_in_period if int(period) <= 3 else 3600 + elapsed_in_period
+
+
 def metric_card_html(card: dict[str, object]) -> str:
     rank = card.get("rank")
     rank_number = int(rank) if rank is not None and pd.notna(rank) else None
@@ -411,6 +484,26 @@ def render_context_cards(cards: list[dict[str, str]]) -> None:
     st.html(f'<div class="context-metric-grid">{content}</div>')
 
 
+def team_abbreviation(value: object) -> str | None:
+    text = str(value)
+    if text in TEAM_NAMES:
+        return text
+    return TEAM_ABBREV_BY_NAME.get(text)
+
+
+def team_cell_html(value: object, *, small: bool = False) -> str:
+    abbreviation = team_abbreviation(value)
+    label = TEAM_NAMES.get(abbreviation, str(value)) if abbreviation else str(value)
+    if not abbreviation or abbreviation not in TEAM_LOGOS:
+        return html.escape(label)
+    logo_class = "team-logo-small" if small else "team-logo"
+    return (
+        '<span class="team-cell">'
+        f'<img class="{logo_class}" src="{html.escape(TEAM_LOGOS[abbreviation])}" alt="{html.escape(label)} logo" />'
+        f'<span>{html.escape(label)}</span></span>'
+    )
+
+
 def render_table(
     frame: pd.DataFrame,
     *,
@@ -452,7 +545,10 @@ def render_table(
                 classes.append("numeric")
             if column == primary:
                 classes.append("primary")
-            content = html.escape(shown)
+            if column in {"Team", "Away Team", "Home Team"}:
+                content = team_cell_html(shown, small=True)
+            else:
+                content = html.escape(shown)
             if column == pill:
                 pill_class = "pill-for" if shown == "FOR" else "pill-allowed" if shown == "ALLOWED" else "pill-neutral"
                 content = f'<span class="table-pill {pill_class}">{content}</span>'
@@ -520,7 +616,8 @@ def render_league_balance_table(frame: pd.DataFrame) -> None:
             cell_class = frame.at[row.name, f"__class_{column}"] if f"__class_{column}" in frame else ""
             if cell_class:
                 classes.append(cell_class)
-            cell_html.append(f'<td class="{" ".join(classes)}">{html.escape(str(value))}</td>')
+            content = team_cell_html(value) if column == "Team" else html.escape(str(value))
+            cell_html.append(f'<td class="{" ".join(classes)}">{content}</td>')
         rows.append(f'<tr{row_class}>{"".join(cell_html)}</tr>')
     st.html(
         '<div class="nhl-table-shell"><div class="nhl-table-scroll" style="max-height:760px">'
@@ -536,6 +633,143 @@ def render_league_balance_table(frame: pd.DataFrame) -> None:
         '<th>GF Time</th><th>GA Time</th><th>GD/60</th></tr></thead>'
         f'<tbody>{"".join(rows)}</tbody></table></div></div>'
     )
+
+
+def render_league_overview_table(frame: pd.DataFrame) -> None:
+    if frame.empty:
+        st.info("No completed games match the current league overview filters.")
+        return
+    columns = [
+        "Rank", "Team", "Record", "Points Percentage", "Goals Scored", "Goals Allowed", "Goals Difference",
+        "Even GF/60", "Even GA/60", "Even GD/60",
+        "Advantage GF/60", "Advantage GA/60", "Advantage GD/60",
+        "Disadvantage GF/60", "Disadvantage GA/60", "Disadvantage GD/60",
+        "Weighted GF", "Weighted GA", "Weighted GD",
+    ]
+    rows = []
+    for _, row in frame[columns].iterrows():
+        is_league = str(row["Team"]) == "League Average"
+        row_class = ' class="league-row"' if is_league else ""
+        cell_html = []
+        for column in columns:
+            classes = []
+            if column == "Team":
+                classes.append("primary")
+            if column == "Rank":
+                classes.append("rank-cell")
+            if column not in {"Team", "Record"}:
+                classes.append("numeric")
+            cell_class = frame.at[row.name, f"__class_{column}"] if f"__class_{column}" in frame else ""
+            if cell_class:
+                classes.append(cell_class)
+            content = team_cell_html(row[column]) if column == "Team" else html.escape(str(row[column]))
+            cell_html.append(f'<td class="{" ".join(classes)}">{content}</td>')
+        rows.append(f'<tr{row_class}>{"".join(cell_html)}</tr>')
+    st.html(
+        '<div class="nhl-table-shell"><div class="nhl-table-scroll" style="max-height:760px">'
+        '<table class="nhl-table league-overview-table"><thead>'
+        '<tr class="group-row"><th rowspan="2">Rank</th><th rowspan="2">Team</th>'
+        '<th colspan="5" class="group-neutral">Standings Context</th>'
+        '<th colspan="3" class="group-actual">Even Strength</th>'
+        '<th colspan="3" class="group-actual">All Advantages</th>'
+        '<th colspan="3" class="group-actual">All Disadvantages</th>'
+        '<th colspan="3" class="group-difference">League-Mix Weighted</th></tr>'
+        '<tr class="subhead-row"><th>Record</th><th>Pts %</th><th>GF</th><th>GA</th><th>GD</th>'
+        '<th>GF/60</th><th>GA/60</th><th>GD/60</th>'
+        '<th>GF/60</th><th>GA/60</th><th>GD/60</th>'
+        '<th>GF/60</th><th>GA/60</th><th>GD/60</th>'
+        '<th>GF</th><th>GA</th><th>GD</th></tr></thead>'
+        f'<tbody>{"".join(rows)}</tbody></table></div></div>'
+    )
+
+
+def league_overview_display(table: pd.DataFrame, total_teams: int) -> pd.DataFrame:
+    table = table.copy()
+    if "raw_goal_difference" not in table:
+        table["raw_goal_difference"] = table["raw_goals"] - table["raw_goals_allowed"]
+    table["standings_sort"] = table["points_pct"].fillna(0)
+    table = table.sort_values(["standings_sort", "points", "raw_goal_difference", "team"], ascending=[False, False, False, True])
+    table["overview_rank"] = np.arange(1, len(table) + 1)
+    league_values = {"team": "League Average", "overview_rank": np.nan}
+    for column in [
+        "games_played", "wins", "losses", "overtime_losses", "points", "points_pct",
+        "raw_goals", "raw_goals_allowed", "raw_goal_difference", "weighted_gf", "weighted_ga", "weighted_gd",
+        "Even_gf60", "Even_ga60", "Even_gd60", "Advantage_gf60", "Advantage_ga60", "Advantage_gd60",
+        "Disadvantage_gf60", "Disadvantage_ga60", "Disadvantage_gd60",
+    ]:
+        league_values[column] = table[column].mean() if column in table else np.nan
+    table = pd.concat([table, pd.DataFrame([league_values])], ignore_index=True)
+
+    def number_count(value: float) -> str:
+        return "—" if pd.isna(value) else f"{value:.1f}" if abs(value - round(value)) > 0.05 else f"{int(round(value))}"
+
+    def plus_count(value: float) -> str:
+        return "—" if pd.isna(value) else f"{value:+.1f}" if abs(value - round(value)) > 0.05 else f"{int(round(value)):+d}"
+
+    def rate_text(value: float) -> str:
+        return "—" if pd.isna(value) else f"{value:+.2f}" if value < 0 else f"{value:.2f}"
+
+    display = pd.DataFrame({
+        "Rank": table["overview_rank"].map(lambda value: "League" if pd.isna(value) else f"#{int(value)} / {total_teams}"),
+        "Team": table["team"].map(lambda value: "League Average" if value == "League Average" else TEAM_NAMES.get(value, value)),
+        "Record": [
+            f"{gp:.1f} GP; {w:.1f}-{l:.1f}-{otl:.1f}" if team_name == "League Average" else f"{int(gp)} GP; {int(w)}-{int(l)}-{int(otl)}"
+            for team_name, gp, w, l, otl in zip(table["team"], table["games_played"], table["wins"], table["losses"], table["overtime_losses"])
+        ],
+        "Points Percentage": table["points_pct"].map(lambda value: "—" if pd.isna(value) else f"{value:.2%}"),
+        "Goals Scored": table["raw_goals"].map(number_count),
+        "Goals Allowed": table["raw_goals_allowed"].map(number_count),
+        "Goals Difference": table["raw_goal_difference"].map(plus_count),
+        "Even GF/60": table["Even_gf60"].map(rate_text),
+        "Even GA/60": table["Even_ga60"].map(rate_text),
+        "Even GD/60": table["Even_gd60"].map(rate_text),
+        "Advantage GF/60": table["Advantage_gf60"].map(rate_text),
+        "Advantage GA/60": table["Advantage_ga60"].map(rate_text),
+        "Advantage GD/60": table["Advantage_gd60"].map(rate_text),
+        "Disadvantage GF/60": table["Disadvantage_gf60"].map(rate_text),
+        "Disadvantage GA/60": table["Disadvantage_ga60"].map(rate_text),
+        "Disadvantage GD/60": table["Disadvantage_gd60"].map(rate_text),
+        "Weighted GF": table["weighted_gf"].map(number_count),
+        "Weighted GA": table["weighted_ga"].map(number_count),
+        "Weighted GD": table["weighted_gd"].map(plus_count),
+    })
+
+    def overview_rank_class(rank_value: float) -> str:
+        if pd.isna(rank_value):
+            return ""
+        rank_number = int(rank_value)
+        if rank_number <= total_teams / 4:
+            return "cell-elite"
+        if rank_number <= total_teams / 2:
+            return "cell-soft-good"
+        if rank_number <= total_teams * 3 / 4:
+            return "cell-soft-low"
+        return "cell-low"
+
+    heatmap_columns = {
+        "Points Percentage": ("points_pct", False),
+        "Goals Scored": ("raw_goals", False),
+        "Goals Allowed": ("raw_goals_allowed", True),
+        "Goals Difference": ("raw_goal_difference", False),
+        "Even GF/60": ("Even_gf60", False),
+        "Even GA/60": ("Even_ga60", True),
+        "Even GD/60": ("Even_gd60", False),
+        "Advantage GF/60": ("Advantage_gf60", False),
+        "Advantage GA/60": ("Advantage_ga60", True),
+        "Advantage GD/60": ("Advantage_gd60", False),
+        "Disadvantage GF/60": ("Disadvantage_gf60", False),
+        "Disadvantage GA/60": ("Disadvantage_ga60", True),
+        "Disadvantage GD/60": ("Disadvantage_gd60", False),
+        "Weighted GF": ("weighted_gf", False),
+        "Weighted GA": ("weighted_ga", True),
+        "Weighted GD": ("weighted_gd", False),
+    }
+    team_rows = table["team"].ne("League Average")
+    for display_column, (source_column, ascending) in heatmap_columns.items():
+        ranks = table.loc[team_rows, source_column].rank(method="min", ascending=ascending, na_option="bottom")
+        display[f"__class_{display_column}"] = ""
+        display.loc[team_rows, f"__class_{display_column}"] = ranks.map(overview_rank_class).values
+    return display
 
 
 def goal_table_html(frame: pd.DataFrame) -> str:
@@ -746,6 +980,11 @@ def build_score_flow_entries(
         for game_id, group in goal_plays.groupby("game_id", sort=False)
     }
     shootout_games = set(plays_frame.loc[plays_frame["event_type"].eq("shootout-complete"), "game_id"])
+    shootout_ot_end = (
+        plays_frame[plays_frame["event_type"].eq("period-end") & plays_frame["period"].eq(4)]
+        .groupby("game_id", as_index=True)["elapsed_seconds"]
+        .max()
+    )
     game_end = (
         plays_frame[plays_frame["event_type"].eq("game-end")]
         .groupby("game_id", as_index=True)["elapsed_seconds"]
@@ -758,6 +997,8 @@ def build_score_flow_entries(
         perspective_teams = [game["home_team"], game["away_team"]] if selected_team == "All" else [selected_team]
         game_goals = goal_groups.get(game_id, goal_plays.iloc[0:0])
         end_second = int(game_end.get(game_id, max(3600, max_elapsed.get(game_id, 3600))))
+        if game_id in shootout_games:
+            end_second = int(shootout_ot_end.get(game_id, 3900))
         end_second = max(3600, end_second)
         for perspective_team in perspective_teams:
             is_home = perspective_team == game["home_team"]
@@ -853,14 +1094,14 @@ def build_score_flow_entries(
 
 @st.cache_data(show_spinner=False)
 def cached_score_flow_entries(
-    season_value: int,
+    season_values: tuple[int, ...],
     game_type_values: tuple[int, ...],
     start_value: str,
     end_value: str,
     selected_team: str,
 ) -> pd.DataFrame:
-    all_games = read_kind("games", season_value)
-    all_plays = read_kind("plays", season_value)
+    all_games = read_kinds("games", list(season_values))
+    all_plays = read_kinds("plays", list(season_values))
     if all_games.empty or all_plays.empty:
         return pd.DataFrame()
     all_games = all_games.copy()
@@ -970,6 +1211,40 @@ def flow_display_table(frame: pd.DataFrame, selected_team: str, outcome: str) ->
     if selected_team == "All":
         columns = ["Team", *columns]
     return out[columns]
+
+
+def flow_time_lookup_table(frame: pd.DataFrame, selected_team: str, lookup_second: int) -> pd.DataFrame:
+    if frame.empty:
+        return pd.DataFrame()
+    active = frame[
+        frame["entry_second"].le(lookup_second)
+        & frame["event_second"].gt(lookup_second)
+    ].copy()
+    if active.empty:
+        return pd.DataFrame()
+    active = active.sort_values(["game_date", "team"], ascending=[False, True])
+    active["Date"] = pd.to_datetime(active["game_date"]).dt.strftime("%b %d")
+    active["Team"] = active["team"].map(lambda value: TEAM_NAMES.get(value, value))
+    active["Game"] = [
+        game_label(team_code, home, away)
+        for team_code, home, away in zip(active["team"], active["home_team"], active["away_team"])
+    ]
+    active["Score"] = active["entry_score"]
+    active["Time in State at Lookup"] = (lookup_second - active["entry_second"]).map(seconds_clock)
+    active["State Started"] = [
+        elapsed_start_clock(entry_second, game_type)
+        for entry_second, game_type in zip(active["entry_second"], active["game_type"])
+    ]
+    active["Next Event"] = active["outcome"].map({"FOR": "Goal For", "AGAINST": "Goal Against", "FINAL": "Final"})
+    team_home = active["team"].eq(active["home_team"])
+    score_for = np.where(team_home, active["home_score"], active["away_score"]).astype(int)
+    score_against = np.where(team_home, active["away_score"], active["home_score"]).astype(int)
+    result = np.where(score_for > score_against, "W", np.where(active["otl"], "OTL", "L"))
+    active["Result"] = [f"{letter}, {max(a, b)}-{min(a, b)}" for letter, a, b in zip(result, score_for, score_against)]
+    columns = ["Date", "Game", "Score", "State Started", "Time in State at Lookup", "Next Event", "Result"]
+    if selected_team == "All":
+        columns = ["Team", *columns]
+    return active[columns].head(100 if selected_team == "All" else len(active))
 
 
 with tab1:
@@ -1562,8 +1837,8 @@ with tab3:
     flow_state = st.selectbox("Goal-difference scenario", flow_state_options, index=flow_state_options.index("Tied"))
     cache_start = str(pd.Timestamp(start_date).date())
     cache_end = str(pd.Timestamp(end_date).date())
-    flow_entries = cached_score_flow_entries(season, tuple(game_types), cache_start, cache_end, team)
-    league_flow_entries = flow_entries if team == "All" else cached_score_flow_entries(season, tuple(game_types), cache_start, cache_end, "All")
+    flow_entries = cached_score_flow_entries(tuple(selected_seasons), tuple(game_types), cache_start, cache_end, team)
+    league_flow_entries = flow_entries if team == "All" else cached_score_flow_entries(tuple(selected_seasons), tuple(game_types), cache_start, cache_end, "All")
     if flow_entries.empty:
         st.info("No games match the current score-flow filters.")
     else:
@@ -1582,6 +1857,26 @@ with tab3:
         league_state_entries = raw_league_state_entries if selected_flow_goals == "All" else raw_league_state_entries[
             raw_league_state_entries["entry_goals_for"].eq(int(selected_flow_goals))
         ].copy()
+        use_time_filter = st.checkbox("Filter to games at a specific time")
+        if use_time_filter:
+            lookup_period, lookup_time = st.columns([1, 2])
+            with lookup_period:
+                score_lookup_period = st.selectbox("Period at lookup", [1, 2, 3, 4], format_func=lambda value: "OT" if value == 4 else f"Period {value}")
+            with lookup_time:
+                score_lookup_time_left = st.text_input("Time left at lookup", value="10:00", help="Use MM:SS. Example: 10:00 in the 3rd.")
+            try:
+                lookup_second = period_time_left_to_elapsed(score_lookup_period, score_lookup_time_left)
+                state_entries = state_entries[
+                    state_entries["entry_second"].le(lookup_second)
+                    & state_entries["event_second"].gt(lookup_second)
+                ].copy()
+                league_state_entries = league_state_entries[
+                    league_state_entries["entry_second"].le(lookup_second)
+                    & league_state_entries["event_second"].gt(lookup_second)
+                ].copy()
+                st.caption(f"Filtered to games in this state at {score_lookup_time_left} left in {'OT' if score_lookup_period == 4 else f'Period {score_lookup_period}'}.")
+            except Exception:
+                st.warning("Enter time left as MM:SS, like 10:00 or 2:30.")
         if state_entries.empty:
             st.info("No entries match this score-flow scenario.")
         else:
@@ -1668,19 +1963,373 @@ with tab3:
     data_footnote()
 
 with tab4:
-    st.subheader("Coverage and Auditability")
-    completed = games[games["game_state"].isin(["OFF", "FINAL"])]
-    processed_ids = set(plays["game_id"].unique()) if not plays.empty else set()
-    expected_ids = set(completed[completed["game_type"].isin(game_types)]["game_id"])
-    missing = sorted(expected_ids - processed_ids)
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Completed games", f"{len(expected_ids):,}")
-    c2.metric("Games with play-by-play", f"{len(expected_ids & processed_ids):,}")
-    c3.metric("Missing", f"{len(missing):,}")
-    if missing:
-        render_table(pd.DataFrame({"Missing game ID": missing}), height=360, primary="Missing game ID")
+    st.subheader("League Overview")
+    st.caption(
+        "One-row league table using the selected season, competition, and date range. "
+        "Lineup, score-differential, period, minute, and goalie sidebar filters are intentionally ignored here."
+    )
+    overview_games = games.copy()
+    overview_games["game_date"] = pd.to_datetime(overview_games["game_date"])
+    overview_games = overview_games[
+        overview_games["game_date"].between(start_date, end_date)
+        & overview_games["game_type"].isin(game_types)
+        & overview_games["game_state"].isin(["OFF", "FINAL"])
+    ].copy()
+    overview_precomputed = read_kinds("league_overview", selected_seasons)
+    if not overview_precomputed.empty:
+        overview_precomputed["through_game_date"] = pd.to_datetime(overview_precomputed["through_game_date"])
+    full_completed_games = games.copy()
+    full_completed_games["game_date"] = pd.to_datetime(full_completed_games["game_date"])
+    full_completed_games = full_completed_games[
+        full_completed_games["game_type"].isin(game_types)
+        & full_completed_games["game_state"].isin(["OFF", "FINAL"])
+    ].copy()
+    overview_full_range = (
+        len(selected_seasons) == 1
+        and len(game_types) == 1
+        and not full_completed_games.empty
+        and pd.Timestamp(start_date) <= full_completed_games["game_date"].min()
+        and pd.Timestamp(end_date) >= full_completed_games["game_date"].max()
+    )
+    use_precomputed_overview = (
+        carryover == 5
+        and overview_full_range
+        and not overview_precomputed.empty
+        and overview_precomputed["game_type"].isin(game_types).any()
+    )
+    if use_precomputed_overview:
+        overview_fast = overview_precomputed[
+            overview_precomputed["game_type"].isin(game_types)
+            & overview_precomputed["carryover_seconds"].eq(5)
+        ].copy()
+        overview_teams = sorted(overview_fast["team"].dropna().unique(), key=lambda abbreviation: TEAM_NAMES.get(abbreviation, abbreviation))
+        render_league_overview_table(league_overview_display(overview_fast, len(overview_teams)))
+        st.caption(
+            "Using precomputed league overview metrics for the standard full-season view. "
+            "Weighted GF/GA normalizes every team to the league-average exact state mix."
+        )
+    elif overview_games.empty or plays.empty:
+        st.info("No completed games match the current league overview filters.")
     else:
-        st.success("All completed games in this selection have play-by-play data.")
+        overview_game_ids = set(overview_games["game_id"])
+        overview_plays = plays[plays["game_id"].isin(overview_game_ids)].copy()
+        overview_manpower = read_kinds("manpower", selected_seasons)
+        if not overview_manpower.empty:
+            overview_manpower["game_date"] = pd.to_datetime(overview_manpower["game_date"])
+            overview_manpower = overview_manpower[
+                overview_manpower["game_id"].isin(overview_game_ids)
+                & overview_manpower["game_type"].isin(game_types)
+            ].copy()
+        overview_teams = sorted(
+            set(overview_games["home_team"].dropna()) | set(overview_games["away_team"].dropna()),
+            key=lambda abbreviation: TEAM_NAMES.get(abbreviation, abbreviation),
+        )
+        teams_frame = pd.DataFrame({"team": overview_teams})
+
+        max_period_by_game = (
+            overview_plays.groupby("game_id", as_index=False)["period"].max().rename(columns={"period": "max_period"})
+            if not overview_plays.empty else pd.DataFrame({"game_id": [], "max_period": []})
+        )
+        home_results = overview_games[[
+            "game_id", "game_type", "home_team", "away_team", "home_score", "away_score"
+        ]].rename(columns={"home_team": "team", "away_team": "opponent", "home_score": "score_for", "away_score": "score_against"})
+        away_results = overview_games[[
+            "game_id", "game_type", "away_team", "home_team", "away_score", "home_score"
+        ]].rename(columns={"away_team": "team", "home_team": "opponent", "away_score": "score_for", "home_score": "score_against"})
+        result_rows = pd.concat([home_results, away_results], ignore_index=True).merge(max_period_by_game, on="game_id", how="left")
+        result_rows["win"] = result_rows["score_for"].gt(result_rows["score_against"]).astype(int)
+        result_rows["otl"] = (
+            result_rows["score_for"].lt(result_rows["score_against"])
+            & result_rows["game_type"].eq(2)
+            & result_rows["max_period"].fillna(3).gt(3)
+        ).astype(int)
+        result_rows["loss"] = result_rows["score_for"].lt(result_rows["score_against"]).astype(int) - result_rows["otl"]
+        standings = result_rows.groupby("team", as_index=False).agg(
+            games_played=("game_id", "nunique"),
+            wins=("win", "sum"),
+            losses=("loss", "sum"),
+            overtime_losses=("otl", "sum"),
+            points=("win", lambda values: 0),
+        )
+        standings["points"] = 2 * standings["wins"] + standings["overtime_losses"]
+        standings["points_pct"] = standings["points"] / (2 * standings["games_played"])
+
+        if overview_manpower.empty:
+            st.info("Lineup exposure is unavailable for the current overview filters.")
+        else:
+            overview_manpower["category"] = overview_manpower["state"].map(state_category)
+            overview_manpower["stage_key"] = (
+                overview_manpower["state"].astype(str)
+                + "|FG" + overview_manpower["for_goalie"].astype(int).astype(str)
+                + "|AG" + overview_manpower["against_goalie"].astype(int).astype(str)
+            )
+            exposure_category = overview_manpower.groupby(["team", "category"], as_index=False)["seconds"].sum()
+            exposure_stage = overview_manpower.groupby(["team", "stage_key"], as_index=False)["seconds"].sum()
+            team_total_seconds = overview_manpower.groupby("team", as_index=False)["seconds"].sum().rename(columns={"seconds": "total_seconds"})
+
+            overview_goals = overview_plays[overview_plays["event_type"].eq("goal")].copy()
+            if "period_type" in overview_goals:
+                overview_goals = overview_goals[~overview_goals["period_type"].eq("SO")].copy()
+            if overview_goals.empty:
+                goal_view = pd.DataFrame(columns=["team", "category", "stage_key", "raw_goals", "raw_goals_allowed"])
+            else:
+                scoring_home = overview_goals["scoring_team"].eq(overview_goals["home_team"])
+                scoring_team = overview_goals["scoring_team"]
+                allowed_team = np.where(scoring_home, overview_goals["away_team"], overview_goals["home_team"])
+                scoring_goalie = np.where(scoring_home, overview_goals["home_goalie"], overview_goals["away_goalie"]).astype(bool)
+                allowed_goalie = np.where(scoring_home, overview_goals["away_goalie"], overview_goals["home_goalie"]).astype(bool)
+                overview_goals["credited_state"] = overview_goals["official_state"]
+                overview_carry = (
+                    overview_goals["seconds_since_state_change"].le(carryover)
+                    & overview_goals["prior_state"].notna()
+                    & overview_goals["prior_state"].ne(overview_goals["official_state"])
+                )
+                overview_goals.loc[overview_carry, "credited_state"] = overview_goals.loc[overview_carry, "prior_state"]
+                goals_for_view = pd.DataFrame({
+                    "team": scoring_team,
+                    "state": overview_goals["credited_state"],
+                    "team_goalie": scoring_goalie,
+                    "opponent_goalie": allowed_goalie,
+                    "raw_goals": 1.0,
+                    "raw_goals_allowed": 0.0,
+                })
+                goals_allowed_view = pd.DataFrame({
+                    "team": allowed_team,
+                    "state": overview_goals["credited_state"].map(invert_state),
+                    "team_goalie": allowed_goalie,
+                    "opponent_goalie": scoring_goalie,
+                    "raw_goals": 0.0,
+                    "raw_goals_allowed": 1.0,
+                })
+                goal_view = pd.concat([goals_for_view, goals_allowed_view], ignore_index=True)
+                goal_view["category"] = goal_view["state"].map(state_category)
+                goal_view["stage_key"] = (
+                    goal_view["state"].astype(str)
+                    + "|FG" + goal_view["team_goalie"].astype(int).astype(str)
+                    + "|AG" + goal_view["opponent_goalie"].astype(int).astype(str)
+                )
+
+            goals_category = goal_view.groupby(["team", "category"], as_index=False)[["raw_goals", "raw_goals_allowed"]].sum()
+            goals_stage = goal_view.groupby(["team", "stage_key"], as_index=False)[["raw_goals", "raw_goals_allowed"]].sum()
+            raw_goals = goal_view.groupby("team", as_index=False)[["raw_goals", "raw_goals_allowed"]].sum()
+
+            categories = ["Even", "Advantage", "Disadvantage"]
+            category_grid = teams_frame.merge(pd.DataFrame({"category": categories}), how="cross")
+            category_table = (
+                category_grid
+                .merge(exposure_category, on=["team", "category"], how="left")
+                .merge(goals_category, on=["team", "category"], how="left")
+                .fillna({"seconds": 0, "raw_goals": 0, "raw_goals_allowed": 0})
+            )
+            category_table["gf60"] = np.where(category_table["seconds"].gt(0), category_table["raw_goals"] * 3600 / category_table["seconds"], np.nan)
+            category_table["ga60"] = np.where(category_table["seconds"].gt(0), category_table["raw_goals_allowed"] * 3600 / category_table["seconds"], np.nan)
+            category_table["gd60"] = category_table["gf60"] - category_table["ga60"]
+            category_wide = category_table.pivot(index="team", columns="category", values=["gf60", "ga60", "gd60"])
+            category_wide.columns = [f"{category}_{metric}" for metric, category in category_wide.columns]
+            category_wide = category_wide.reset_index()
+
+            stage_seconds = overview_manpower.groupby("stage_key", as_index=False)["seconds"].sum()
+            total_stage_seconds = stage_seconds["seconds"].sum()
+            stage_seconds["league_share"] = stage_seconds["seconds"] / total_stage_seconds
+            league_stage_goals = goal_view.groupby("stage_key", as_index=False)[["raw_goals", "raw_goals_allowed"]].sum()
+            league_stage = stage_seconds.merge(league_stage_goals, on="stage_key", how="left").fillna({"raw_goals": 0, "raw_goals_allowed": 0})
+            league_stage["league_gf_rate"] = np.where(league_stage["seconds"].gt(0), league_stage["raw_goals"] / league_stage["seconds"], 0)
+            league_stage["league_ga_rate"] = np.where(league_stage["seconds"].gt(0), league_stage["raw_goals_allowed"] / league_stage["seconds"], 0)
+
+            team_stage = exposure_stage.merge(goals_stage, on=["team", "stage_key"], how="left").fillna({"raw_goals": 0, "raw_goals_allowed": 0})
+            team_stage["team_gf_rate"] = np.where(team_stage["seconds"].gt(0), team_stage["raw_goals"] / team_stage["seconds"], np.nan)
+            team_stage["team_ga_rate"] = np.where(team_stage["seconds"].gt(0), team_stage["raw_goals_allowed"] / team_stage["seconds"], np.nan)
+            weighted_grid = teams_frame.merge(league_stage[["stage_key", "league_share", "league_gf_rate", "league_ga_rate"]], how="cross")
+            weighted_grid = weighted_grid.merge(
+                team_stage[["team", "stage_key", "team_gf_rate", "team_ga_rate"]],
+                on=["team", "stage_key"], how="left",
+            )
+            weighted_grid["gf_rate"] = weighted_grid["team_gf_rate"].fillna(weighted_grid["league_gf_rate"])
+            weighted_grid["ga_rate"] = weighted_grid["team_ga_rate"].fillna(weighted_grid["league_ga_rate"])
+            weighted_rates = weighted_grid.groupby("team", as_index=False).apply(
+                lambda group: pd.Series({
+                    "weighted_gf_rate": (group["league_share"] * group["gf_rate"]).sum(),
+                    "weighted_ga_rate": (group["league_share"] * group["ga_rate"]).sum(),
+                }),
+                include_groups=False,
+            ).reset_index(drop=True)
+            weighted = teams_frame.merge(team_total_seconds, on="team", how="left").merge(weighted_rates, on="team", how="left")
+            weighted[["total_seconds", "weighted_gf_rate", "weighted_ga_rate"]] = weighted[["total_seconds", "weighted_gf_rate", "weighted_ga_rate"]].fillna(0)
+            weighted["weighted_gf"] = weighted["total_seconds"] * weighted["weighted_gf_rate"]
+            weighted["weighted_ga"] = weighted["total_seconds"] * weighted["weighted_ga_rate"]
+            weighted["weighted_gd"] = weighted["weighted_gf"] - weighted["weighted_ga"]
+
+            table = (
+                teams_frame
+                .merge(standings, on="team", how="left")
+                .merge(raw_goals, on="team", how="left")
+                .merge(category_wide, on="team", how="left")
+                .merge(weighted[["team", "total_seconds", "weighted_gf", "weighted_ga", "weighted_gd"]], on="team", how="left")
+            )
+            fill_zero = ["games_played", "wins", "losses", "overtime_losses", "points", "raw_goals", "raw_goals_allowed", "total_seconds", "weighted_gf", "weighted_ga", "weighted_gd"]
+            table[fill_zero] = table[fill_zero].fillna(0)
+            table["raw_goal_difference"] = table["raw_goals"] - table["raw_goals_allowed"]
+            table["standings_sort"] = table["points_pct"].fillna(0)
+            table = table.sort_values(["standings_sort", "points", "raw_goal_difference", "team"], ascending=[False, False, False, True])
+            table["overview_rank"] = np.arange(1, len(table) + 1)
+
+            league_values = {"team": "League Average", "overview_rank": np.nan}
+            for column in [
+                "games_played", "wins", "losses", "overtime_losses", "points", "points_pct",
+                "raw_goals", "raw_goals_allowed", "raw_goal_difference", "weighted_gf", "weighted_ga", "weighted_gd",
+            ]:
+                league_values[column] = table[column].mean()
+            for metric in ["gf60", "ga60", "gd60"]:
+                for category in categories:
+                    source_column = f"{category}_{metric}"
+                    league_values[source_column] = category_table.groupby("category").apply(
+                        lambda group: (
+                            group["raw_goals"].sum() * 3600 / group["seconds"].sum()
+                            if metric == "gf60" and group["seconds"].sum()
+                            else group["raw_goals_allowed"].sum() * 3600 / group["seconds"].sum()
+                            if metric == "ga60" and group["seconds"].sum()
+                            else (group["raw_goals"].sum() - group["raw_goals_allowed"].sum()) * 3600 / group["seconds"].sum()
+                            if metric == "gd60" and group["seconds"].sum()
+                            else np.nan
+                        ),
+                        include_groups=False,
+                    ).get(category, np.nan)
+            table = pd.concat([table, pd.DataFrame([league_values])], ignore_index=True)
+
+            def number_count(value: float) -> str:
+                return "—" if pd.isna(value) else f"{value:.1f}" if abs(value - round(value)) > 0.05 else f"{int(round(value))}"
+
+            def plus_count(value: float) -> str:
+                return "—" if pd.isna(value) else f"{value:+.1f}" if abs(value - round(value)) > 0.05 else f"{int(round(value)):+d}"
+
+            def rate_text(value: float) -> str:
+                return "—" if pd.isna(value) else f"{value:+.2f}" if value < 0 else f"{value:.2f}"
+
+            display = pd.DataFrame({
+                "Rank": table["overview_rank"].map(lambda value: "League" if pd.isna(value) else f"#{int(value)} / {len(overview_teams)}"),
+                "Team": table["team"].map(lambda value: "League Average" if value == "League Average" else TEAM_NAMES.get(value, value)),
+                "Record": [
+                    f"{gp:.1f} GP; {w:.1f}-{l:.1f}-{otl:.1f}" if team_name == "League Average" else f"{int(gp)} GP; {int(w)}-{int(l)}-{int(otl)}"
+                    for team_name, gp, w, l, otl in zip(table["team"], table["games_played"], table["wins"], table["losses"], table["overtime_losses"])
+                ],
+                "Points Percentage": table["points_pct"].map(lambda value: "—" if pd.isna(value) else f"{value:.2%}"),
+                "Goals Scored": table["raw_goals"].map(number_count),
+                "Goals Allowed": table["raw_goals_allowed"].map(number_count),
+                "Goals Difference": table["raw_goal_difference"].map(plus_count),
+                "Even GF/60": table["Even_gf60"].map(rate_text),
+                "Even GA/60": table["Even_ga60"].map(rate_text),
+                "Even GD/60": table["Even_gd60"].map(rate_text),
+                "Advantage GF/60": table["Advantage_gf60"].map(rate_text),
+                "Advantage GA/60": table["Advantage_ga60"].map(rate_text),
+                "Advantage GD/60": table["Advantage_gd60"].map(rate_text),
+                "Disadvantage GF/60": table["Disadvantage_gf60"].map(rate_text),
+                "Disadvantage GA/60": table["Disadvantage_ga60"].map(rate_text),
+                "Disadvantage GD/60": table["Disadvantage_gd60"].map(rate_text),
+                "Weighted GF": table["weighted_gf"].map(number_count),
+                "Weighted GA": table["weighted_ga"].map(number_count),
+                "Weighted GD": table["weighted_gd"].map(plus_count),
+            })
+
+            def overview_rank_class(rank_value: float) -> str:
+                if pd.isna(rank_value):
+                    return ""
+                rank_number = int(rank_value)
+                total = len(overview_teams) or 32
+                if rank_number <= total / 4:
+                    return "cell-elite"
+                if rank_number <= total / 2:
+                    return "cell-soft-good"
+                if rank_number <= total * 3 / 4:
+                    return "cell-soft-low"
+                return "cell-low"
+
+            heatmap_columns = {
+                "Points Percentage": ("points_pct", False),
+                "Goals Scored": ("raw_goals", False),
+                "Goals Allowed": ("raw_goals_allowed", True),
+                "Goals Difference": ("raw_goal_difference", False),
+                "Even GF/60": ("Even_gf60", False),
+                "Even GA/60": ("Even_ga60", True),
+                "Even GD/60": ("Even_gd60", False),
+                "Advantage GF/60": ("Advantage_gf60", False),
+                "Advantage GA/60": ("Advantage_ga60", True),
+                "Advantage GD/60": ("Advantage_gd60", False),
+                "Disadvantage GF/60": ("Disadvantage_gf60", False),
+                "Disadvantage GA/60": ("Disadvantage_ga60", True),
+                "Disadvantage GD/60": ("Disadvantage_gd60", False),
+                "Weighted GF": ("weighted_gf", False),
+                "Weighted GA": ("weighted_ga", True),
+                "Weighted GD": ("weighted_gd", False),
+            }
+            team_rows = table["team"].ne("League Average")
+            for display_column, (source_column, ascending) in heatmap_columns.items():
+                ranks = table.loc[team_rows, source_column].rank(method="min", ascending=ascending, na_option="bottom")
+                display[f"__class_{display_column}"] = ""
+                display.loc[team_rows, f"__class_{display_column}"] = ranks.map(overview_rank_class).values
+
+            render_league_overview_table(display)
+            st.caption(
+                "Weighted GF/GA estimates each team against the league-average exact state mix "
+                "(state plus goalie-on/off context), then scales it to that team's tracked time. "
+                "If a team has not played a rare exact state yet, the league rate for that state is used as the fallback."
+            )
+    data_footnote()
+
+with tab5:
+    st.subheader("Coverage and Auditability")
+    st.markdown(
+        "Run a local refresh when yesterday's games are still marked live or MoneyPuck has not been picked up yet. "
+        "This refresh uses the seasons and competition selected in the sidebar."
+    )
+    if st.button("Run Data Update", type="primary", use_container_width=True):
+        with st.spinner("Refreshing NHL schedule/game files and MoneyPuck data..."):
+            update_success, update_output = run_data_update(selected_seasons, game_types)
+        st.session_state["last_data_update_success"] = update_success
+        st.session_state["last_data_update_output"] = update_output
+        st.rerun()
+    if "last_data_update_output" in st.session_state:
+        if st.session_state.get("last_data_update_success"):
+            st.success("Data update finished. The table below is reading the refreshed local files.")
+        else:
+            st.warning("Data update finished with a warning or failure. Check the log below.")
+        with st.expander("Latest Data Update Log", expanded=False):
+            st.code(st.session_state["last_data_update_output"], language="text")
+
+    today = pd.Timestamp.today(tz=None).normalize()
+    quality_games = games.copy()
+    quality_games["game_date"] = pd.to_datetime(quality_games["game_date"])
+    quality_games = quality_games[
+        quality_games["game_type"].isin(game_types)
+        & quality_games["game_date"].lt(today)
+    ].sort_values(["game_date", "game_id"], ascending=[False, False]).head(50)
+    processed_ids = set(plays["game_id"].unique()) if not plays.empty else set()
+    moneypuck_quality = read_kinds("moneypuck_shots", selected_seasons)
+    moneypuck_ids = set(moneypuck_quality["game_id"].unique()) if not moneypuck_quality.empty else set()
+    schedule_completed = quality_games["game_state"].isin(["OFF", "FINAL"])
+    schedule_completed_ids = set(quality_games[schedule_completed]["game_id"])
+    needs_schedule_refresh = ~schedule_completed
+    missing_moneypuck = ~quality_games["game_id"].isin(moneypuck_ids)
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("Latest games shown", f"{len(quality_games):,}")
+    c2.metric("NHL loaded", f"{len(set(quality_games['game_id']) & processed_ids):,}")
+    c3.metric("MoneyPuck loaded", f"{len(set(quality_games['game_id']) & moneypuck_ids):,}")
+    c4.metric("Schedule stale", f"{int(needs_schedule_refresh.sum()):,}")
+    c5.metric("Missing MoneyPuck", f"{int(missing_moneypuck.sum()):,}")
+    if quality_games.empty:
+        st.info("No games match the selected seasons and competition through today.")
+    else:
+        coverage = pd.DataFrame({
+            "Date": quality_games["game_date"].dt.strftime("%b %d, %Y"),
+            "Away Team": quality_games["away_team"].map(lambda value: TEAM_NAMES.get(value, value)),
+            "Home Team": quality_games["home_team"].map(lambda value: TEAM_NAMES.get(value, value)),
+            "Schedule State": quality_games["game_state"],
+            "NHL.com Loaded": quality_games["game_id"].isin(processed_ids),
+            "MoneyPuck Loaded": quality_games["game_id"].isin(moneypuck_ids),
+            "Schedule Completed": quality_games["game_id"].isin(schedule_completed_ids),
+            "Needs Schedule Refresh": needs_schedule_refresh,
+            "Game ID": quality_games["game_id"],
+        })
+        render_table(coverage, height=560, primary="Game ID")
     st.markdown(
         "Official event strength and reconstructed shift strength are kept separately. "
         "Use the raw JSON cache to audit any game-level discrepancy."
