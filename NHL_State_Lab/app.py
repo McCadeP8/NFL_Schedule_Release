@@ -507,7 +507,7 @@ def team_cell_html(value: object, *, small: bool = False) -> str:
 def render_table(
     frame: pd.DataFrame,
     *,
-    height: int = 480,
+    height: int | None = 480,
     formats: dict[str, object] | None = None,
     primary: str | None = None,
     pill: str | None = None,
@@ -554,8 +554,9 @@ def render_table(
                 content = f'<span class="table-pill {pill_class}">{content}</span>'
             cells.append(f'<td class="{" ".join(classes)}">{content}</td>')
         rows.append(f'<tr>{"".join(cells)}</tr>')
+    scroll_style = "" if height is None else f' style="max-height:{height}px"'
     st.html(
-        f'<div class="nhl-table-shell"><div class="nhl-table-scroll" style="max-height:{height}px">'
+        f'<div class="nhl-table-shell"><div class="nhl-table-scroll"{scroll_style}>'
         f'<table class="nhl-table"><thead><tr>{"".join(headers)}</tr></thead><tbody>{"".join(rows)}</tbody></table>'
         f'</div></div>'
     )
@@ -620,7 +621,7 @@ def render_league_balance_table(frame: pd.DataFrame) -> None:
             cell_html.append(f'<td class="{" ".join(classes)}">{content}</td>')
         rows.append(f'<tr{row_class}>{"".join(cell_html)}</tr>')
     st.html(
-        '<div class="nhl-table-shell"><div class="nhl-table-scroll" style="max-height:760px">'
+        '<div class="nhl-table-shell"><div class="nhl-table-scroll">'
         '<table class="nhl-table league-balance-table"><thead>'
         '<tr class="group-row"><th rowspan="2">Rank</th><th rowspan="2">Team</th>'
         '<th colspan="6" class="group-neutral">Context</th>'
@@ -666,7 +667,7 @@ def render_league_overview_table(frame: pd.DataFrame) -> None:
             cell_html.append(f'<td class="{" ".join(classes)}">{content}</td>')
         rows.append(f'<tr{row_class}>{"".join(cell_html)}</tr>')
     st.html(
-        '<div class="nhl-table-shell"><div class="nhl-table-scroll" style="max-height:760px">'
+        '<div class="nhl-table-shell"><div class="nhl-table-scroll">'
         '<table class="nhl-table league-overview-table"><thead>'
         '<tr class="group-row"><th rowspan="2">Rank</th><th rowspan="2">Team</th>'
         '<th colspan="8" class="group-neutral">Standings Context</th>'
@@ -2274,7 +2275,7 @@ with tab4:
             ].copy()
             render_table(
                 league_time_mix_display(mix_manpower),
-                height=620,
+                height=None,
                 primary="Team",
             )
     data_footnote()
