@@ -1,6 +1,8 @@
 import html
+import json
 import random
 import time
+import urllib.request
 
 import streamlit as st
 
@@ -12,165 +14,110 @@ st.set_page_config(
 )
 
 
-TEAMS = [
-    {
-        "name": "Wizards",
-        "abbr": "WAS",
-        "balls": 2,
-        "primary": "#002B5C",
-        "secondary": "#E31837",
-        "logo": "https://a.espncdn.com/i/teamlogos/nba/500/was.png",
-    },
-    {
-        "name": "Pacers",
-        "abbr": "IND",
-        "balls": 2,
-        "primary": "#002D62",
-        "secondary": "#FDBB30",
-        "logo": "https://a.espncdn.com/i/teamlogos/nba/500/ind.png",
-    },
-    {
-        "name": "Nets",
-        "abbr": "BKN",
-        "balls": 2,
-        "primary": "#000000",
-        "secondary": "#777777",
-        "logo": "https://a.espncdn.com/i/teamlogos/nba/500/bkn.png",
-    },
-    {
-        "name": "Jazz",
-        "abbr": "UTA",
-        "balls": 3,
-        "primary": "#753BBD",
-        "secondary": "#FFFFFF",
-        "logo": "https://a.espncdn.com/i/teamlogos/nba/500/utah.png",
-    },
-    {
-        "name": "Kings",
-        "abbr": "SAC",
-        "balls": 3,
-        "primary": "#5A2D81",
-        "secondary": "#63727A",
-        "logo": "https://a.espncdn.com/i/teamlogos/nba/500/sac.png",
-    },
-    {
-        "name": "Grizzlies",
-        "abbr": "MEM",
-        "balls": 3,
-        "primary": "#5D76A9",
-        "secondary": "#12173F",
-        "logo": "https://a.espncdn.com/i/teamlogos/nba/500/mem.png",
-    },
-    {
-        "name": "Mavericks",
-        "abbr": "DAL",
-        "balls": 3,
-        "primary": "#00538C",
-        "secondary": "#B8C4CA",
-        "logo": "https://a.espncdn.com/i/teamlogos/nba/500/dal.png",
-    },
-    {
-        "name": "Pelicans",
-        "abbr": "NOP",
-        "balls": 3,
-        "primary": "#0C2340",
-        "secondary": "#C8102E",
-        "logo": "https://a.espncdn.com/i/teamlogos/nba/500/no.png",
-    },
-    {
-        "name": "Bulls",
-        "abbr": "CHI",
-        "balls": 3,
-        "primary": "#CE1141",
-        "secondary": "#000000",
-        "logo": "https://a.espncdn.com/i/teamlogos/nba/500/chi.png",
-    },
-    {
-        "name": "Bucks",
-        "abbr": "MIL",
-        "balls": 3,
-        "primary": "#00471B",
-        "secondary": "#EEE1C6",
-        "logo": "https://a.espncdn.com/i/teamlogos/nba/500/mil.png",
-    },
-    {
-        "name": "Warriors",
-        "abbr": "GSW",
-        "balls": 2,
-        "primary": "#1D428A",
-        "secondary": "#FFC72C",
-        "logo": "https://a.espncdn.com/i/teamlogos/nba/500/gs.png",
-    },
-    {
-        "name": "Clippers",
-        "abbr": "LAC",
-        "balls": 2,
-        "primary": "#C8102E",
-        "secondary": "#1D428A",
-        "logo": "https://a.espncdn.com/i/teamlogos/nba/500/lac.png",
-    },
-    {
-        "name": "Heat",
-        "abbr": "MIA",
-        "balls": 2,
-        "primary": "#98002E",
-        "secondary": "#F9A01B",
-        "logo": "https://a.espncdn.com/i/teamlogos/nba/500/mia.png",
-    },
-    {
-        "name": "Hornets",
-        "abbr": "CHA",
-        "balls": 2,
-        "primary": "#1D1160",
-        "secondary": "#00788C",
-        "logo": "https://a.espncdn.com/i/teamlogos/nba/500/cha.png",
-    },
-    {
-        "name": "Suns",
-        "abbr": "PHX",
-        "balls": 1,
-        "primary": "#1D1160",
-        "secondary": "#E56020",
-        "logo": "https://a.espncdn.com/i/teamlogos/nba/500/phx.png",
-    },
-    {
-        "name": "Magic",
-        "abbr": "ORL",
-        "balls": 1,
-        "primary": "#0077C0",
-        "secondary": "#C4CED4",
-        "logo": "https://a.espncdn.com/i/teamlogos/nba/500/orl.png",
-    },
+STANDINGS_URL = "https://site.api.espn.com/apis/v2/sports/basketball/nba/standings"
+LOTTERY_TEAM_COUNT = 16
+# Balls by lottery seed (worst record first).
+SEED_BALLS = [2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 2, 2, 2, 2, 1, 1]
+
+
+def _team(name: str, abbr: str, primary: str, secondary: str, logo_slug: str) -> dict[str, str]:
+    return {
+        "name": name,
+        "abbr": abbr,
+        "primary": primary,
+        "secondary": secondary,
+        "logo": f"https://a.espncdn.com/i/teamlogos/nba/500/{logo_slug}.png",
+    }
+
+
+ALL_TEAMS = [
+    _team("Hawks", "ATL", "#E03A3E", "#C1D32F", "atl"),
+    _team("Celtics", "BOS", "#007A33", "#BA9653", "bos"),
+    _team("Nets", "BKN", "#000000", "#777777", "bkn"),
+    _team("Hornets", "CHA", "#1D1160", "#00788C", "cha"),
+    _team("Bulls", "CHI", "#CE1141", "#000000", "chi"),
+    _team("Cavaliers", "CLE", "#860038", "#FDBB30", "cle"),
+    _team("Mavericks", "DAL", "#00538C", "#B8C4CA", "dal"),
+    _team("Nuggets", "DEN", "#0E2240", "#FEC524", "den"),
+    _team("Pistons", "DET", "#C8102E", "#1D42BA", "det"),
+    _team("Warriors", "GSW", "#1D428A", "#FFC72C", "gs"),
+    _team("Rockets", "HOU", "#CE1141", "#000000", "hou"),
+    _team("Pacers", "IND", "#002D62", "#FDBB30", "ind"),
+    _team("Clippers", "LAC", "#C8102E", "#1D428A", "lac"),
+    _team("Lakers", "LAL", "#552583", "#FDB927", "lal"),
+    _team("Grizzlies", "MEM", "#5D76A9", "#12173F", "mem"),
+    _team("Heat", "MIA", "#98002E", "#F9A01B", "mia"),
+    _team("Bucks", "MIL", "#00471B", "#EEE1C6", "mil"),
+    _team("Timberwolves", "MIN", "#0C2340", "#78BE20", "min"),
+    _team("Pelicans", "NOP", "#0C2340", "#C8102E", "no"),
+    _team("Knicks", "NYK", "#006BB6", "#F58426", "ny"),
+    _team("Thunder", "OKC", "#007AC1", "#EF3B24", "okc"),
+    _team("Magic", "ORL", "#0077C0", "#C4CED4", "orl"),
+    _team("76ers", "PHI", "#006BB6", "#ED174C", "phi"),
+    _team("Suns", "PHX", "#1D1160", "#E56020", "phx"),
+    _team("Blazers", "POR", "#E03A3E", "#000000", "por"),
+    _team("Kings", "SAC", "#5A2D81", "#63727A", "sac"),
+    _team("Spurs", "SAS", "#C4CED4", "#000000", "sa"),
+    _team("Raptors", "TOR", "#CE1141", "#000000", "tor"),
+    _team("Jazz", "UTA", "#753BBD", "#FFFFFF", "utah"),
+    _team("Wizards", "WAS", "#002B5C", "#E31837", "was"),
+]
+DISPLAY_TEAM_BY_NAME = {team["name"]: team for team in ALL_TEAMS}
+ESPN_NAME_ALIASES = {"Trail Blazers": "Blazers"}
+
+# Used only if the live standings request fails (2025-26 lottery order).
+FALLBACK_ORDER = [
+    "Wizards", "Pacers", "Nets", "Jazz", "Kings", "Grizzlies", "Mavericks", "Pelicans",
+    "Bulls", "Bucks", "Warriors", "Clippers", "Heat", "Hornets", "Suns", "Magic",
+    "Blazers", "Hawks", "Raptors", "76ers", "Lakers", "Timberwolves", "Spurs", "Pistons",
+    "Celtics", "Knicks", "Rockets", "Nuggets", "Cavaliers", "Thunder",
 ]
 
 
-TEAM_BY_NAME = {team["name"]: team for team in TEAMS}
-EXTRA_TEAMS = {
-    "Hawks": {
-        "name": "Hawks",
-        "abbr": "ATL",
-        "primary": "#E03A3E",
-        "secondary": "#C1D32F",
-        "logo": "https://a.espncdn.com/i/teamlogos/nba/500/atl.png",
-    },
-    "Thunder": {
-        "name": "Thunder",
-        "abbr": "OKC",
-        "primary": "#007AC1",
-        "secondary": "#EF3B24",
-        "logo": "https://a.espncdn.com/i/teamlogos/nba/500/okc.png",
-    },
-    "Rockets": {
-        "name": "Rockets",
-        "abbr": "HOU",
-        "primary": "#CE1141",
-        "secondary": "#000000",
-        "logo": "https://a.espncdn.com/i/teamlogos/nba/500/hou.png",
-    },
+@st.cache_data(ttl=900, show_spinner=False)
+def fetch_standings() -> tuple[list[dict[str, object]], str]:
+    """All 30 teams worst record first, plus a status line for the UI."""
+    try:
+        request = urllib.request.Request(STANDINGS_URL, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(request, timeout=10) as response:
+            data = json.load(response)
+        rows = []
+        for conference in data["children"]:
+            for entry in conference["standings"]["entries"]:
+                name = ESPN_NAME_ALIASES.get(entry["team"]["name"], entry["team"]["name"])
+                stats = {stat.get("name"): stat.get("value") for stat in entry["stats"]}
+                rows.append(
+                    {
+                        "name": name,
+                        "wins": int(stats.get("wins") or 0),
+                        "losses": int(stats.get("losses") or 0),
+                        "pct": float(stats.get("winPercent") or 0),
+                    }
+                )
+        if len(rows) != 30 or any(row["name"] not in DISPLAY_TEAM_BY_NAME for row in rows):
+            raise ValueError("unexpected standings payload")
+        # Worst win% first; more losses breaks ties, then last season's order.
+        rows.sort(key=lambda row: (row["pct"], -row["losses"], FALLBACK_ORDER.index(row["name"])))
+        season = (data.get("season") or {}).get("displayName", "")
+        return rows, f"Live {season} standings · updated {time.strftime('%b %d %I:%M %p')}"
+    except Exception:
+        rows = [{"name": name, "wins": None, "losses": None, "pct": None} for name in FALLBACK_ORDER]
+        return rows, "Live standings unavailable — using last season's order"
+
+
+STANDINGS, STANDINGS_STATUS = fetch_standings()
+STANDINGS_ORDER = [str(row["name"]) for row in STANDINGS]
+RECORD_BY_NAME = {
+    str(row["name"]): f"{row['wins']}-{row['losses']}" if row["wins"] is not None else ""
+    for row in STANDINGS
 }
-DISPLAY_TEAM_BY_NAME = {**TEAM_BY_NAME, **EXTRA_TEAMS}
+TEAMS = [
+    {**DISPLAY_TEAM_BY_NAME[name], "balls": SEED_BALLS[index]}
+    for index, name in enumerate(STANDINGS_ORDER[:LOTTERY_TEAM_COUNT])
+]
+TEAM_BY_NAME = {team["name"]: team for team in TEAMS}
 TOTAL_BALLS = sum(team["balls"] for team in TEAMS)
-BOTTOM_PROTECTED_TEAMS = {"Wizards", "Pacers", "Nets"}
+BOTTOM_PROTECTED_TEAMS = {team["name"] for team in TEAMS[:3]}
 BOTTOM_PROTECTED_SLOTS = [12, 11, 10]
 TOP_FIVE_SLOTS = {1, 2, 3, 4, 5}
 AUTO_PULL_SECONDS = 5
@@ -238,10 +185,19 @@ def ensure_state() -> None:
         st.session_state.final_ball_clear_at = None
     if "auto_pull_seconds" not in st.session_state:
         st.session_state.auto_pull_seconds = AUTO_PULL_SECONDS
+    if st.session_state.get("lottery_teams") != list(TEAM_BY_NAME):
+        # Standings changed which teams are in the lottery; start a fresh draw.
+        st.session_state.lottery_teams = list(TEAM_BY_NAME)
+        reset_lottery()
+    if st.session_state.get("last_year_pick", "None") not in {"None", *TEAM_BY_NAME}:
+        st.session_state.last_year_pick = "None"
     if "last_year_pick" not in st.session_state:
-        st.session_state.last_year_pick = "Wizards"
+        st.session_state.last_year_pick = "Wizards" if "Wizards" in TEAM_BY_NAME else "None"
     if "top_five_ineligible" not in st.session_state:
         st.session_state.top_five_ineligible = ["Jazz"]
+    st.session_state.top_five_ineligible = [
+        team for team in st.session_state.top_five_ineligible if team in TEAM_BY_NAME
+    ]
 
 
 def auto_pull_seconds() -> int:
@@ -450,47 +406,117 @@ def draft_picks() -> dict[int, str]:
     )
 
 
+PICK_PROTECTION_NOTES = {
+    "nets_rockets": "Houston can swap first-round picks with Brooklyn and takes the better of the two.",
+    "heat_hornets": "Charlotte receives Miami's pick only if it lands outside the lottery (top 14).",
+    "bucks_pelicans": "New Orleans owns Milwaukee's pick and keeps the better of the two.",
+    "hawks_worse": "Atlanta receives the worse of New Orleans and Milwaukee if that pick lands outside the top 4.",
+    "jazz_trio": "Of the Utah, Cleveland and Minnesota picks: Memphis gets the best, Phoenix the worst, Utah the middle.",
+    "knicks_nets": "Brooklyn receives New York's pick.",
+    "suns_rockets": "Houston receives Phoenix's pick.",
+    "okc_swaps": "OKC owns Denver's pick (top-5 protected) and can swap one pick with the Clippers, who can then swap with Toronto.",
+    "mavs_hornets": "Charlotte receives Dallas' pick if it lands outside the top 2.",
+    "hawks_spurs": "San Antonio receives Atlanta's pick.",
+    "spurs_kings": "Sacramento receives San Antonio's pick if top 16; otherwise Oklahoma City.",
+    "lakers_grizzlies": "Memphis receives the Lakers' pick if it lands outside the top 4.",
+    "sixers_nets": "Brooklyn receives Philadelphia's pick if it lands outside the top 8.",
+}
+TEAMS_BY_NOTE = {
+    "nets_rockets": {"Nets", "Rockets"},
+    "heat_hornets": {"Heat"},
+    "bucks_pelicans": {"Bucks", "Pelicans"},
+    "hawks_worse": {"Bucks", "Pelicans"},
+    "jazz_trio": {"Jazz", "Cavaliers", "Timberwolves"},
+    "knicks_nets": {"Knicks"},
+    "suns_rockets": {"Suns"},
+    "okc_swaps": {"Thunder", "Nuggets", "Clippers", "Raptors"},
+    "mavs_hornets": {"Mavericks"},
+    "hawks_spurs": {"Hawks"},
+    "spurs_kings": {"Spurs"},
+    "lakers_grizzlies": {"Lakers"},
+    "sixers_nets": {"76ers"},
+}
+
+
+def active_protection_notes() -> list[str]:
+    """Notes touching at least one lottery team, numbered in this order."""
+    return [key for key, teams in TEAMS_BY_NOTE.items() if teams & set(TEAM_BY_NAME)]
+
+
+def full_draft_order(picks: dict[int, str]) -> dict[str, int]:
+    """Pick number for all 30 teams. Undrawn lottery teams fill open lottery
+    slots in standings order; non-lottery teams follow by record."""
+    positions = {team: pick for pick, team in picks.items()}
+    open_picks = [pick for pick in range(1, LOTTERY_TEAM_COUNT + 1) if pick not in picks]
+    undrawn = [team["name"] for team in TEAMS if team["name"] not in positions]
+    positions.update(zip(undrawn, open_picks))
+    for pick, team in enumerate(STANDINGS_ORDER[LOTTERY_TEAM_COUNT:], start=LOTTERY_TEAM_COUNT + 1):
+        positions[team] = pick
+    return positions
+
+
+def pick_owners(picks: dict[int, str]) -> dict[str, tuple[str, str]]:
+    """Original team -> (team that currently owns the pick, note key)."""
+    pos = full_draft_order(picks)
+    owners = {team: (team, "") for team in pos}
+
+    def give(original: str, owner: str, note: str) -> None:
+        owners[original] = (owner, note)
+
+    if pos["Nets"] < pos["Rockets"]:
+        give("Nets", "Rockets", "nets_rockets")
+        give("Rockets", "Nets", "nets_rockets")
+    if pos["Heat"] > 14:
+        give("Heat", "Hornets", "heat_hornets")
+
+    better, worse = sorted(["Pelicans", "Bucks"], key=pos.get)
+    give(better, "Pelicans", "bucks_pelicans")
+    if pos[worse] > 4:
+        give(worse, "Hawks", "hawks_worse")
+    else:
+        give(worse, "Pelicans", "bucks_pelicans")
+
+    best, middle, worst = sorted(["Jazz", "Cavaliers", "Timberwolves"], key=pos.get)
+    give(best, "Grizzlies", "jazz_trio")
+    give(middle, "Jazz", "jazz_trio")
+    give(worst, "Suns", "jazz_trio")
+
+    give("Knicks", "Nets", "knicks_nets")
+    give("Suns", "Rockets", "suns_rockets")
+
+    thunder_picks = ["Thunder"] + (["Nuggets"] if pos["Nuggets"] > 5 else [])
+    for team in thunder_picks:
+        give(team, "Thunder", "okc_swaps")
+    clippers_pick = "Clippers"
+    thunder_worst = max(thunder_picks, key=pos.get)
+    if pos["Clippers"] < pos[thunder_worst]:
+        give("Clippers", "Thunder", "okc_swaps")
+        give(thunder_worst, "Clippers", "okc_swaps")
+        clippers_pick = thunder_worst
+    if pos["Raptors"] < pos[clippers_pick]:
+        give("Raptors", "Clippers", "okc_swaps")
+        give(clippers_pick, "Raptors", "okc_swaps")
+
+    if pos["Mavericks"] > 2:
+        give("Mavericks", "Hornets", "mavs_hornets")
+    give("Hawks", "Spurs", "hawks_spurs")
+    give("Spurs", "Kings" if pos["Spurs"] <= 16 else "Thunder", "spurs_kings")
+    if pos["Lakers"] > 4:
+        give("Lakers", "Grizzlies", "lakers_grizzlies")
+    if pos["76ers"] > 8:
+        give("76ers", "Nets", "sixers_nets")
+    return owners
+
+
 def protected_pick_display(picks: dict[int, str], pick_number: int, original_team: str) -> tuple[str, str, str]:
-    pelicans_pick = next((pick for pick, team in picks.items() if team == "Pelicans"), None)
-    bucks_pick = next((pick for pick, team in picks.items() if team == "Bucks"), None)
+    owner, note = pick_owners(picks)[original_team]
+    from_label = f"from {DISPLAY_TEAM_BY_NAME[original_team]['abbr']}" if owner != original_team else ""
+    return owner, from_label, note
 
-    if original_team in {"Pelicans", "Bucks"}:
-        if pelicans_pick and bucks_pick:
-            better_pick = min(pelicans_pick, bucks_pick)
-            worse_pick = max(pelicans_pick, bucks_pick)
-            if pick_number == better_pick:
-                if original_team == "Bucks":
-                    return "Pelicans", "from MIL", "pelicans_better"
-                return "Pelicans", "", "pelicans_better"
-            if pick_number == worse_pick and pick_number > 4:
-                return "Hawks", f"from {TEAM_BY_NAME[original_team]['abbr']}", "hawks_worse"
-            if pick_number == worse_pick:
-                if original_team == "Bucks":
-                    return "Pelicans", "from MIL", "pelicans_better"
-                return "Pelicans", "", "pelicans_better"
-        elif original_team == "Bucks" and pick_number > 4:
-            return "Hawks", "from MIL", "hawks_worse"
-        elif original_team == "Bucks":
-            return "Pelicans", "from MIL", "pelicans_better"
-        elif original_team == "Pelicans" and pick_number > 4:
-            return "Hawks", "from NOP", "hawks_worse"
-        elif original_team == "Pelicans":
-            return "Pelicans", "", "pelicans_better"
 
-    if original_team == "Clippers":
-        return "Thunder", "from LAC", "clippers_thunder"
-    if original_team == "Heat" and pick_number > 14:
-        return "Hornets", "from MIA", "heat_hornets"
-    if original_team == "Jazz":
-        return "Grizzlies", "from UTA", "jazz_grizzlies"
-    if original_team == "Mavericks" and pick_number > 2:
-        return "Hornets", "from DAL", "mavs_hornets"
-    if original_team == "Nets":
-        return "Rockets", "from BKN", "nets_rockets"
-    if original_team == "Suns":
-        return "Rockets", "from PHX", "suns_rockets"
-
-    return original_team, "", ""
+def protection_note_number(note: str) -> str:
+    notes = active_protection_notes()
+    return str(notes.index(note) + 1) if note in notes else ""
 
 
 def inject_css() -> None:
@@ -629,6 +655,12 @@ div[data-testid="stButton"] button[kind="primary"]:hover {
   transform: translateY(-1px);
 }
 
+.standings-status {
+  color: rgba(240,243,245,0.6) !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  margin: -4px 0 8px 0 !important;
+}
 .section-kicker {
   color: var(--light);
   font-size: 13px;
@@ -1365,7 +1397,7 @@ def render_team_tiles() -> None:
   <div class="team-top">
     <div>
       <div class="team-name">{esc(team['name'])}</div>
-      <div class="team-abbr">{esc(team['abbr'])}</div>
+      <div class="team-abbr">{esc(" · ".join(filter(None, [team['abbr'], RECORD_BY_NAME.get(team['name'])])))}</div>
     </div>
     <div class="team-badges">
       <div class="odds-count">{first_pick_pct}</div>
@@ -1382,6 +1414,7 @@ def render_team_tiles() -> None:
     st.markdown(
         f"""
 <div class="section-kicker">Lottery Teams</div>
+<div class="standings-status">{esc(STANDINGS_STATUS)}</div>
 <div class="team-grid">{"".join(cards)}</div>
 """,
         unsafe_allow_html=True,
@@ -1397,19 +1430,10 @@ def render_draft_board() -> None:
             display_team_name, from_label, footnote_key = protected_pick_display(picks, pick_number, team_name)
             team = DISPLAY_TEAM_BY_NAME[display_team_name]
             logo = f'<img src="{esc(team["logo"])}" alt="{esc(team["name"])}">'
-            footnote_numbers = {
-                "hawks_worse": "1",
-                "pelicans_better": "2",
-                "clippers_thunder": "3",
-                "heat_hornets": "4",
-                "jazz_grizzlies": "5",
-                "mavs_hornets": "6",
-                "nets_rockets": "7",
-                "suns_rockets": "8",
-            }
+            footnote_number = protection_note_number(footnote_key)
             footnote_html = (
-                f'<sup class="pick-footnote">{footnote_numbers[footnote_key]}</sup>'
-                if footnote_key
+                f'<sup class="pick-footnote">{footnote_number}</sup>'
+                if footnote_number
                 else ""
             )
             name = f"{esc(team['name'])}{footnote_html}"
@@ -1458,39 +1482,25 @@ def render_draft_board() -> None:
 
 
 def render_pick_protections_note() -> None:
+    items = "".join(
+        f'<div class="protection-item"><sup>{number}</sup> {esc(PICK_PROTECTION_NOTES[key])}</div>'
+        for number, key in enumerate(active_protection_notes(), start=1)
+    )
     st.html(
-        """
+        f"""
 <div class="protections-footnote">
   <strong>Pick Protections:</strong>
-  <div class="protections-list">
-    <div class="protection-item"><sup>1</sup> Atlanta receives the worse of New Orleans and Milwaukee if that pick lands outside the top 4.</div>
-    <div class="protection-item"><sup>2</sup> New Orleans receives the better of its own pick and Milwaukee's pick.</div>
-    <div class="protection-item"><sup>3</sup> Oklahoma City receives the Clippers pick.</div>
-    <div class="protection-item"><sup>4</sup> Charlotte receives Miami's pick only if it lands outside the top 14.</div>
-    <div class="protection-item"><sup>5</sup> Memphis receives Utah's pick.</div>
-    <div class="protection-item"><sup>6</sup> Charlotte receives Dallas' pick if it lands outside the top 2.</div>
-    <div class="protection-item"><sup>7</sup> Houston receives Brooklyn's pick.</div>
-    <div class="protection-item"><sup>8</sup> Houston receives Phoenix's pick.</div>
-  </div>
+  <div class="protections-list">{items}</div>
 </div>
 """
     )
 
 
 def team_protection_footnotes(team_name: str) -> str:
-    footnotes_by_team = {
-        "Pelicans": ["1", "2"],
-        "Bucks": ["1", "2"],
-        "Clippers": ["3"],
-        "Heat": ["4"],
-        "Jazz": ["5"],
-        "Mavericks": ["6"],
-        "Nets": ["7"],
-        "Suns": ["8"],
-    }
     return "".join(
         f'<sup class="odds-footnote">{number}</sup>'
-        for number in footnotes_by_team.get(team_name, [])
+        for number, key in enumerate(active_protection_notes(), start=1)
+        if team_name in TEAMS_BY_NOTE[key]
     )
 
 

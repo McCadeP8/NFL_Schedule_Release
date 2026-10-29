@@ -113,7 +113,7 @@ st.markdown(
     .league-balance-table td.cell-low { background:rgba(197,46,64,.40); color:#fff8f9; font-weight:900; }
     .league-balance-table .league-row td { background:#182b40; color:#ffffff; font-weight:900; border-top:2px solid #496983; }
     .league-balance-table .rank-cell { font-size:15px; font-weight:950; }
-    .league-overview-table { min-width:1880px; font-size:14px; }
+    .league-overview-table { min-width:2040px; font-size:14px; }
     .league-overview-table td { padding:13px 14px; font-size:14px; line-height:1.2; }
     .league-overview-table td.primary { font-size:16px; }
     .league-overview-table thead th { padding:13px 13px; font-size:12px; }
@@ -179,10 +179,195 @@ st.markdown(
 )
 
 
+SORTABLE_TABLE_STYLES = """
+* { box-sizing:border-box; }
+html,body { margin:0; padding:0; background:transparent; color:#f5f7fb; font-family:Arial,sans-serif; }
+.nhl-table-shell { margin:10px 0 25px; overflow:hidden; border:1px solid #263b53; border-radius:14px;
+                   background:#0c1828; box-shadow:0 12px 28px rgba(0,0,0,.18); }
+.nhl-table-scroll { overflow:auto; scrollbar-color:#38506b #0c1828; }
+.nhl-table { width:100%; min-width:760px; border-collapse:separate; border-spacing:0; font-size:13px; }
+.nhl-table thead th { position:sticky; top:0; z-index:3; padding:12px 24px 12px 14px; background:#14263a;
+                      border-bottom:2px solid #2d4863; color:#a9bbcd; text-align:left; font-size:11px;
+                      font-weight:900; letter-spacing:.1em; text-transform:uppercase; white-space:nowrap; }
+.nhl-table thead th.sortable { cursor:pointer; user-select:none; }
+.nhl-table thead th.sortable:hover { color:#fff; background:#1d3650; }
+.nhl-table thead th.sortable::after { content:"↕"; position:absolute; right:8px; opacity:.35; }
+.nhl-table thead th.sort-asc::after { content:"▲"; opacity:1; color:#62d7d3; }
+.nhl-table thead th.sort-desc::after { content:"▼"; opacity:1; color:#62d7d3; }
+.nhl-table tbody tr { background:#0c1828; transition:background .14s ease; }
+.nhl-table tbody tr:nth-child(even) { background:#101f31; }
+.nhl-table tbody tr:hover { background:#173149; }
+.nhl-table td { padding:11px 14px; border-bottom:1px solid #1f3449; color:#dce7f3; white-space:nowrap; }
+.nhl-table td.numeric,.nhl-table th.numeric { text-align:right; font-variant-numeric:tabular-nums; }
+.nhl-table td.primary { color:#fff; font-weight:850; }
+.team-cell { display:inline-flex; align-items:center; gap:9px; font-weight:850; }
+.team-logo { width:26px; height:26px; object-fit:contain; filter:drop-shadow(0 2px 3px rgba(0,0,0,.35)); }
+.team-logo-small { width:21px; height:21px; object-fit:contain; vertical-align:middle; margin-right:7px; }
+.table-pill { display:inline-flex; min-width:48px; justify-content:center; padding:4px 8px; border-radius:999px;
+              font-size:10px; font-weight:900; letter-spacing:.08em; }
+.pill-for { color:#8ff0ce; background:rgba(16,163,127,.17); border:1px solid rgba(38,201,154,.38); }
+.pill-allowed { color:#ff9eaa; background:rgba(201,54,73,.18); border:1px solid rgba(235,102,117,.38); }
+.pill-neutral { color:#b9cadb; background:#1a2c40; border:1px solid #304a64; }
+.nhl-table .group-row th { position:sticky; top:0; z-index:4; padding:9px 12px; color:#fff;
+                           text-align:center; font-size:12px; letter-spacing:.12em; }
+.nhl-table .group-row th[rowspan] { text-align:left; vertical-align:bottom; background:#14263a; }
+.nhl-table .group-neutral { background:#33465a; }
+.nhl-table .group-actual { background:#205f50; }
+.nhl-table .group-expected { background:#285778; }
+.nhl-table .group-difference { background:#674a18; }
+.nhl-table .subhead-row th { top:36px; text-align:right; }
+.game-state-table { min-width:1280px; font-size:16px; }
+.game-state-table td { padding:15px 17px; font-size:16px; line-height:1.25; }
+.game-state-table td.primary { font-size:18px; }
+.game-state-table thead th { padding:14px 25px 14px 16px; font-size:13px; }
+.game-state-table .group-row th { font-size:15px; padding:12px 15px; }
+.game-state-table .subhead-row th { top:43px; font-size:13px; }
+.league-balance-table { min-width:1780px; font-size:14px; }
+.league-overview-table { min-width:2040px; font-size:14px; }
+.league-balance-table td,.league-overview-table td { padding:13px 14px; font-size:14px; line-height:1.2; }
+.league-balance-table td.primary,.league-overview-table td.primary { font-size:16px; }
+.league-balance-table thead th,.league-overview-table thead th { padding:13px 25px 13px 13px; font-size:12px; }
+.league-balance-table .group-row th,.league-overview-table .group-row th { font-size:14px; padding:11px 13px; }
+.league-balance-table .subhead-row th,.league-overview-table .subhead-row th { top:40px; font-size:12px; }
+td.cell-elite { background:rgba(7,132,95,.38); color:#f5fffb; font-weight:900; }
+td.cell-soft-good { background:rgba(104,148,123,.32); color:#f7fffa; font-weight:850; }
+td.cell-soft-low { background:rgba(164,107,117,.32); color:#fff7f8; font-weight:850; }
+td.cell-low { background:rgba(197,46,64,.40); color:#fff8f9; font-weight:900; }
+.league-row td { background:#182b40 !important; color:#fff; font-weight:900; border-top:2px solid #496983; }
+.rank-cell { font-size:15px; font-weight:950; }
+.goals-split { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; align-items:start; }
+.goal-panel { min-width:0; }
+.goal-panel-title { display:flex; align-items:center; justify-content:space-between; margin:0 0 8px;
+                    padding:13px 16px; border-radius:12px 12px 0 0; font-size:22px; font-weight:950; color:#fff; }
+.goal-panel-title small { font-size:11px; color:rgba(255,255,255,.75); text-transform:uppercase; letter-spacing:.1em; }
+.goal-panel.for .goal-panel-title { background:linear-gradient(120deg,#075d48,#0c8b69); }
+.goal-panel.allowed .goal-panel-title { background:linear-gradient(120deg,#761d2a,#b42d40); }
+.goal-panel .nhl-table-shell { margin-top:0; border-radius:0 0 14px 14px; }
+.goal-panel .nhl-table-scroll { max-height:620px; }
+.goal-panel .nhl-table { min-width:710px; }
+.flow-panels { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; align-items:start; }
+.flow-panel { min-width:0; }
+.flow-panel-title { display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin:0;
+                    padding:14px 16px; color:#fff; border-radius:12px 12px 0 0; }
+.flow-panel-title strong { display:block; font-size:20px; line-height:1.05; }
+.flow-panel-title span { color:rgba(255,255,255,.76); font-size:11px; font-weight:850; letter-spacing:.1em; text-transform:uppercase; }
+.flow-panel.for .flow-panel-title { background:linear-gradient(120deg,#075d48,#0c8b69); }
+.flow-panel.final .flow-panel-title { background:linear-gradient(120deg,#31495f,#486984); }
+.flow-panel.against .flow-panel-title { background:linear-gradient(120deg,#761d2a,#b42d40); }
+.flow-panel .nhl-table-shell { margin-top:0; border-radius:0 0 14px 14px; }
+.flow-panel .nhl-table-scroll { max-height:620px; }
+.flow-table { width:100%; min-width:0; table-layout:fixed; font-size:11px; }
+.flow-table thead th { padding:8px 20px 8px 6px; font-size:9px; white-space:normal; line-height:1.1; }
+.flow-table td { padding:8px 6px; white-space:normal; line-height:1.15; vertical-align:top; }
+.flow-table td.primary { font-size:11px; }
+@media (max-width:1100px) { .flow-panels { grid-template-columns:1fr; } }
+@media (max-width:900px) { .goals-split { grid-template-columns:1fr; } }
+"""
+
+
+SORTABLE_TABLE_SCRIPT = r"""
+document.querySelectorAll('table').forEach((table) => {
+  const headerRows = Array.from(table.tHead?.rows || []);
+  if (!headerRows.length || !table.tBodies.length) return;
+  const occupied = [];
+  headerRows.forEach((row, rowIndex) => {
+    occupied[rowIndex] ||= [];
+    let columnIndex = 0;
+    Array.from(row.cells).forEach((cell) => {
+      while (occupied[rowIndex][columnIndex]) columnIndex += 1;
+      const rowSpan = Number(cell.rowSpan || 1);
+      const colSpan = Number(cell.colSpan || 1);
+      for (let r = rowIndex; r < rowIndex + rowSpan; r += 1) {
+        occupied[r] ||= [];
+        for (let c = columnIndex; c < columnIndex + colSpan; c += 1) occupied[r][c] = true;
+      }
+      if (colSpan === 1 && (rowIndex === headerRows.length - 1 || rowSpan > 1)) {
+        const sortColumnIndex = columnIndex;
+        cell.classList.add('sortable');
+        cell.title = 'Click to sort';
+        cell.setAttribute('role', 'button');
+        cell.tabIndex = 0;
+        const sort = () => sortTable(table, cell, sortColumnIndex);
+        cell.addEventListener('click', sort);
+        cell.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); sort(); }
+        });
+      }
+      columnIndex += colSpan;
+    });
+  });
+});
+
+function sortableValue(text) {
+  const value = text.trim().replace(/\u2212/g, '-');
+  if (!value || value === '—') return { missing:true, numeric:false, value:'' };
+  const rank = value.match(/^#?(\d+)\s*\/\s*\d+$/);
+  if (rank) return { missing:false, numeric:true, value:Number(rank[1]) };
+  const clock = value.match(/^([+-]?)(\d+):(\d{2})$/);
+  if (clock) {
+    const sign = clock[1] === '-' ? -1 : 1;
+    return { missing:false, numeric:true, value:sign * (Number(clock[2]) * 60 + Number(clock[3])) };
+  }
+  const percent = value.match(/^([+-]?[\d,.]+)%$/);
+  if (percent) return { missing:false, numeric:true, value:Number(percent[1].replace(/,/g, '')) };
+  const number = value.match(/^([+-]?[\d,.]+)(?:\s|$)/);
+  if (number) return { missing:false, numeric:true, value:Number(number[1].replace(/,/g, '')) };
+  const date = Date.parse(value);
+  if (!Number.isNaN(date) && /[A-Za-z]{3}/.test(value)) return { missing:false, numeric:true, value:date };
+  return { missing:false, numeric:false, value:value.toLocaleLowerCase() };
+}
+
+function sortTable(table, header, columnIndex) {
+  const body = table.tBodies[0];
+  const descending = !header.classList.contains('sort-desc');
+  table.querySelectorAll('th').forEach((cell) => cell.classList.remove('sort-asc', 'sort-desc'));
+  header.classList.add(descending ? 'sort-desc' : 'sort-asc');
+  const rows = Array.from(body.rows);
+  const pinned = rows.filter((row) => row.classList.contains('league-row'));
+  const sortable = rows.filter((row) => !row.classList.contains('league-row'));
+  sortable.sort((left, right) => {
+    const a = sortableValue(left.cells[columnIndex]?.textContent || '');
+    const b = sortableValue(right.cells[columnIndex]?.textContent || '');
+    if (a.missing !== b.missing) return a.missing ? 1 : -1;
+    let comparison;
+    if (a.numeric && b.numeric) comparison = a.value - b.value;
+    else comparison = String(a.value).localeCompare(String(b.value), undefined, { numeric:true, sensitivity:'base' });
+    return descending ? -comparison : comparison;
+  });
+  body.replaceChildren(...sortable, ...pinned); if (Array.from(table.querySelectorAll('thead th')).some((cell) => cell.textContent.trim().toLocaleLowerCase().startsWith('rank'))) sortable.forEach((row, index) => { if (row.cells[0]) row.cells[0].textContent = `#${index + 1} / ${sortable.length}`; });
+}
+"""
+
+
+def render_sortable_markup(markup: str, *, height: int) -> None:
+    document = (
+        f"<!doctype html><html><head><meta charset='utf-8'><style>{SORTABLE_TABLE_STYLES}</style></head>"
+        f"<body>{markup}<script>{SORTABLE_TABLE_SCRIPT}</script></body></html>"
+    )
+    st.iframe(document, width="stretch", height=max(120, int(height)))
+
+
+# Only the columns the app reads; keeps memory low enough for Streamlit Community Cloud.
+LOAD_COLUMNS: dict[str, list[str]] = {
+    "moneypuck_shots": ['away_team', 'away_score_before', 'game_id', 'is_goal', 'home_team', 'home_score_before', 'period', 'team', 'event_team', 'elapsed_seconds', 'xg', 'game_type', 'home_diff_before', 'event_team_diff_before', 'state', 'for_goalie', 'against_goalie'],
+    "plays": ['game_id', 'game_type', 'game_date', 'sort_order', 'event_type', 'period', 'period_type', 'time_in_period', 'elapsed_seconds', 'home_team', 'away_team', 'event_team', 'scoring_team', 'home_score_before', 'away_score_before', 'home_diff_before', 'actor_name', 'away_goalie', 'away_skaters', 'home_skaters', 'home_goalie', 'event_team_diff_before', 'official_state', 'prior_state', 'seconds_since_state_change'],
+    "manpower": ['game_id', 'game_type', 'game_date', 'team', 'opponent', 'period', 'game_minute', 'score_diff', 'score_bucket', 'state', 'for_goalie', 'against_goalie', 'seconds'],
+    "score_states": ['game_id', 'game_type', 'game_date', 'team', 'opponent', 'period', 'game_minute', 'score_diff', 'score_bucket', 'seconds'],
+}
+
+
 @st.cache_data(show_spinner=False)
+def _read_parquet_cached(path: str, modified: float, columns: tuple[str, ...] | None) -> pd.DataFrame:
+    # `modified` keys the cache so nightly data updates are picked up without a restart.
+    return pd.read_parquet(path, columns=list(columns) if columns else None)
+
+
 def read_kind(kind: str, season: int) -> pd.DataFrame:
     path = DATA / f"{kind}_{season}.parquet"
-    return pd.read_parquet(path) if path.exists() else pd.DataFrame()
+    if not path.exists():
+        return pd.DataFrame()
+    columns = LOAD_COLUMNS.get(kind)
+    return _read_parquet_cached(str(path), path.stat().st_mtime, tuple(columns) if columns else None)
 
 
 def read_kinds(kind: str, season_values: list[int]) -> pd.DataFrame:
@@ -203,7 +388,7 @@ def run_data_update(season_values: list[int], game_type_values: list[int]) -> tu
             str(season_value),
             "--game-types",
             *[str(value) for value in game_type_values],
-            "--refresh",
+            "--incremental",
         ]
         try:
             result = subprocess.run(
@@ -225,7 +410,7 @@ def run_data_update(season_values: list[int], game_type_values: list[int]) -> tu
             output_blocks.append(
                 f"$ {' '.join(command)}\n\nTimed out after 15 minutes.\n{timeout_output.strip()}"
             )
-    read_kind.clear()
+    _read_parquet_cached.clear()
     cached_score_flow_entries.clear()
     return success, "\n\n---\n\n".join(output_blocks)
 
@@ -555,11 +740,12 @@ def render_table(
             cells.append(f'<td class="{" ".join(classes)}">{content}</td>')
         rows.append(f'<tr>{"".join(cells)}</tr>')
     scroll_style = "" if height is None else f' style="max-height:{height}px"'
-    st.html(
+    markup = (
         f'<div class="nhl-table-shell"><div class="nhl-table-scroll"{scroll_style}>'
         f'<table class="nhl-table"><thead><tr>{"".join(headers)}</tr></thead><tbody>{"".join(rows)}</tbody></table>'
         f'</div></div>'
     )
+    render_sortable_markup(markup, height=height + 45 if height is not None else 85 + len(frame) * 48)
 
 
 def render_game_state_table(frame: pd.DataFrame) -> None:
@@ -577,7 +763,7 @@ def render_game_state_table(frame: pd.DataFrame) -> None:
             for idx, value in enumerate(cells)
         )
         rows.append(f"<tr>{row_html}</tr>")
-    st.html(
+    markup = (
         '<div class="nhl-table-shell"><div class="nhl-table-scroll" style="max-height:620px">'
         '<table class="nhl-table game-state-table"><thead>'
         '<tr class="group-row"><th rowspan="2">Date</th><th rowspan="2">Game</th><th rowspan="2">Result</th>'
@@ -587,6 +773,7 @@ def render_game_state_table(frame: pd.DataFrame) -> None:
         '<th>GF</th><th>GA</th><th>GD</th></tr></thead>'
         f'<tbody>{"".join(rows)}</tbody></table></div></div>'
     )
+    render_sortable_markup(markup, height=665)
 
 
 def render_league_balance_table(frame: pd.DataFrame) -> None:
@@ -620,7 +807,7 @@ def render_league_balance_table(frame: pd.DataFrame) -> None:
             content = team_cell_html(value) if column == "Team" else html.escape(str(value))
             cell_html.append(f'<td class="{" ".join(classes)}">{content}</td>')
         rows.append(f'<tr{row_class}>{"".join(cell_html)}</tr>')
-    st.html(
+    markup = (
         '<div class="nhl-table-shell"><div class="nhl-table-scroll">'
         '<table class="nhl-table league-balance-table"><thead>'
         '<tr class="group-row"><th rowspan="2">Rank</th><th rowspan="2">Team</th>'
@@ -634,6 +821,7 @@ def render_league_balance_table(frame: pd.DataFrame) -> None:
         '<th>GF Time</th><th>GA Time</th><th>GD/60</th></tr></thead>'
         f'<tbody>{"".join(rows)}</tbody></table></div></div>'
     )
+    render_sortable_markup(markup, height=115 + len(frame) * 48)
 
 
 def render_league_overview_table(frame: pd.DataFrame) -> None:
@@ -643,8 +831,8 @@ def render_league_overview_table(frame: pd.DataFrame) -> None:
     columns = [
         "Rank", "Team", "GP", "W", "L", "OTL", "Points Percentage", "Goals Scored", "Goals Allowed", "Goals Difference",
         "Even GF Time", "Even GA Time", "Even GD/60",
-        "Advantage GF Time", "Advantage GA Time", "Advantage GD/60",
-        "Disadvantage GF Time", "Disadvantage GA Time", "Disadvantage GD/60",
+        "Advantage GF Time", "Advantage GA Time", "Advantage GD/60", "Adj. PP",
+        "Disadvantage GF Time", "Disadvantage GA Time", "Disadvantage GD/60", "Adj. PK",
         "Weighted GF", "Weighted GA", "Weighted GD",
     ]
     rows = []
@@ -666,22 +854,23 @@ def render_league_overview_table(frame: pd.DataFrame) -> None:
             content = team_cell_html(row[column]) if column == "Team" else html.escape(str(row[column]))
             cell_html.append(f'<td class="{" ".join(classes)}">{content}</td>')
         rows.append(f'<tr{row_class}>{"".join(cell_html)}</tr>')
-    st.html(
+    markup = (
         '<div class="nhl-table-shell"><div class="nhl-table-scroll">'
         '<table class="nhl-table league-overview-table"><thead>'
         '<tr class="group-row"><th rowspan="2">Rank</th><th rowspan="2">Team</th>'
         '<th colspan="8" class="group-neutral">Standings Context</th>'
         '<th colspan="3" class="group-actual">Even Strength</th>'
-        '<th colspan="3" class="group-actual">All Advantages</th>'
-        '<th colspan="3" class="group-actual">All Disadvantages</th>'
+        '<th colspan="4" class="group-actual">All Advantages</th>'
+        '<th colspan="4" class="group-actual">All Disadvantages</th>'
         '<th colspan="3" class="group-difference">League-Mix Weighted</th></tr>'
         '<tr class="subhead-row"><th>GP</th><th>W</th><th>L</th><th>OTL</th><th>Pts %</th><th>GF</th><th>GA</th><th>GD</th>'
         '<th>GF Time</th><th>GA Time</th><th>GD/60</th>'
-        '<th>GF Time</th><th>GA Time</th><th>GD/60</th>'
-        '<th>GF Time</th><th>GA Time</th><th>GD/60</th>'
+        '<th>GF Time</th><th>GA Time</th><th>GD/60</th><th>Adj. PP</th>'
+        '<th>GF Time</th><th>GA Time</th><th>GD/60</th><th>Adj. PK</th>'
         '<th>GF</th><th>GA</th><th>GD</th></tr></thead>'
         f'<tbody>{"".join(rows)}</tbody></table></div></div>'
     )
+    render_sortable_markup(markup, height=115 + len(frame) * 48)
 
 
 def league_overview_display(table: pd.DataFrame, total_teams: int) -> pd.DataFrame:
@@ -696,7 +885,7 @@ def league_overview_display(table: pd.DataFrame, total_teams: int) -> pd.DataFra
         "games_played", "wins", "losses", "overtime_losses", "points", "points_pct",
         "raw_goals", "raw_goals_allowed", "raw_goal_difference", "weighted_gf", "weighted_ga", "weighted_gd",
         "Even_gf60", "Even_ga60", "Even_gd60", "Advantage_gf60", "Advantage_ga60", "Advantage_gd60",
-        "Disadvantage_gf60", "Disadvantage_ga60", "Disadvantage_gd60",
+        "Disadvantage_gf60", "Disadvantage_ga60", "Disadvantage_gd60", "adj_pp", "adj_pk",
     ]:
         league_values[column] = table[column].mean() if column in table else np.nan
     league_goal_average = (
@@ -742,9 +931,11 @@ def league_overview_display(table: pd.DataFrame, total_teams: int) -> pd.DataFra
         "Advantage GF Time": table["Advantage_gf60"].map(pace_text),
         "Advantage GA Time": table["Advantage_ga60"].map(pace_text),
         "Advantage GD/60": table["Advantage_gd60"].map(rate_text),
+        "Adj. PP": table["adj_pp"].map(lambda value: "—" if pd.isna(value) else f"{value:.2%}"),
         "Disadvantage GF Time": table["Disadvantage_gf60"].map(pace_text),
         "Disadvantage GA Time": table["Disadvantage_ga60"].map(pace_text),
         "Disadvantage GD/60": table["Disadvantage_gd60"].map(rate_text),
+        "Adj. PK": table["adj_pk"].map(lambda value: "—" if pd.isna(value) else f"{value:.2%}"),
         "Weighted GF": table["weighted_gf"].map(decimal_count),
         "Weighted GA": table["weighted_ga"].map(decimal_count),
         "Weighted GD": table["weighted_gd"].map(lambda value: "—" if pd.isna(value) else f"{value:+.2f}"),
@@ -773,9 +964,11 @@ def league_overview_display(table: pd.DataFrame, total_teams: int) -> pd.DataFra
         "Advantage GF Time": ("Advantage_gf60", False),
         "Advantage GA Time": ("Advantage_ga60", True),
         "Advantage GD/60": ("Advantage_gd60", False),
+        "Adj. PP": ("adj_pp", False),
         "Disadvantage GF Time": ("Disadvantage_gf60", False),
         "Disadvantage GA Time": ("Disadvantage_ga60", True),
         "Disadvantage GD/60": ("Disadvantage_gd60", False),
+        "Adj. PK": ("adj_pk", False),
         "Weighted GF": ("weighted_gf", False),
         "Weighted GA": ("weighted_ga", True),
         "Weighted GD": ("weighted_gd", False),
@@ -872,12 +1065,13 @@ def goal_table_html(frame: pd.DataFrame) -> str:
 def render_goals_split(goals_for: pd.DataFrame, goals_allowed: pd.DataFrame) -> None:
     for_html = goal_table_html(goals_for) if not goals_for.empty else '<div class="nhl-table-shell" style="padding:24px">No goals scored.</div>'
     allowed_html = goal_table_html(goals_allowed) if not goals_allowed.empty else '<div class="nhl-table-shell" style="padding:24px">No goals allowed.</div>'
-    st.html(
+    markup = (
         '<div class="goals-split">'
         f'<section class="goal-panel for"><div class="goal-panel-title">For <small>{len(goals_for)} goals</small></div>{for_html}</section>'
         f'<section class="goal-panel allowed"><div class="goal-panel-title">Allowed <small>{len(goals_allowed)} goals</small></div>{allowed_html}</section>'
         '</div>'
     )
+    render_sortable_markup(markup, height=min(720, 115 + max(len(goals_for), len(goals_allowed), 1) * 46))
 
 
 def render_flow_summary(cards: list[dict[str, str]]) -> None:
@@ -927,13 +1121,14 @@ def render_flow_panels(
     selected_team: str,
 ) -> None:
     display_limit = 100 if selected_team == "All" else None
-    st.html(
+    markup = (
         '<div class="flow-panels">'
         + flow_panel_html("Goal For", "Diff improves by one", for_frame, "for", display_limit=display_limit)
         + flow_panel_html("No More Goals", "State runs to final", final_frame, "final", display_limit=display_limit)
         + flow_panel_html("Goal Against", "Diff worsens by one", against_frame, "against", display_limit=display_limit)
         + '</div>'
     )
+    render_sortable_markup(markup, height=720)
 
 
 def table_html(
@@ -1028,6 +1223,60 @@ def perspective_shots(shots: pd.DataFrame) -> pd.DataFrame:
     out = pd.concat([shooting, defending], ignore_index=True)
     out["score_bucket"] = diff_bucket(out["score_diff"])
     return out
+
+
+def adjusted_special_teams_rates(
+    manpower_frame: pd.DataFrame,
+    shots_frame: pd.DataFrame,
+    teams: list[str],
+) -> pd.DataFrame:
+    """Two-minute goal probabilities implied by each team's observed scoring pace."""
+    if manpower_frame.empty or shots_frame.empty or not teams:
+        return pd.DataFrame(columns=["team", "adj_pp", "adj_pk"])
+
+    exposure = manpower_frame[
+        manpower_frame["state"].isin(["5v4", "4v5"])
+        & manpower_frame["for_goalie"].astype(bool)
+        & manpower_frame["against_goalie"].astype(bool)
+    ].groupby(["team", "state"], as_index=False)["seconds"].sum()
+
+    shot_view = perspective_shots(shots_frame)
+    shot_view = shot_view[
+        shot_view["state"].isin(["5v4", "4v5"])
+        & shot_view["team_goalie"].astype(bool)
+        & shot_view["opponent_goalie"].astype(bool)
+    ]
+    outcomes = shot_view.groupby(["team", "state"], as_index=False)[["agf", "aga"]].sum()
+
+    table = pd.DataFrame({"team": teams})
+    for state, event_column, prefix in [
+        ("5v4", "agf", "pp"),
+        ("4v5", "aga", "pk"),
+    ]:
+        state_values = (
+            exposure[exposure["state"].eq(state)][["team", "seconds"]]
+            .merge(
+                outcomes[outcomes["state"].eq(state)][["team", event_column]],
+                on="team",
+                how="left",
+            )
+            .rename(columns={"seconds": f"{prefix}_seconds", event_column: f"{prefix}_events"})
+        )
+        table = table.merge(state_values, on="team", how="left")
+
+    pp_goal_probability = np.where(
+        table["pp_seconds"].gt(0),
+        -np.expm1(-120 * table["pp_events"].fillna(0) / table["pp_seconds"]),
+        np.nan,
+    )
+    pk_goal_against_probability = np.where(
+        table["pk_seconds"].gt(0),
+        -np.expm1(-120 * table["pk_events"].fillna(0) / table["pk_seconds"]),
+        np.nan,
+    )
+    table["adj_pp"] = pp_goal_probability
+    table["adj_pk"] = 1 - pk_goal_against_probability
+    return table[["team", "adj_pp", "adj_pk"]]
 
 
 def flow_state_label(value: int) -> str:
@@ -1171,7 +1420,7 @@ def build_score_flow_entries(
     return frame
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, ttl=3600)
 def cached_score_flow_entries(
     season_values: tuple[int, ...],
     game_type_values: tuple[int, ...],
@@ -2054,6 +2303,33 @@ with tab4:
         & overview_games["game_type"].isin(game_types)
         & overview_games["game_state"].isin(["OFF", "FINAL"])
     ].copy()
+    special_teams = sorted(
+        set(overview_games["home_team"].dropna()) | set(overview_games["away_team"].dropna()),
+        key=lambda abbreviation: TEAM_NAMES.get(abbreviation, abbreviation),
+    )
+    special_teams_manpower = read_kinds("manpower", selected_seasons)
+    if not special_teams_manpower.empty:
+        special_teams_manpower = special_teams_manpower[
+            special_teams_manpower["game_id"].isin(set(overview_games["game_id"]))
+            & special_teams_manpower["game_type"].isin(game_types)
+        ].copy()
+    special_teams_shots = read_kinds("moneypuck_shots", selected_seasons)
+    if not special_teams_shots.empty:
+        special_teams_shots = special_teams_shots[
+            special_teams_shots["game_id"].isin(set(overview_games["game_id"]))
+            & special_teams_shots["game_type"].isin(game_types)
+        ].copy()
+        if "game_date" not in special_teams_shots:
+            special_teams_shots = special_teams_shots.merge(
+                overview_games[["game_id", "game_date"]].drop_duplicates("game_id"),
+                on="game_id",
+                how="left",
+            )
+    overview_special_teams = adjusted_special_teams_rates(
+        special_teams_manpower,
+        special_teams_shots,
+        special_teams,
+    )
     overview_precomputed = read_kinds("league_overview", selected_seasons)
     if not overview_precomputed.empty:
         overview_precomputed["through_game_date"] = pd.to_datetime(overview_precomputed["through_game_date"])
@@ -2081,6 +2357,7 @@ with tab4:
             overview_precomputed["game_type"].isin(game_types)
             & overview_precomputed["carryover_seconds"].eq(5)
         ].copy()
+        overview_fast = overview_fast.merge(overview_special_teams, on="team", how="left")
         overview_teams = sorted(overview_fast["team"].dropna().unique(), key=lambda abbreviation: TEAM_NAMES.get(abbreviation, abbreviation))
         render_league_overview_table(league_overview_display(overview_fast, len(overview_teams)))
         st.caption(
@@ -2249,6 +2526,7 @@ with tab4:
             fill_zero = ["games_played", "wins", "losses", "overtime_losses", "points", "raw_goals", "raw_goals_allowed", "total_seconds", "weighted_gf", "weighted_ga", "weighted_gd"]
             table[fill_zero] = table[fill_zero].fillna(0)
             table["raw_goal_difference"] = table["raw_goals"] - table["raw_goals_allowed"]
+            table = table.merge(overview_special_teams, on="team", how="left")
             render_league_overview_table(league_overview_display(table, len(overview_teams)))
             st.caption(
                 "Weighted GF/GA estimates each team against the league-average exact state mix "
@@ -2286,7 +2564,8 @@ with tab5:
         "Run a local refresh when yesterday's games are still marked live or MoneyPuck has not been picked up yet. "
         "This refresh uses the seasons and competition selected in the sidebar."
     )
-    if st.button("Run Data Update", type="primary", use_container_width=True):
+    # Updates need the local raw cache; hidden on hosted deploys so visitors cannot trigger downloads.
+    if (ROOT / "data" / "raw").exists() and st.button("Run Data Update", type="primary", use_container_width=True):
         with st.spinner("Refreshing NHL schedule/game files and MoneyPuck data..."):
             update_success, update_output = run_data_update(selected_seasons, game_types)
         st.session_state["last_data_update_success"] = update_success
@@ -2340,3 +2619,5 @@ with tab5:
         "Use the raw JSON cache to audit any game-level discrepancy."
     )
     data_footnote(include_moneypuck=True)
+
+# Source fingerprint: sortable-rank-positions-v2

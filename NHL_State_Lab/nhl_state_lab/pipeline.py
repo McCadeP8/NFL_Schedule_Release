@@ -8,6 +8,7 @@ import pandas as pd
 
 from .api import NHLClient
 from .config import NHL_STATS, NHL_WEB, PROCESSED_DIR, RAW_DIR, TEAM_ABBREVS
+from .html_shifts import html_shift_payload
 from .moneypuck import load_moneypuck
 from .derived_metrics import build_league_overview_metrics
 from .transform import (
@@ -49,11 +50,12 @@ def process_season(
     season: int,
     game_types: list[int],
     refresh: bool = False,
+    incremental: bool = False,
     skip_moneypuck: bool = False,
     limit: int | None = None,
 ) -> None:
     client = NHLClient()
-    games = discover_games(client, season, refresh)
+    games = discover_games(client, season, refresh or incremental)
     games = games[games["game_type"].isin(game_types)].copy()
     completed = games[games["game_state"].isin(["OFF", "FINAL"])].copy()
     if limit:
@@ -87,6 +89,9 @@ def process_season(
                 base / "shifts" / f"{game_id}.json",
                 refresh,
             )
+            if not shifts_json.get("data"):
+                # Stats API sometimes returns empty shift charts; use official HTML TOI reports.
+                shifts_json = html_shift_payload(game_row, pbp, base / "shifts_html", refresh)
             plays = flatten_plays(pbp, game_row)
             shifts = normalize_shifts(shifts_json, pbp, game_row)
             seconds = build_second_states(shifts, plays, game_row)
@@ -118,7 +123,7 @@ def process_season(
 
     if not skip_moneypuck:
         try:
-            shots = load_moneypuck(client, season, RAW_DIR, refresh)
+            shots = load_moneypuck(client, season, RAW_DIR, refresh or incremental)
             save_parquet(shots, PROCESSED_DIR / f"moneypuck_shots_{season}.parquet")
             print(f"MoneyPuck: {len(shots):,} shots")
         except Exception as exc:
@@ -143,6 +148,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--season", type=int, required=True, help="YYYYYYYY, e.g. 20252026")
     parser.add_argument("--game-types", type=int, nargs="+", default=[2, 3])
     parser.add_argument("--refresh", action="store_true")
+    parser.add_argument(
+        "--incremental",
+        action="store_true",
+        help="Refetch schedule and MoneyPuck only; download games not yet cached",
+    )
     parser.add_argument("--skip-moneypuck", action="store_true")
     parser.add_argument("--limit", type=int, default=None, help="Development-only game limit")
     return parser.parse_args()
@@ -154,6 +164,7 @@ if __name__ == "__main__":
         args.season,
         args.game_types,
         refresh=args.refresh,
+        incremental=args.incremental,
         skip_moneypuck=args.skip_moneypuck,
         limit=args.limit,
     )

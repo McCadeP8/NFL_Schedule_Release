@@ -1,9 +1,11 @@
 {
   "season": 20262027,
   "game_types": [
-    2
+    1,
+    2,
+    3
   ],
-  "scheduled_games": 1344,
-  "completed_games": 16,
+  "scheduled_games": 1409,
+  "completed_games": 267,
   "failures": []
 }

@@ -8279,6 +8279,18 @@ def best_ball_projection(roster: pd.DataFrame, superflex: bool) -> float:
     return total
 
 
+def pearson_poll_signature(*frames: pd.DataFrame) -> str:
+    """Fingerprint the Pearson Poll inputs for its disk cache key."""
+    parts = []
+    for frame in frames:
+        if frame is None or frame.empty:
+            parts.append("0")
+            continue
+        hashed = pd.util.hash_pandas_object(frame.astype(str), index=False)
+        parts.append(f"{len(frame)}:{int(hashed.sum()) & 0xFFFFFFFFFFFFFFFF:x}")
+    return "|".join(parts)
+
+
 @st.cache_data(
     persist="disk",
     show_spinner="Calculating the Pearson Poll...",
@@ -8293,9 +8305,11 @@ def build_pearson_poll(
     _schools: pd.DataFrame,
     _rosters: pd.DataFrame,
     _projections: pd.DataFrame,
+    data_signature: str = "",
 ) -> pd.DataFrame:
-    # The source tables are deliberately excluded from Streamlit's cache key.
-    # Refresh controls explicitly clear this cache when live data changes.
+    # The source tables are excluded from Streamlit's cache key; data_signature
+    # stands in for them so new scores or schedules never hit a stale entry.
+    del data_signature
     schedule = _schedule
     npl_schedule = _npl_schedule
     scores = _scores
@@ -8852,6 +8866,7 @@ def render_rankings(
         schools,
         rosters,
         projections,
+        pearson_poll_signature(schedule, npl_schedule, scores, rosters, projections),
     )
     coaches_poll = pearson_poll.copy()
     previous_ap = rank_map(rankings, "AP Poll", selected_week - 1)

@@ -4,3 +4,4 @@ __pycache__/
 .streamlit/secrets.toml
 data/raw/
 data/processed/*.csv
+logs/
