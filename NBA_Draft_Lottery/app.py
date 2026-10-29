@@ -439,8 +439,8 @@ TEAMS_BY_NOTE = {
 
 
 def active_protection_notes() -> list[str]:
-    """Notes touching at least one lottery team, numbered in this order."""
-    return [key for key, teams in TEAMS_BY_NOTE.items() if teams & set(TEAM_BY_NAME)]
+    """All protection notes, numbered in this order (every pick 1-30 is shown)."""
+    return list(TEAMS_BY_NOTE)
 
 
 def full_draft_order(picks: dict[int, str]) -> dict[str, int]:
@@ -1481,6 +1481,50 @@ def render_draft_board() -> None:
     )
 
 
+def render_non_lottery_board() -> None:
+    picks = draft_picks()
+    owners = pick_owners(picks)
+
+    def pick_row(pick_number: int) -> str:
+        original_team = STANDINGS_ORDER[pick_number - 1]
+        owner, footnote_key = owners[original_team]
+        team = DISPLAY_TEAM_BY_NAME[owner]
+        footnote_number = protection_note_number(footnote_key)
+        footnote_html = f'<sup class="pick-footnote">{footnote_number}</sup>' if footnote_number else ""
+        tags = []
+        if owner != original_team:
+            tags.append(f"from {DISPLAY_TEAM_BY_NAME[original_team]['abbr']}")
+        if RECORD_BY_NAME.get(original_team):
+            tags.append(RECORD_BY_NAME[original_team])
+        tag_html = "".join(f'<span class="pick-tag">{esc(tag)}</span>' for tag in tags)
+        return f"""
+<div class="pick-row">
+  <div class="pick-number">{pick_number}</div>
+  <div class="pick-logo"><img src="{esc(team['logo'])}" alt="{esc(team['name'])}"></div>
+  <div class="pick-team">{esc(team['name'])}{footnote_html}{tag_html}</div>
+</div>
+"""
+
+    left = "".join(pick_row(i) for i in range(17, 24))
+    right = "".join(pick_row(i) for i in range(24, 31))
+    st.markdown(
+        f"""
+<div class="section-kicker">Non-Lottery Picks (By Record)</div>
+<div class="draft-board">
+  <div class="draft-column">
+    <div class="draft-header">Picks 17-23</div>
+    {left}
+  </div>
+  <div class="draft-column">
+    <div class="draft-header">Picks 24-30</div>
+    {right}
+  </div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+
 def render_pick_protections_note() -> None:
     items = "".join(
         f'<div class="protection-item"><sup>{number}</sup> {esc(PICK_PROTECTION_NOTES[key])}</div>'
@@ -1747,6 +1791,7 @@ with right_col:
 
     render_latest_ball()
     render_draft_board()
+    render_non_lottery_board()
 
 render_lottery_odds_table()
 render_pick_protections_note()
